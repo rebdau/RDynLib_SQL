@@ -41,10 +41,23 @@
 Aligning_General_SQL <- function(FT_con, QTOF_con, FT_expnr, QTOF_expnr, err,
                                  t.ini) {
 
-    ft_sql  <- dbGetQuery(FT_con, paste0("SELECT * FROM ms_compound where ",
-                                         "expid = ", FT_expnr))
-    syn_sql <- dbGetQuery(QTOF_con, paste0("SELECT * FROM ms_compound where ",
-                                           "expid = ", QTOF_expnr))
+   ft_sql <- dbGetQuery(
+                FT_con, paste0("SELECT c.* FROM ms_compound c WHERE EXISTS (
+                   SELECT 1
+                   FROM msms_spectrum p
+                   WHERE p.compound_id = c.compound_id
+                     AND p.expid = ", FT_expnr, "
+                 )"
+                )
+              )
+              
+    
+    syn_sql <- dbGetQuery(
+                QTOF_con, paste0("SELECT c.* FROM ms_compound c WHERE EXISTS (
+                   SELECT 1
+                   FROM msms_spectrum p
+                   WHERE p.compound_id = c.compound_id 
+                                           AND p.expid = ", QTOF_expnr))
 
     ft_mode  <- dbGetQuery(FT_con, "SELECT mode FROM experiment")$mode[1]
     syn_mode <- dbGetQuery(QTOF_con, "SELECT mode FROM experiment")$mode[1]
