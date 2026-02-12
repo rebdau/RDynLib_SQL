@@ -1,4 +1,4 @@
-EnterName<-function(base.dir,finlist,dbkey,SubDB){
+EnterName<-function(base.dir, finlist, dbkey, SubDB){
 	TMP<-SelectSubDB(base.dir,finlist,SubDB)
 	setwd(TMP[[3]])
 	CmpCSV<-read.table("compound.csv",header=T,sep="\t",stringsAsFactors=F)

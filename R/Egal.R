@@ -156,3 +156,5 @@ Egal<-function(base.dir,finlist,SubDB,file2=NULL,file4=NULL){
 }
 
 # file<-Egal(base.dir,finlist,SubDB="QTOFneg")
+
+

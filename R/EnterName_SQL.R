@@ -57,76 +57,16 @@
 #'
 #' @export
 EnterName_SQL <- function(data_path, CoMPID){
-
+  
   # connect to database
   data_con <- dbConnect(SQLite(), data_path)
   on.exit(dbDisconnect(data_con), add = TRUE)
   
-<<<<<<< HEAD
-  CmpCSV<-read.table("compound.csv",header=T,sep="\t",stringsAsFactors=F)
-  # compound.csv might be a shrunk version of the initial database, just containing
-  # the selected experiment, then, row number is not equal to the COMPID:
-  dbkey<-which(as.integer(CmpCSV["compound_id"])%in%as.integer(dbkey))
-  #ConcatName<-read.table("compound_name.txt",header=T,sep="\t",stringsAsFactors=F)
-  print("Currently, this info for your dbkey is present:")
-  print(paste("COMPID: ",CmpCSV[dbkey, "compound_id"],sep=""))
-  print(paste("COMPNAME: ",CmpCSV[dbkey, "name"],sep=""))
-  print(paste("FORMULA: ",CmpCSV[dbkey, "formula"],sep=""))
-  print(paste("MASS_MEASURED: ",CmpCSV[dbkey, "mass_measured"],sep=""))
-  print(paste("PPM_DEVIATION: ",CmpCSV[dbkey, "ppm_deviation"],sep=""))
-  print(paste("RETENTION_TIME: ",CmpCSV[dbkey, "retention_time"],sep=""))
-  print(paste("EXPID: ",CmpCSV[dbkey, "expid"],sep=""))
-  print(paste("SMILES: ",CmpCSV[dbkey, "smiles"],sep=""))
-  rm_sel=""
-  while (rm_sel=="") rm_sel<-toupper(c(readline("Initials first and last name:")))
-  if (nchar(rm_sel)!=2) {
-    print("Should be 2 characters long.")
-    return()
-  }
-  print("Info regarding structural confidence of the given name:")
-  print("ID, identified via NMR or spiking of standard")
-  print("AN, annotated, reasonably certain that the given name is correct")
-  print("KA, characterized, highly certain that the main structure invoked by the name is ok,")
-  print("    but e.g. moiety linkages or stereomer configuration might be wrong")
-  print("PU, putative, uncertain - might as well be another structural isomer")
-  rm_sel1=""
-  while (rm_sel1=="") rm_sel1<-toupper(c(readline("Structural confidence level:")))
-  if (nchar(rm_sel1)!=2) {
-    print("Should be 2 characters long.")
-    return()
-  }
-  rm_sel1<-paste(rm_sel1," ",sep="")
-  #print("Give structural moieties separated by ' + ' as a concatenated name.")
-  #rm_selQ<-readline("Concatenated name:")
-  print("For the following name, replace comma by underscore and primes by the abbreviation pr")
-  rm_sel2=""
-  while (rm_sel2=="") rm_sel2<-tolower(c(readline("Name:")))
-  rm_sel2<-paste(rm_sel2," ",sep="")
-  print("Is it a buffer adduct? E.g. acetate or formate? If not, press enter.")
-  rm_sel3<-substr(toupper(c(readline("Adduct:"))),1,4)
-  if (rm_sel3!="") rm_sel3<-paste(rm_sel3," ",sep="")
-  print("Is it an isotope, e.g. 13C, 34S, 37Cl, 13C34S? If not, press enter.")
-  rm_sel4<-c(readline("Isotope:"))
-  if (rm_sel4!="") rm_sel4<-paste(rm_sel4," ",sep="")
-  print("Do you think it is an in-source fragment? If not, press enter, else say yes")
-  rm_sel5<-c(readline("In-source fragment:"))
-  if (rm_sel5!="") rm_sel5<-"ISF "
-  print("Do you think it is an odd electron ion? If not, press enter, else say yes")
-  rm_sel6<-c(readline("Odd electron ion:"))
-  if (rm_sel6!="") rm_sel6<-"OE "
-  print("Is it a complex between the neutral molecule and its ion, i.e. a 'dimer'? If not, press enter.")
-  rm_sel8<-c(readline("Ion-neutral complex of molecule:"))
-  if (rm_sel8!="") rm_sel8<-"DIM "
-  print("Is it a complex between (a) neutral(s) and an ion of different species, i.e. a 'heteromer'? If not, press enter.")
-  rm_sel9<-c(readline("Ion-neutral complex:"))
-  if (rm_sel9!="") rm_sel9<-"ADD "
-=======
   # read compound
   cmp_data <- dbGetQuery(
     data_con,
     paste0("SELECT * FROM ms_compound WHERE compound_id = ", as.integer(CoMPID))
   )
->>>>>>> dev_Ahlam
   
   if (nrow(cmp_data) == 0) {
     stop("No compound found for compound_id = ", CoMPID)
@@ -219,8 +159,6 @@ EnterName_SQL <- function(data_path, CoMPID){
     )
   }
   
-
-
   # optional metadata
   formul <- gsub(" ", "", toupper(readline("Formula (enter if none): ")), fixed = TRUE)
   smiles <- readline("SMILES (enter if none): ")
