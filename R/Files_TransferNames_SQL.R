@@ -5,8 +5,8 @@
 #' subdatabase specific compound tables based on the database names defined
 #' in a compound association file. 
 #'   
-#' @param sqlite_path Character string. Path to the SQLite database containing
-#'   the \code{ms_compound} table.
+#' @param sqlite_dir Character string. Directory containing SQLite databases.
+#'   Each database file must be named <database_name>.sqlite.
 #' @param assoc_path Character string. Path to the association file defining
 #'   reference and target databases and compound ID mappings.
 #'
@@ -21,13 +21,12 @@
 #' @author Ahlam Mentag
 #' 
 #' @export
-Files_TransferNames_SQL <- function(sqlite_path, assoc_path) {
+Files_TransferNames_SQL <- function(sqlite_dir, assoc_path) {
   
   library(DBI)
   library(RSQLite)
   
-
-  #Read association file
+  # Read association file
   Assoc <- read.table(
     assoc_path,
     header = TRUE,
@@ -45,26 +44,21 @@ Files_TransferNames_SQL <- function(sqlite_path, assoc_path) {
   ref_db    <- ref_db[1]
   target_db <- target_db[1]
   
-
-  #Connect to SQLite
-  con <- dbConnect(SQLite(), sqlite_path)
-  on.exit(dbDisconnect(con), add = TRUE)
-  
-
-  #Helper to read compounds
+  # Helper function that connects to the correct database
   read_compounds <- function(db_name) {
+    
+    sqlite_path <- file.path(sqlite_dir, paste0(db_name, ".sqlite"))
+    
+    if (!file.exists(sqlite_path)) {
+      stop(paste("Database file not found:", sqlite_path))
+    }
+    
+    con <- dbConnect(SQLite(), sqlite_path)
+    on.exit(dbDisconnect(con), add = TRUE)
     
     df <- dbGetQuery(
       con,
-      paste0(
-        "SELECT
-           compound_id ,
-           name,
-           subsid,
-           smiles
-         FROM ms_compound
-         WHERE source_database = '", db_name, "'"
-      )
+      "SELECT compound_id, name, subsid, smiles FROM ms_compound"
     )
     
     df[] <- lapply(df, as.character)
@@ -73,12 +67,16 @@ Files_TransferNames_SQL <- function(sqlite_path, assoc_path) {
     df
   }
   
-
-  ## Load sub-databases
+  # Load both databases
   ftng <- read_compounds(ref_db)
   ftps <- read_compounds(target_db)
   
   syn <- unique(rbind(ftng, ftps))
   
-  return(list(ftng, ftps, syn, Assoc))
+  return(list(
+    ftng = ftng,
+    ftps = ftps,
+    syn  = syn,
+    Assoc = Assoc
+  ))
 }

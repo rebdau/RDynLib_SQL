@@ -1,43 +1,66 @@
 #' @title Transfer compound names across SQLite sub-databases.
 #' 
-#' @description SubDBNameTransfer_SQL() function propagates compound names, 
+#' @description SubDBNameTransfer_SQL() propagates compound names,
 #' identifiers, and SMILES strings between associated compounds stored
-#' in a SQLite database. Associations are provided via a single association file
-#' defining reference and target compound IDs.
+#' in separate SQLite databases (one per sub-database).
 #'
-#' @param sqlite_path Character string. Path to the SQLite database containing
-#'   the \code{ms_compound} table.
+#' @param sqlite_dir Character string. Directory containing SQLite databases.
+#'   Each database file must be named <database_name>.sqlite.
+#'   
 #' @param assoc_path Character string. Path to the association file defining
-#'   reference and target compound_ids of two aligned compounds.
+#'   reference and target compound_ids.
 #'
-#' @return Updates compound names, SUBSID, and SMILES directly in the SQLite
-#'   database using compound IDs.
+#' @return A data frame of compounds having multiple mappings.
 #'
 #' @author Ahlam Mentag
 #' 
 #' @export
-SubDBNameTransfer_SQL <- function(sqlite_path, assoc_path) {
+SubDBNameTransfer_SQL <- function(sqlite_dir, assoc_path) {
   
   library(DBI)
   library(RSQLite)
   
-  # Load names and associations
-  Names_lst <- Files_TransferNames_SQL(
-    sqlite_path = sqlite_path,
-    assoc_path  = assoc_path
+  # Read association file
+  Assoc <- read.table(
+    assoc_path,
+    header = TRUE,
+    sep = "\t",
+    stringsAsFactors = FALSE
   )
   
-  #Transfer names
+  ref_db    <- unique(Assoc$ref_database)
+  target_db <- unique(Assoc$target_database)
+  
+  if (length(ref_db) != 1 || length(target_db) != 1) {
+    stop("Association file must contain exactly one ref and one target database")
+  }
+  
+  ref_db    <- ref_db[1]
+  target_db <- target_db[1]
+  
+  # Load compound metadata from both databases
+  Names_lst <- Files_TransferNames_SQL(
+    sqlite_dir = sqlite_dir,
+    assoc_path = assoc_path
+  )
+  
+  # Perform name transfer logic
   transfertNam <- TransferNames_SQL(Names_lst)
   
   Updated_Names <- transfertNam[[1]]
   Mult.frame    <- transfertNam[[2]]
-
-  # Write back to SQLite
-  con <- dbConnect(SQLite(), sqlite_path)
-  on.exit(dbDisconnect(con), add = TRUE)
   
-  update_table <- function(df) {
+  # Helper function to update one database
+  update_database <- function(db_name, df) {
+    
+    sqlite_path <- file.path(sqlite_dir, paste0(db_name, ".sqlite"))
+    
+    if (!file.exists(sqlite_path)) {
+      stop(paste("Database file not found:", sqlite_path))
+    }
+    
+    con <- dbConnect(SQLite(), sqlite_path)
+    on.exit(dbDisconnect(con), add = TRUE)
     
     for (i in seq_len(nrow(df))) {
       
@@ -55,10 +78,11 @@ SubDBNameTransfer_SQL <- function(sqlite_path, assoc_path) {
       )
     }
   }
+
   
-  update_table(Updated_Names[[1]])  # ref
-  update_table(Updated_Names[[2]])  # target
-  update_table(Updated_Names[[3]])  # syn (if needed)
+  update_database(ref_db,    Updated_Names[[1]])
+  update_database(target_db, Updated_Names[[2]])
   
   return(Mult.frame)
 }
+
