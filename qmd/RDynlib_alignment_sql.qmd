@@ -1,0 +1,174 @@
+---
+title: "RDynLib_alignment"
+author: "Rebecca Dauwe"
+format: html
+tbl-cap-location: bottom
+editor: source
+date: 'Compiled: `r format(Sys.Date(), "%B %d, %Y")`'
+---
+
+# Introduction
+
+In this document, we upload the existing DynLib library and RDynLib package and align DynLib subdatabases
+
+# Upload the RDynLib package
+
+All functions of the RDynLib package are in the R subfolder. By running `devtools::load_all`we can immediately use and test all functions in the RDynLib folder and subfolders.
+
+```{r}
+#| message: false
+
+#' Load required libraries
+library(devtools)
+#rm(list = c("convert_compid_assoc"))
+#` Uploading RDynLib: Load all functions of the RDynlib directory
+load_all()
+```
+
+
+
+### Example: Running `LCalign` on FT/QTOF Data
+
+
+
+```{r}
+# Select example experiment numbers
+expnr.ft <- 191
+expnr.syn <- 38
+
+# Optional parameters
+err <- 0.02
+t.ini <- 5
+
+#SQL databases paths
+FT_path <- "C:/Users/amentag/Desktop/these/These/clones/RDynlib/RDynLib/Similarity/FTMS/data/DYL_FLAX_FTMSneg.sqlite"
+QTOF_path <- "C:/Users/amentag/Desktop/these/These/clones/RDynlib/RDynLib/Similarity/QTOF/data/DYL_FLAX_QTOFneg.sqlite"
+
+FT_con <- DBI::dbConnect(RSQLite::SQLite(), FT_path)
+QTOF_con <- DBI::dbConnect(RSQLite::SQLite(), QTOF_path)
+  
+align_SQL <- Aligning_General_SQL(FT_con, QTOF_con, expnr.ft, expnr.syn, err, t.ini)
+
+head(align_SQL)
+nrow(align_SQL)
+```
+
+
+
+## (2) Remove false positives based on spectral match
+The `matchFTSyn` function removes false positive FTm/z, QTOFm/z peak pairs by checking whether a certain percentage of the MS2 spectral peaks can be traced in the MS/MS spectrum. 
+By default, 60% of the MS2 peaks should be traced in the MS/MS spectrum as the MS2 spectrum is much less crowded.
+
+### Input
+
+```{r}
+LCal_sql <- matchFTSyn_SQL(align_SQL, FT_con, QTOF_con, minIon = 0.6)
+head(LCal_sql)
+nrow(LCal_sql)
+```
+
+## (3) Remove outliers based on retention time difference
+The `RemoveOutliers` function 
+looks at the retention time difference between matched peaks (LCal[,6]);
+`rng` is the number of standard deviations that the retention time difference can deviate from the mean retention time difference:
+computes mean ± (rng × SD);
+removes all rows outside that range.
+
+```{r}
+#We use the same function as the last version
+LCal_sql <- RemoveOutliers(LCal_sql, rng = 2)
+head(LCal_sql)
+nrow(LCal_sql)
+```
+
+## (4) Regression
+The `RegressionPie_LCalign` function computes regression between FT and QTOF chromatograms. 
+Deviations from a straight curve might occur as different LC systems are involved. Therefore, a piecewise regression is performed including at most two knots. 
+
+By looking at the result from multiple experiments, robust regression
+was more accurate than traditional least squares. 
+The 'startpoint' allows to decide on the FT retention time from which regression should be started. 
+
+```{r}
+rg_sql <- RegressionPie_LCalign_SQL(LCal_sql, startpoint = 1)
+head(rg_sql)
+```
+
+## (5) Plot Regression line
+Plot FT retention times (Y-axis; LCal[,2]) in function of Synapt retention times
+(X-axis; LCal[,4])
+
+```{r}
+PlotPie_LCalign(LCal_sql,rg_sql)
+```
+
+# Create Association table
+
+The `Aligning_FT_QTOF()` function is the wrapper function that manages the full above alignment workflow for a specific FT run, including interactive steps.
+
+
+`Aligning_FT_QTOF()` returns an updated Assoc table with aligned COMPIDS
+
+### Example: Running `LCalign` on FT/QTOF Data
+
+```{r}
+FT_con <- dbConnect(SQLite(), FT_path)
+QTOF_con <- dbConnect(SQLite(), QTOF_path)
+fill <- FillAssocFTnQTOFn_SQL(FT_con, QTOF_con, assoc_path, FT_expnr, QTOF_expnr,
+                                       cutoff = 1, rg_sql, lc.err = 1, err, minIon = 0.6,
+                                       polarity_ft = 0, polarity_qtof = 0)
+```
+
+
+```{r}
+
+
+
+FT_path <- "C:/Users/amentag/Desktop/these/These/clones/new_clones/RDynLib/Similarity/FTMS/data/DYL_FLAX_FTMSneg.sqlite"
+QTOF_path <- "C:/Users/amentag/Desktop/these/These/clones/new_clones/RDynLib/Similarity/QTOF/data/DYL_FLAX_QTOFneg.sqlite"
+
+assoc_path <- "C:/Users/amentag/Desktop/these/These/clones/new_clones/RDynLib/New_Dynlib/data/combined_assoc.txt"
+
+Assoc_SQL <-Aligning_FT_QTOF_SQL(
+  FT_path = FT_path,
+  QTOF_path = QTOF_path,
+  FT_expnr = 191,
+  QTOF_expnr = 38,
+  Assoc = assoc_path,
+  startpoint = 1,
+  save_assoc = FALSE
+)
+
+
+                              
+```
+
+
+```{r}
+
+tail(Assoc_SQL)
+
+```
+
+
+```{r}
+print(Assoc_SQL)
+```
+
+The number of new added alignment rows
+```{r}
+Assoc_before <- read.table(assoc_path, header = TRUE, sep = "\t", stringsAsFactors = FALSE)
+Assoc_before <- nrow(Assoc_before)
+Assoc_after <- nrow(Assoc_SQL)
+n_new <- Assoc_after - Assoc_before
+n_new
+```
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,635 @@
+---
+title: "Untitled"
+format: html
+server: shiny
+---
+
+---
+title: "Untitled"
+format: html
+server: shiny
+---
+
+In this Quarto document, we create four embedded MongoDB databases from four existing SQL DynLib databases. We transform the relational structure of the SQL databases into a collection-based NoSQL format, and finally, we benchmark queries on both types of databases.
+
+```{r}
+library(RSQLite)
+library(mongolite)
+library(jsonlite)
+library(dplyr)
+library(stringi)
+library(DBI)
+library(janitor)
+library(microbenchmark)
+pth <- getwd()
+pth
+
+```
+
+```{r}
+#define SQLite documents
+sqlite_files <- c("data/Dylib_FTMS_neg_or.sqlite", 
+                  "data/Dylib_FTMS_pos2.sqlite",
+                  "data/Dylib_QTOF_neg.sqlite", 
+                  "data/Dylib_QTOF_pos.sqlite")
+
+#giving names for the resulting MongoDb databases
+mongo_dbs <- c("Dylib_FTMS_neg_mongo2", "Dylib_FTMS_pos_mongo2",
+               "Dylib_QTOF_neg_mongo2", "Dylib_QTOF_pos_mongo2")
+
+#giving names for the resulting MongoDb collections
+mongo_collections <- c("coll_FTMS_neg2", "coll_FTMS_pos2", 
+                       "coll_QTOF_neg2", "coll_QTOF_pos2")
+
+```
+
+```{r}
+
+# Cleaning columns
+clean_utf8 <- function(df) {
+  df[] <- lapply(df, function(col) {
+    if (is.character(col)) stri_encode(col, "", "UTF-8") else col
+  })
+  return(df)
+}
+
+```
+
+```{r}
+# Create a folder for saving the resulting json files
+json_dir <- "data/embaded2_json"
+if (!dir.exists(json_dir)) {
+  dir.create(json_dir, recursive = TRUE)
+}
+```
+
+```{r}
+# Loop over SQLite files
+for (i in seq_along(sqlite_files)) {
+  sqlite_file <- sqlite_files[i]
+  mongo_db <- mongo_dbs[i]
+  mongo_collection <- mongo_collections[i]
+
+  message("\nProcessing ", basename(sqlite_file))
+
+  con <- dbConnect(SQLite(), sqlite_file)
+
+  # Read & clean tables
+  experiment_tbl <- dbReadTable(con, "experiment") %>% clean_utf8()
+  msms_spectrum_tbl <- dbReadTable(con, "msms_spectrum") %>% clean_utf8()
+  msms_peak_tbl <- dbReadTable(con, "msms_spectrum_peak") %>% clean_utf8()
+  compound_tbl <- dbReadTable(con, "ms_compound") %>% clean_utf8()
+
+  dbDisconnect(con)
+
+  # Insert experiment collection
+  mongo_exp <- mongo(collection = "experiment", db = mongo_db)
+  mongo_exp$remove('{}')
+  mongo_exp$insert(experiment_tbl)
+  message("Experiment collection inserted with ", nrow(experiment_tbl), " documents")
+
+  # Group peaks and compounds
+  peaks_by_spec <- split(msms_peak_tbl, msms_peak_tbl$spectrum_id)
+  compound_by_id <- split(compound_tbl, compound_tbl$compound_id)
+
+  # Build spectrum documents
+  link_docs <- lapply(seq_len(nrow(msms_spectrum_tbl)), function(idx) {
+    spec_row <- as.list(msms_spectrum_tbl[idx, , drop = FALSE])
+    spec_id <- spec_row$spectrum_id
+    cmp_id <- spec_row$compound_id
+
+    # Structure peaks as array of objects
+    peaks <- peaks_by_spec[[as.character(spec_id)]]
+    if (!is.null(peaks)) {
+      spec_row$peaks <- lapply(seq_len(nrow(peaks)), function(j) {
+        list(mz = as.numeric(peaks$mz[j]), intensity = as.numeric(peaks$intensity[j]))
+      })
+    } else {
+      spec_row$peaks <- list()
+    }
+
+    # Array of compound objects
+    compound <- compound_by_id[[as.character(cmp_id)]]
+    if (!is.null(compound)) {
+      spec_row$compound <- lapply(seq_len(nrow(compound)), function(j) {
+        as.list(compound[j, , drop = FALSE])
+      })
+    } else {
+      spec_row$compound <- list()
+    }
+
+    return(spec_row)
+  })
+
+  #'Insert all documents into MongoDB 
+  #'and write a JSON file for each database
+  mongo_conn <- mongo(collection = mongo_collection, db = mongo_db)
+  mongo_conn$remove('{}')
+
+  json_docs <- vapply(
+    link_docs,
+    FUN = function(doc) {
+      tryCatch(
+        toJSON(doc, auto_unbox = TRUE, null = "null", POSIXt = "ISO8601", na = "null"),
+        error = function(e) {
+          warning("Invalid JSON: ", conditionMessage(e))
+          NA_character_
+        }
+      )
+    },
+    FUN.VALUE = character(1)
+  )
+
+  valid_docs <- json_docs[!is.na(json_docs)]
+
+  # Save one JSON file per SQLite database
+  json_file <- file.path(json_dir, paste0(tools::file_path_sans_ext(basename(sqlite_file)), ".json"))
+  writeLines(valid_docs, con = json_file)
+  message("Saved JSON file: ", json_file)
+
+  # Insert into MongoDB
+  if (length(valid_docs) > 0) {
+    mongo_conn$insert(valid_docs, parse = TRUE)
+    message("Inserted ", length(valid_docs), " documents into MongoDB.")
+  } else {
+    message("No valid documents to insert into MongoDB.")
+  }
+
+  # Add indexes for performance
+  mongo_conn$index(add = '{"spectrum_id": 1}')
+  mongo_conn$index(add = '{"peaks.intensity": 1}')
+
+  message("MongoDB import & indexing done for DB: ", mongo_db, " / Collection: ", mongo_collection)
+}
+
+```
+
+**Data Manipulation**
+
+```{r}
+library(mongolite)
+#Connexion to the Dylib_FTMS_neg_or database
+coll <- mongo(collection = "coll_FTMS_neg2", db = "Dylib_FTMS_neg_mongo2")
+data <- coll$find()
+head(data)
+
+```
+
+```{r}
+# Count the number of document in ms_compound collection (201034)
+nb_documents <- coll$count()
+nb_documents 
+```
+
+```{r}
+# Print the first document in compound field
+doc <- coll$find(limit = 1)
+print(doc$compound)
+```
+
+```{r}
+# Print the first document in peaks field
+doc <- coll$find(limit = 1)
+print(doc$peaks)
+
+```
+
+```{r}
+# find the documents where compound.expid field is equal to 18
+result <- coll$find('{"compound.expid": 18}', limit = 4)
+print(result)
+```
+
+```{r}
+library(mongolite)
+#Connexion to the experiment collection of the Dylib_FTMS_neg_or database
+coll_exp <- mongo(collection = "experiment", db = "Dylib_FTMS_neg_mongo2")
+data <- coll_exp$find()
+head(data)
+
+
+```
+
+```{r}
+# Count the number of document in ms_compound collection (265)
+nb_doc_exp <- coll_exp$count()
+nb_doc_exp 
+
+```
+
+```{r}
+# Get the first document
+# Print the first document in experiment collection
+doc_exp <- coll_exp$find(limit = 1)
+print(doc_exp)
+
+```
+
+```{r}
+# find the documents where expid field is equal to 18
+exp18 <- coll_exp$find('{"expid": 18}', limit = 4)
+print(exp18)
+```
+
+```{r}
+#Connexion to the experiment collection of the Dylib_FTMS_neg_or database
+coll_qpos <- mongo(collection = "coll_QTOF_pos2", db = "Dylib_QTOF_pos_mongo2")
+data <- coll_qpos$find()
+head(data)
+```
+
+```{r}
+# Print the first document in compound field
+doc_qpos <- coll_qpos$find(limit = 1)
+print(doc_qpos$compound)
+```
+
+```{r}
+# Count the number of document in ms_compound collection (6237)
+nb_doc_qpos <- coll_qpos$count()
+nb_doc_qpos 
+```
+
+```{r}
+# Print the first document in peaks field
+doc_pk_qpos <- coll_qpos$find(limit = 1)
+print(doc_pk_qpos$peaks)
+```
+
+```{r}
+# Print the first document in compound field
+doc_cmp_qpos <- coll_qpos$find(limit = 1)
+print(doc_cmp_qpos$compound)
+```
+
+**Performance Test between SQL and MongoDB:**
+
+First, we compare the time performance of a simple query that extracts documents with specific `spectrum_id`s from both SQL and MongoDB databases.
+
+```{r}
+
+# Spectrum IDs - numeric
+spectrum_ids <- c(1, 5, 8)
+
+# SQLite connection
+sqlite_con <- dbConnect(RSQLite::SQLite(), "data/DyLib_QTOF_neg.sqlite")
+
+# MongoDB connection
+mongo_con <- mongo(collection = "coll_QTOF_neg", db = "Dylib_QTOF_neg_mongo")
+
+# SQLite extraction function
+get_from_sqlite <- function(ids) {
+  dbGetQuery(sqlite_con, sprintf(
+    "SELECT * FROM msms_spectrum WHERE spectrum_id IN (%s)",
+    paste(ids, collapse = ", ")
+  ))
+}
+
+
+gget_from_mongo <- function(ids) {
+  pipeline <- sprintf('[
+                      {
+                      "$match" : {
+                         "spectrum_id" : {"$in" : [%s]}
+                      }
+                      }
+                      
+                      ]',paste(ids, collapse = ","))
+   mongo_con$aggregate(pipeline)
+}
+
+
+
+print(get_from_mongo(spectrum_ids))  # This should return documents
+
+# Benchmarking
+benchmark_result <- microbenchmark(
+  sqlite = invisible(get_from_sqlite(spectrum_ids)),
+  mongo  = invisible(get_from_mongo(spectrum_ids)),
+  times = 20L
+)
+
+# Results
+print(benchmark_result)
+boxplot(benchmark_result)
+
+
+```
+
+MongoDB query takes much more time for execution then SQL that was super fast for extracting documents for those specific 3 spectrum_id.
+
+Next we use another query to extract peaks with an intensity greater than 100 for a given spectrum_ids
+
+```{r}
+# Spectrum IDs to query
+spectrum_ids <- c(1, 5, 8)
+
+# SQLite connection
+sqlite_con <- dbConnect(RSQLite::SQLite(), "data/DyLib_QTOF_neg.sqlite")
+
+# MongoDB connection
+mongo_con <- mongo(collection = "coll_QTOF_neg", db = "Dylib_QTOF_neg_mongo")
+
+# SQLite retrieval function
+get_from_sqlite <- function(ids) {
+  query <- sprintf(
+    "SELECT spectrum_id, mz, intensity FROM msms_spectrum_peak WHERE spectrum_id IN (%s) AND intensity > 100",
+    paste(ids, collapse = ", ")
+  )
+  dbGetQuery(sqlite_con, query)
+}
+
+get_from_mongo_agg <- function(ids) {
+  ids_str <- paste(ids, collapse = ", ")
+  
+  pipeline <- sprintf('[
+              
+    {
+      "$match": {
+        "spectrum_id": { "$in": [%s] },
+        "peaks": { "$elemMatch": { "intensity": { "$gt": 100 } } }
+      }
+    },
+    {
+      "$project": {
+        "spectrum_id": 1,
+        "peaks": 1,
+        "_id": 0
+      }
+    }
+  ]', ids_str)
+  
+  mongo_con$aggregate(pipeline)
+}
+
+
+
+
+# Run benchmark
+benchmark_result <- microbenchmark(
+  sqlite = invisible(get_from_sqlite(spectrum_ids)),
+  mongo  = invisible(get_from_mongo(spectrum_ids)),
+  times = 20L
+)
+
+# Show results
+print(benchmark_result)
+boxplot(benchmark_result, main = "SQLite vs MongoDB Query Time", ylab = "Time (microseconds)")
+
+```
+
+Also for peaks extraction SQL was fast compared to MongoDB query.
+
+Next we use another query to extract peaks with an intensity greater than 100 for 1000 spectrum_ids
+
+```{r}
+library(DBI)
+library(RSQLite)
+library(mongolite)
+library(microbenchmark)
+library(dplyr)
+
+# CONNECTIONS 
+sqlite_con <- dbConnect(SQLite(), "data/DyLib_QTOF_neg.sqlite")
+mongo_con <- mongo(collection = "coll_QTOF_neg", db = "Dylib_QTOF_neg_mongo")
+
+# RETRIEVE 1000 SPECTRUM IDs FROM SQLITE 
+spectrum_ids <- dbGetQuery(sqlite_con, "SELECT DISTINCT spectrum_id FROM msms_spectrum_peak LIMIT 10000")$spectrum_id
+
+# SQLITE QUERY FUNCTION
+get_from_sqlite <- function(ids) {
+  id_str <- paste(ids, collapse = ", ")
+  query <- sprintf(
+    "SELECT spectrum_id, mz, intensity FROM msms_spectrum_peak WHERE spectrum_id IN (%s) AND intensity > 100",
+    id_str
+  )
+  dbGetQuery(sqlite_con, query)
+}
+
+# MONGODB QUERY FUNCTION
+get_from_mongo_filtered_peaks <- function(ids) {
+  # Use jsonlite to format the array safely
+  id_json <- toJSON(ids, auto_unbox = TRUE)
+  
+  pipeline <- sprintf('[ 
+    { "$match": { "spectrum_id": { "$in": %s } } },
+    { "$unwind": "$peaks" },
+    { "$match": { "peaks.intensity": { "$gt": 100 } } },
+    { "$project": {
+        "spectrum_id": 1,
+        "mz": "$peaks.mz",
+        "intensity": "$peaks.intensity",
+        "_id": 0
+    }}
+  ]', id_json)
+
+  mongo_con$aggregate(pipeline)
+}
+
+# RUN BENCHMARK 
+benchmark_result <- microbenchmark(
+  sqlite = invisible(get_from_sqlite(spectrum_ids)),
+  mongo  = invisible(get_from_mongo_filtered_peaks(spectrum_ids)),
+  times = 10L
+)
+
+print(benchmark_result)
+boxplot(benchmark_result, main = "SQLite vs MongoDB (Filtered Peaks)", ylab = "Time (ms)")
+
+
+```
+
+MongoDB here is faster than SQL
+
+In this script we select rows/documents with an mz between 100 and 200 and intensity \> 5000
+
+```{r}
+#CONNECTIONS
+sqlite_con <- dbConnect(SQLite(), "data/DyLib_QTOF_neg.sqlite")
+mongo_con <- mongo(collection = "coll_QTOF_neg", db = "Dylib_QTOF_neg_mongo")
+
+# CREATE COMPOUND MULTIKEY INDEX ON MONGODB 
+# This index helps MongoDB quickly find peaks matching both mz and intensity criteria
+mongo_con$index(add = '{"peaks.mz": 1, "peaks.intensity": 1}')
+
+# SQLITE QUERY FUNCTION 
+get_peaks_from_sqlite_filtered <- function() {
+  query <- "
+    SELECT spectrum_id, mz, intensity 
+    FROM msms_spectrum_peak 
+    WHERE mz BETWEEN 100 AND 200 AND intensity > 5000
+  "
+  dbGetQuery(sqlite_con, query)
+}
+
+# MONGODB AGGREGATION FUNCTION WITH OPTIMIZED FILTERING 
+get_peaks_from_mongo_filtered <- function() {
+  pipeline <- '[
+    { "$match": { 
+        "peaks": { 
+          "$elemMatch": { 
+            "mz": { "$gte": 100, "$lte": 200 }, 
+            "intensity": { "$gt": 5000 }
+          }
+        }
+      }
+    },
+    { "$unwind": "$peaks" },
+    { "$match": {
+        "peaks.mz": { "$gte": 100, "$lte": 200 },
+        "peaks.intensity": { "$gt": 5000 }
+      }
+    },
+    { "$project": {
+        "spectrum_id": 1,
+        "mz": "$peaks.mz",
+        "intensity": "$peaks.intensity",
+        "_id": 0
+      }
+    }
+  ]'
+  mongo_con$aggregate(pipeline)
+}
+
+# RUN BENCHMARK 
+benchmark_result <- microbenchmark(
+  sqlite = invisible(get_peaks_from_sqlite_filtered()),
+  mongo  = invisible(get_peaks_from_mongo_filtered()),
+  times = 10L
+)
+
+# RESULTS 
+print(benchmark_result)
+boxplot(benchmark_result, main = "SQLite vs MongoDB (Filtered Peaks mz 100-200, intensity > 5000)", ylab = "Time (ms)")
+
+```
+
+The benchmark results show that mongodb is faster than SQL.
+
+Here we just changed the filtering criteria to return fewer peaks by selecting rows/documents that have mz between 200 and 210 and intensity \> 10000
+
+```{r}
+library(DBI)
+library(RSQLite)
+library(mongolite)
+library(microbenchmark)
+
+# Connections
+sqlite_con <- dbConnect(SQLite(), "data/DyLib_QTOF_neg.sqlite")
+mongo_con <- mongo(collection = "coll_QTOF_neg", db = "Dylib_QTOF_neg_mongo")
+
+# Create compound multikey index in MongoDB for peaks.mz and peaks.intensity
+mongo_con$index(add = '{"peaks.mz": 1, "peaks.intensity": 1}')
+
+# SQLite function: query peaks with mz between 200 and 210 and intensity > 10000
+get_peaks_sqlite_filtered <- function() {
+  query <- "
+    SELECT spectrum_id, mz, intensity
+    FROM msms_spectrum_peak
+    WHERE mz BETWEEN 200 AND 210 AND intensity > 10000
+  "
+  dbGetQuery(sqlite_con, query)
+}
+
+# MongoDB function: optimized aggregation with early $match on nested fields
+get_peaks_mongo_filtered <- function() {
+  pipeline <- '[
+    { "$match": {  
+        "peaks": {
+          "$elemMatch": {
+            "mz": { "$gte": 200, "$lte": 210 },
+            "intensity": { "$gt": 10000 }
+          }
+        }
+      }
+    },
+    { "$unwind": "$peaks" },
+    { "$match": {
+        "peaks.mz": { "$gte": 200, "$lte": 210 },
+        "peaks.intensity": { "$gt": 10000 }
+      }
+    },
+    { "$project": {
+        "spectrum_id": 1,
+        "mz": "$peaks.mz",
+        "intensity": "$peaks.intensity",
+        "_id": 0
+      }
+    }
+  ]'
+  mongo_con$aggregate(pipeline)
+}
+
+# Benchmark
+benchmark_result <- microbenchmark(
+  sqlite = invisible(get_peaks_sqlite_filtered()),
+  mongo  = invisible(get_peaks_mongo_filtered()),
+  times = 10L
+)
+
+print(benchmark_result)
+boxplot(benchmark_result, main = "SQLite vs MongoDB: Peaks mz 200-210 & intensity > 10000", ylab = "Time (ms)")
+
+
+```
+
+Also MongoDB is faster than SQLite in this benchmark, As a result mongoDB can outperform SQL for highly selective queries on deeply nested data.
+
+Here we group by spectrum_id and we select peaks where mz is greater or equal than 3000 and intensity is greater than 10000
+
+```{r}
+
+mongo_con$index(add = '{"peaks.mz": 1, "peaks.intensity": 1}')
+
+get_nested_summary_mongo <- function() {
+  pipeline <- '[
+  { "$match": {  
+        "peaks": {
+          "$elemMatch": {
+            "mz": { "$gte": 3000},
+            "intensity": { "$gt": 10000 }
+          }
+        }
+      }
+    },
+    { "$unwind": "$peaks" },
+    { "$match": {
+        "peaks.mz": { "$gt": 3000 },
+        "peaks.intensity": { "$gt": 10000 }
+    }},
+    { "$group": {
+        "_id": "$spectrum_id",
+        "n_peaks": { "$sum": 1 }
+    }}
+  ]'
+  mongo_con$aggregate(pipeline)
+}
+
+
+ 
+
+get_nested_summary_sqlite <- function() {
+  query <- "
+    SELECT spectrum_id,
+           COUNT(*) AS num_peaks,
+           AVG(intensity) AS avg_intensity
+    FROM msms_spectrum_peak
+    WHERE mz > 300 AND intensity > 1000
+    GROUP BY spectrum_id
+  "
+  dbGetQuery(sqlite_con, query)
+}
+
+benchmark_result <- microbenchmark(
+  mongo  = invisible(get_nested_summary_mongo()),
+  sqlite = invisible(get_nested_summary_sqlite()),
+  times = 10L
+)
+
+print(benchmark_result)
+boxplot(benchmark_result, main = "MongoDB vs SQLite: Nested Aggregation", ylab = "Time (ms)")
+
+
+```
+
+the benchmark results show that mongodb is faster than SQLite for this query which ensure that mongoDB can outperform SQL for highly selective queries on deeply nested data.
