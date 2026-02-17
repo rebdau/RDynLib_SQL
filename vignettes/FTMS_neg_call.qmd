@@ -77,7 +77,7 @@ Next we calculate the similarity score between the dynlib and flax seed FTMS neg
 #test the new function(where the user should enter the mslevel and spectrum type)
 
 ```{r}
-source("D:/work/these/These/clones/new_clones/RDynLib/Similarity/FTMS/sim_new.R")
+source("C:/Users/ament/Desktop/Github/RDynLib_SQL/R/similarity_functions.R")
 
 res1 <- symmetric_dotproduct_combined(
   ftms_all,
