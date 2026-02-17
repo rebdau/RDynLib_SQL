@@ -230,9 +230,13 @@ symmetric_dotproduct_combined <- function(
     digits = 4
 ) {
   
+  if (!requireNamespace("rstudioapi", quietly = TRUE)) {
+    install.packages("rstudioapi", repos = "https://cloud.r-project.org/")
+  }
+  library(rstudioapi)
+  
   precursor_resolution <- match.arg(precursor_resolution)
   fragments_resolution <- match.arg(fragments_resolution)
-  
   
   st_filtered <- st_sps[st_sps$polarity == polarity_query]
   dy_filtered <- dy_sps[
@@ -244,16 +248,22 @@ symmetric_dotproduct_combined <- function(
   if (length(st_filtered) == 0 || length(dy_filtered) == 0)
     return(data.frame())
   
-  #  MS LEVEL prompt
-  
+  # MS LEVEL prompt
   if ("msLevel" %in% names(spectraData(st_filtered))) {
     available_ms_st <- sort(unique(spectraData(st_filtered)$msLevel))
     cat("\nAvailable MS levels for st_sps:\n")
     print(available_ms_st)
     
     repeat {
-      ms_input_st <- readline("Enter MS level(s) for st_sps (comma separated, e.g. 2 or 2,3): ")
-      chosen_ms_st <- suppressWarnings(as.numeric(strsplit(ms_input_st, ",")[[1]]))
+      ms_input_st <- rstudioapi::showPrompt(
+        "MS level st_sps",
+        paste("Available MS levels:", paste(available_ms_st, collapse = ", "), "\nEnter MS level(s) for st_sps (comma separated, e.g. 2 or 2,3):")
+      )
+      if (is.null(ms_input_st)) {
+        cat("Operation cancelled by user.\n")
+        return(data.frame())
+      }
+      chosen_ms_st <- suppressWarnings(as.numeric(unlist(strsplit(ms_input_st, ","))))
       if (!any(is.na(chosen_ms_st)) && all(chosen_ms_st %in% available_ms_st)) break
       cat("Invalid input. Please choose from:", paste(available_ms_st, collapse = ","), "\n")
     }
@@ -267,8 +277,15 @@ symmetric_dotproduct_combined <- function(
     print(available_ms_dy)
     
     repeat {
-      ms_input_dy <- readline("Enter MS level(s) for dy_sps (comma separated): ")
-      chosen_ms_dy <- suppressWarnings(as.numeric(strsplit(ms_input_dy, ",")[[1]]))
+      ms_input_dy <- rstudioapi::showPrompt(
+        "MS level dy_sps",
+        paste("Available MS levels:", paste(available_ms_dy, collapse = ", "), "\nEnter MS level(s) for dy_sps (comma separated):")
+      )
+      if (is.null(ms_input_dy)) {
+        cat("Operation cancelled by user.\n")
+        return(data.frame())
+      }
+      chosen_ms_dy <- suppressWarnings(as.numeric(unlist(strsplit(ms_input_dy, ","))))
       if (!any(is.na(chosen_ms_dy)) && all(chosen_ms_dy %in% available_ms_dy)) break
       cat("Invalid input. Please choose from:", paste(available_ms_dy, collapse = ","), "\n")
     }
@@ -279,47 +296,73 @@ symmetric_dotproduct_combined <- function(
   if (length(st_filtered) == 0 || length(dy_filtered) == 0)
     return(data.frame())
   
-  
-  #  Spectrum type prompt
-  
-  if ("spectrum_type" %in% names(spectraData(st_filtered))) {
-    available_type_st <- sort(unique(spectraData(st_filtered)$spectrum_type))
+  # Spectrum.type prompt
+  if ("spectrum.type" %in% names(spectraData(st_filtered))) {
+    available_type_st <- sort(unique(na.omit(spectraData(st_filtered)$spectrum.type)))
     cat("\nAvailable spectrum types for st_sps:\n")
     print(available_type_st)
     
     repeat {
-      type_input_st <- readline("Enter spectrum_type(s) for st_sps (comma separated if multiple): ")
-      chosen_type_st <- strsplit(type_input_st, ",")[[1]]
-      chosen_type_st <- trimws(chosen_type_st)  # remove spaces
+      type_input_st <- rstudioapi::showPrompt(
+        "Spectrum type query",
+        paste("Available types:", paste(available_type_st, collapse = ", "), "\nEnter spectrum.type(s) for the query (comma separated if multiple):")
+      )
+      if (is.null(type_input_st)) {
+        cat("Operation cancelled by user.\n")
+        return(data.frame())
+      }
+      
+      chosen_type_st <- unlist(strsplit(type_input_st, ","))
+      chosen_type_st <- trimws(chosen_type_st)
+      
+      # Debug: Afficher les valeurs saisies et disponibles
+      cat("You entered:", paste(chosen_type_st, collapse = ", "), "\n")
+      cat("Available types:", paste(available_type_st, collapse = ", "), "\n")
+      
+      # Vérifier si toutes les entrées sont valides
       if (all(chosen_type_st %in% available_type_st)) break
-      cat("Invalid input. Please choose from:", paste(available_type_st, collapse = ","), "\n")
+      
+      cat("Invalid input. Please choose from:", paste(available_type_st, collapse = ", "), "\n")
     }
     
-    st_filtered <- st_filtered[spectraData(st_filtered)$spectrum_type %in% chosen_type_st]
+    st_filtered <- st_filtered[spectraData(st_filtered)$spectrum.type %in% chosen_type_st]
   }
   
-  if ("spectrum_type" %in% names(spectraData(dy_filtered))) {
-    available_type_dy <- sort(unique(spectraData(dy_filtered)$spectrum_type))
-    cat("\nAvailable spectrum types for dy_sps:\n")
+  if ("spectrum.type" %in% names(spectraData(dy_filtered))) {
+    available_type_dy <- sort(unique(na.omit(spectraData(dy_filtered)$spectrum.type)))
+    cat("\nAvailable spectrum types for the target:\n")
     print(available_type_dy)
     
     repeat {
-      type_input_dy <- readline("Enter spectrum_type(s) for dy_sps (comma separated if multiple): ")
-      chosen_type_dy <- strsplit(type_input_dy, ",")[[1]]
+      type_input_dy <- rstudioapi::showPrompt(
+        "Spectrum type target",
+        paste("Available types:", paste(available_type_dy, collapse = ", "), "\nEnter spectrum.type(s) for target (comma separated if multiple):")
+      )
+      if (is.null(type_input_dy)) {
+        cat("Operation cancelled by user.\n")
+        return(data.frame())
+      }
+      
+      chosen_type_dy <- unlist(strsplit(type_input_dy, ","))
       chosen_type_dy <- trimws(chosen_type_dy)
+      
+      # Debug: Afficher les valeurs saisies et disponibles
+      cat("You entered:", paste(chosen_type_dy, collapse = ", "), "\n")
+      cat("Available types:", paste(available_type_dy, collapse = ", "), "\n")
+      
       if (all(chosen_type_dy %in% available_type_dy)) break
-      cat("Invalid input. Please choose from:", paste(available_type_dy, collapse = ","), "\n")
+      
+      cat("Invalid input. Please choose from:", paste(available_type_dy, collapse = ", "), "\n")
     }
     
-    dy_filtered <- dy_filtered[spectraData(dy_filtered)$spectrum_type %in% chosen_type_dy]
+    dy_filtered <- dy_filtered[spectraData(dy_filtered)$spectrum.type %in% chosen_type_dy]
   }
+  
   
   if (length(st_filtered) == 0 || length(dy_filtered) == 0)
     return(data.frame())
   
-  
-  # similarity calculation
-  
+  # Similarity calculation
   param <- MetaboAnnotation::CompareSpectraParam(
     ppm = ppm,
     tolerance = tolerance,
@@ -351,6 +394,7 @@ symmetric_dotproduct_combined <- function(
   
   return(df)
 }
+
 
 
 
