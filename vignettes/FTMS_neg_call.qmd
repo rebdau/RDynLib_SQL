@@ -1,28 +1,32 @@
 ---
-title: "Untitled"
-format: html
-server: shiny
+title: "workflow to test the similarity_RDynlib() function"
+format:
+  html:
+    toc: true
+    self-contained: true
+author: "Ahlam Mentag, Rebecca Dauwe, Johannes Rainer"
 ---
 
-In this quarto document we call the "sim_functions.R" file code to use functions for similarity calculation between FTMS data and the RDynLib FTMS database.
+## Shiny Documents
+
+This quarto document represents the workflow for calling the `similarity_RDynlib()` from the [similarity_functions.R](https://github.com/rebdau/RDynLib_SQL/blob/Ahlam/R/similarity_functions.R) file to calculate the similarity between FTMS flax data and the RDynLib FTMS database.
+
+# Required packages
 
 ```{r}
 library(Spectra)
 library(CompoundDb)
 pth <- getwd()
 pth
-setwd("C:/Users/ament/Desktop/Github/RDynLib/Similarity/FTMS")
-pth <- getwd()
-pth
 ```
 
-First we load the "sim_functions.R" file that contains functions for similarity calculation.
+We start by loading the [similarity_functions.R](https://github.com/rebdau/RDynLib_SQL/blob/Ahlam/R/similarity_functions.R) file to import the similarity function.
 
 ```{r}
-source("sim_functions_ftmsneg.R")
+source("similarity_functions.R")
 ```
 
-Here we install the new CompoundDb version
+Then, install the new CompoundDb version
 
 ```{r}
 BiocManager::install("RforMassSpectrometry/CompoundDb", ref = "jomain", force = TRUE)
@@ -63,7 +67,7 @@ dy_sps <- Spectra(cdb)
 spectraData(dy_sps, columns = c("rtime"))
 ```
 
-Here we load the FTMS of flax seed database (it's already a spectra object)\
+Here we load the FTMS of flax seed database that contains both spectrum types : the assembled and not assembled one (it's already a spectra object),\
 you can load it from: [ftmsneg_flax_sql.qmd](https://github.com/rebdau/RDynLib_ftms/blob/ahlam/ftmsneg_flax_sql.qmd)
 
 ```{r}
@@ -74,12 +78,11 @@ spectraData(ftms_all)
 
 Next we calculate the similarity score between the dynlib and flax seed FTMS negative integuments.
 
-#test the new function(where the user should enter the mslevel and spectrum type)
+#test the new function(where the user should enter the spectrum type and mslevel )
 
 ```{r}
-source("C:/Users/ament/Desktop/Github/RDynLib_SQL/R/similarity_functions.R")
 
-res1 <- symmetric_dotproduct_combined(
+res1 <- similarity_RDynlib(
   ftms_all,
   dy_sps,
   polarity_query = 0,
@@ -90,4 +93,12 @@ res1 <- symmetric_dotproduct_combined(
 )
 
 
+```
+
+print the similarity matrix and the number of rows (matches)
+
+```{r}
+
+print(res1)
+nrow(res1)
 ```
