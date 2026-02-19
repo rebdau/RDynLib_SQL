@@ -5,6 +5,8 @@
 #' 
 #' @return 
 #' a rounded precursorMz value.
+#' 
+#' @author Ahlam Mentag
 neutral_loss <- function(mz_values, precursorMz,
                          method = c("unit.resolution", "high.resolution"),
                          digits = 4) {
@@ -21,6 +23,8 @@ neutral_loss <- function(mz_values, precursorMz,
 #' 
 #' @return 
 #' a rounded mz value.
+#' 
+#' @author Rebecca Dauwe
 round_perl <- function(number,
                        method = c("unit.resolution", "high.resolution"),
                        digits = 4) {
@@ -40,6 +44,8 @@ round_perl <- function(number,
 #' 
 #' @return 
 #' a list of mz and intensity peaks after removing all the duplicates.
+#' 
+#' @author Ahlam Mentag
 remove_duplicates <- function(mz, intensity,
                               method = c("unit.resolution", "high.resolution"),
                               digits = 4) {
