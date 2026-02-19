@@ -283,6 +283,7 @@ similarity_RDynlib <- function(
   if (!requireNamespace("rstudioapi", quietly = TRUE)) {
     install.packages("rstudioapi", repos = "https://cloud.r-project.org/")
   }
+  library(rstudioapi)
   
   precursor_resolution <- match.arg(precursor_resolution)
   fragments_resolution <- match.arg(fragments_resolution)
@@ -306,7 +307,7 @@ similarity_RDynlib <- function(
     repeat {
       type_input_st <- rstudioapi::showPrompt(
         "Spectrum type query",
-        paste("Available types:", paste(available_type_st, collapse = ", "), "\nEnter spectrum.type(s) for the query (comma separated if multiple):")
+        paste("Available types:", paste(available_type_st, collapse = ", "))
       )
       if (is.null(type_input_st)) {
         cat("Operation cancelled by user.\n")
@@ -316,11 +317,9 @@ similarity_RDynlib <- function(
       chosen_type_st <- unlist(strsplit(type_input_st, ","))
       chosen_type_st <- trimws(chosen_type_st)
       
-     
       cat("You entered:", paste(chosen_type_st, collapse = ", "), "\n")
       cat("Available types:", paste(available_type_st, collapse = ", "), "\n")
       
-    
       if (all(chosen_type_st %in% available_type_st)) break
       
       cat("Invalid input. Please choose from:", paste(available_type_st, collapse = ", "), "\n")
@@ -337,7 +336,7 @@ similarity_RDynlib <- function(
     repeat {
       type_input_dy <- rstudioapi::showPrompt(
         "Spectrum type target",
-        paste("Available types:", paste(available_type_dy, collapse = ", "), "\nEnter spectrum.type(s) for target (comma separated if multiple):")
+        paste("Available types:", paste(available_type_dy, collapse = ", "))
       )
       if (is.null(type_input_dy)) {
         cat("Operation cancelled by user.\n")
@@ -347,6 +346,7 @@ similarity_RDynlib <- function(
       chosen_type_dy <- unlist(strsplit(type_input_dy, ","))
       chosen_type_dy <- trimws(chosen_type_dy)
       
+      # Debug: Afficher les valeurs saisies et disponibles
       cat("You entered:", paste(chosen_type_dy, collapse = ", "), "\n")
       cat("Available types:", paste(available_type_dy, collapse = ", "), "\n")
       
@@ -363,49 +363,98 @@ similarity_RDynlib <- function(
     return(data.frame())
   
   # MS LEVEL prompt
+  # MS LEVEL prompt (AFTER spectrum.type filtering)
   if ("msLevel" %in% names(spectraData(st_filtered))) {
-    available_ms_st <- sort(unique(spectraData(st_filtered)$msLevel))
-    cat("\nAvailable MS levels for st_sps:\n")
+    
+    # Recalculate MS levels ONLY from filtered spectrum.type
+    available_ms_st <- sort(unique(na.omit(
+      spectraData(st_filtered)$msLevel
+    )))
+    
+    if (length(available_ms_st) == 0)
+      return(data.frame())
+    
+    cat("\nAvailable MS levels for selected spectrum.type (st_sps):\n")
     print(available_ms_st)
     
     repeat {
       ms_input_st <- rstudioapi::showPrompt(
         "MS level st_sps",
-        paste("Available MS levels:", paste(available_ms_st, collapse = ", "), "\nEnter MS level(s) for st_sps (comma separated, e.g. 2 or 2,3):")
+        paste(
+          "Available MS levels:",
+          paste(available_ms_st, collapse = ", ")
+        )
       )
+      
       if (is.null(ms_input_st)) {
         cat("Operation cancelled by user.\n")
         return(data.frame())
       }
-      chosen_ms_st <- suppressWarnings(as.numeric(unlist(strsplit(ms_input_st, ","))))
-      if (!any(is.na(chosen_ms_st)) && all(chosen_ms_st %in% available_ms_st)) break
-      cat("Invalid input. Please choose from:", paste(available_ms_st, collapse = ","), "\n")
+      
+      chosen_ms_st <- suppressWarnings(
+        as.numeric(unlist(strsplit(ms_input_st, ",")))
+      )
+      
+      chosen_ms_st <- chosen_ms_st[!is.na(chosen_ms_st)]
+      
+      if (length(chosen_ms_st) > 0 &&
+          all(chosen_ms_st %in% available_ms_st)) break
+      
+      cat("Invalid input. Please choose from:",
+          paste(available_ms_st, collapse = ","), "\n")
     }
     
-    st_filtered <- st_filtered[spectraData(st_filtered)$msLevel %in% chosen_ms_st]
+    st_filtered <- st_filtered[
+      spectraData(st_filtered)$msLevel %in% chosen_ms_st
+    ]
   }
   
+  
   if ("msLevel" %in% names(spectraData(dy_filtered))) {
-    available_ms_dy <- sort(unique(spectraData(dy_filtered)$msLevel))
-    cat("\nAvailable MS levels for dy_sps:\n")
+    
+    # Recalculate MS levels ONLY from filtered spectrum.type
+    available_ms_dy <- sort(unique(na.omit(
+      spectraData(dy_filtered)$msLevel
+    )))
+    
+    if (length(available_ms_dy) == 0)
+      return(data.frame())
+    
+    cat("\nAvailable MS levels for selected spectrum.type (dy_sps):\n")
     print(available_ms_dy)
     
     repeat {
       ms_input_dy <- rstudioapi::showPrompt(
         "MS level dy_sps",
-        paste("Available MS levels:", paste(available_ms_dy, collapse = ", "), "\nEnter MS level(s) for dy_sps (comma separated):")
+        paste(
+          "Available MS levels:",
+          paste(available_ms_dy, collapse = ", ")
+        )
       )
+      
       if (is.null(ms_input_dy)) {
         cat("Operation cancelled by user.\n")
         return(data.frame())
       }
-      chosen_ms_dy <- suppressWarnings(as.numeric(unlist(strsplit(ms_input_dy, ","))))
-      if (!any(is.na(chosen_ms_dy)) && all(chosen_ms_dy %in% available_ms_dy)) break
-      cat("Invalid input. Please choose from:", paste(available_ms_dy, collapse = ","), "\n")
+      
+      chosen_ms_dy <- suppressWarnings(
+        as.numeric(unlist(strsplit(ms_input_dy, ",")))
+      )
+      
+      chosen_ms_dy <- chosen_ms_dy[!is.na(chosen_ms_dy)]
+      
+      if (length(chosen_ms_dy) > 0 &&
+          all(chosen_ms_dy %in% available_ms_dy)) break
+      
+      cat("Invalid input. Please choose from:",
+          paste(available_ms_dy, collapse = ","), "\n")
     }
     
-    dy_filtered <- dy_filtered[spectraData(dy_filtered)$msLevel %in% chosen_ms_dy]
+    dy_filtered <- dy_filtered[
+      spectraData(dy_filtered)$msLevel %in% chosen_ms_dy
+    ]
   }
+  
   
   if (length(st_filtered) == 0 || length(dy_filtered) == 0)
     return(data.frame())
