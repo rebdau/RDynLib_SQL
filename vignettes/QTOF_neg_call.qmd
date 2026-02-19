@@ -74,14 +74,14 @@ spectraData(qtof_neg)
 Next we calculate the similarity score between the dynlib and flax seed QTOF negative integuments.
 
 ```{r}
-qtof_matches <- similarity_RDynlib(
+qtof_matches <- symmetric_dotproduct_combined(
   qtof_neg,
   dy_sps,
   polarity_query = 0,
   polarity_target = 0,
 
-  precursor_resolution = "high.resolution",
-  fragments_resolution = "high.resolution",
+  precursor_resolution = "unit.resolution",
+  fragments_resolution = "unit.resolution",
 )
 ```
 
