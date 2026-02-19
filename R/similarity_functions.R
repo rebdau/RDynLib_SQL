@@ -259,6 +259,7 @@ dynlib_map <- function(x, y,
 #' @import Spectra
 #' @import MetaboAnnotation
 #' @import rstudioapi
+#' 
 #' @author Ahlam Mentag
 #' 
 #' @export
