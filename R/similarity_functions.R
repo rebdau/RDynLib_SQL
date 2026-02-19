@@ -1,15 +1,26 @@
-library(Spectra)
-
+#' @description
+#'
+#' Helper function to round the precursorMz values depending on the resolution  
+#' type chosen by the user.
+#' 
+#' @return 
+#' a rounded precursorMz value.
 neutral_loss <- function(mz_values, precursorMz,
                          method = c("unit.resolution", "high.resolution"),
                          digits = 4) {
   
   method <- match.arg(method)
   
-  round_perl(precursorMz, method = method, digits = digits) - mz_values
+  round_perl(precursorMz, method = method, digits = digits - mz_values)
 }
 
-
+#' @description
+#'
+#' Helper function to round the mz values depending on the resolution type 
+#' chosen by the user.
+#' 
+#' @return 
+#' a rounded mz value.
 round_perl <- function(number,
                        method = c("unit.resolution", "high.resolution"),
                        digits = 4) {
@@ -23,7 +34,12 @@ round_perl <- function(number,
   }
 }
 
-
+#' @description
+#'
+#' Helper function to remove the duplicate mz values after the rounding.
+#' 
+#' @return 
+#' a list of mz and intensity peaks after removing all the duplicates.
 remove_duplicates <- function(mz, intensity,
                               method = c("unit.resolution", "high.resolution"),
                               digits = 4) {
@@ -199,27 +215,54 @@ dynlib_map <- function(x, y,
 
 
 
-## To use these functions with `matchSpectra()`:
-## Use the `dynlib_map` function as `MAPFUN` and the
-## `dynlib_symmetric_dotproduct` function as `FUN`.
 
-#csp <- CompareSpectraParam(
-# ppm = 0,
-#tolerance = 0.005,
-#threshold = 0.8,
-#requirePrecursor = TRUE,
-#MAPFUN = dynlib_map,
-#FUN = dynlib_symmetric_dotproduct
-#)
-
-#res <- matchSpectra(query = xxx, target = yyy, param = csp)
-
-library(BiocParallel)
-library(Spectra)
-
-
-
-symmetric_dotproduct_combined <- function(
+#' @description
+#'
+#' Main function to calculate the spectral similarity between spectra produced 
+#' from a high or unit resolution instrument.
+#' 
+#' @param st_sps spectra object, represents the query data 
+#'
+#' @param dy_sps spectra object, represents the target data 
+#' 
+#' @param polarity_query 'numeric' the query polarity, 0  if negative,
+#'         and 1 for positive polarity
+#'        
+#' @param polarity_target 'numeric' the target polarity, 0  if negative,
+#'         and 1 for positive polarity
+#'        
+#' @param precursor_resolution 'character' the resolution type of the precursor  
+#'        masses, it is used to define the rounding type of the precursorMz(),
+#'        it could be either "unit.resolution" or "high.resolution".
+#'        
+#' @param fragments_resolution 'character(1)' the resolution type of the fragments  
+#'        masses, it is used to define the rounding type of the fragments,
+#'        it could be either "unit.resolution" or "high.resolution".
+#'        
+#' @param threshold 'numeric(1)' the score threshold to select a best match, by 
+#'        default it is 0.8.
+#'        
+#' @param ppm 'numeric(1)' define an acceptable difference between m/z values of  
+#'        the compared peaks by default it is 0. 
+#'        
+#' @param tolerance 'numeric(1)' define an acceptable difference between m/z  
+#'        values of the compared peaks by default it is 0,005. 
+#'       
+#' @param digits 'numeric(1)' rounding number, by default it is 4.  
+#'      
+#' @return
+#'
+#' a matrix with the target and the query matches spectraData, the score, and 
+#' the number of matched peaks.
+#'
+#' @import BiocParallel
+#' @import Spectra
+#' @import MetaboAnnotation
+#' @import rstudioapi
+#' @author Ahlam Mentag
+#' 
+#' @export
+similarity_RDynlib <- function(
     st_sps, dy_sps,
     polarity_query, polarity_target,
     precursor_resolution = c("unit.resolution", "high.resolution"),
@@ -233,7 +276,6 @@ symmetric_dotproduct_combined <- function(
   if (!requireNamespace("rstudioapi", quietly = TRUE)) {
     install.packages("rstudioapi", repos = "https://cloud.r-project.org/")
   }
-  library(rstudioapi)
   
   precursor_resolution <- match.arg(precursor_resolution)
   fragments_resolution <- match.arg(fragments_resolution)
@@ -244,6 +286,71 @@ symmetric_dotproduct_combined <- function(
       !is.na(dy_sps$name) & dy_sps$name != "" &
       !grepl("^!", dy_sps$name)
   ]
+  
+  if (length(st_filtered) == 0 || length(dy_filtered) == 0)
+    return(data.frame())
+  
+  # Spectrum.type prompt
+  if ("spectrum.type" %in% names(spectraData(st_filtered))) {
+    available_type_st <- sort(unique(na.omit(spectraData(st_filtered)$spectrum.type)))
+    cat("\nAvailable spectrum types for st_sps:\n")
+    print(available_type_st)
+    
+    repeat {
+      type_input_st <- rstudioapi::showPrompt(
+        "Spectrum type query",
+        paste("Available types:", paste(available_type_st, collapse = ", "), "\nEnter spectrum.type(s) for the query (comma separated if multiple):")
+      )
+      if (is.null(type_input_st)) {
+        cat("Operation cancelled by user.\n")
+        return(data.frame())
+      }
+      
+      chosen_type_st <- unlist(strsplit(type_input_st, ","))
+      chosen_type_st <- trimws(chosen_type_st)
+      
+     
+      cat("You entered:", paste(chosen_type_st, collapse = ", "), "\n")
+      cat("Available types:", paste(available_type_st, collapse = ", "), "\n")
+      
+    
+      if (all(chosen_type_st %in% available_type_st)) break
+      
+      cat("Invalid input. Please choose from:", paste(available_type_st, collapse = ", "), "\n")
+    }
+    
+    st_filtered <- st_filtered[spectraData(st_filtered)$spectrum.type %in% chosen_type_st]
+  }
+  
+  if ("spectrum.type" %in% names(spectraData(dy_filtered))) {
+    available_type_dy <- sort(unique(na.omit(spectraData(dy_filtered)$spectrum.type)))
+    cat("\nAvailable spectrum types for the target:\n")
+    print(available_type_dy)
+    
+    repeat {
+      type_input_dy <- rstudioapi::showPrompt(
+        "Spectrum type target",
+        paste("Available types:", paste(available_type_dy, collapse = ", "), "\nEnter spectrum.type(s) for target (comma separated if multiple):")
+      )
+      if (is.null(type_input_dy)) {
+        cat("Operation cancelled by user.\n")
+        return(data.frame())
+      }
+      
+      chosen_type_dy <- unlist(strsplit(type_input_dy, ","))
+      chosen_type_dy <- trimws(chosen_type_dy)
+      
+      cat("You entered:", paste(chosen_type_dy, collapse = ", "), "\n")
+      cat("Available types:", paste(available_type_dy, collapse = ", "), "\n")
+      
+      if (all(chosen_type_dy %in% available_type_dy)) break
+      
+      cat("Invalid input. Please choose from:", paste(available_type_dy, collapse = ", "), "\n")
+    }
+    
+    dy_filtered <- dy_filtered[spectraData(dy_filtered)$spectrum.type %in% chosen_type_dy]
+  }
+  
   
   if (length(st_filtered) == 0 || length(dy_filtered) == 0)
     return(data.frame())
@@ -296,71 +403,6 @@ symmetric_dotproduct_combined <- function(
   if (length(st_filtered) == 0 || length(dy_filtered) == 0)
     return(data.frame())
   
-  # Spectrum.type prompt
-  if ("spectrum.type" %in% names(spectraData(st_filtered))) {
-    available_type_st <- sort(unique(na.omit(spectraData(st_filtered)$spectrum.type)))
-    cat("\nAvailable spectrum types for st_sps:\n")
-    print(available_type_st)
-    
-    repeat {
-      type_input_st <- rstudioapi::showPrompt(
-        "Spectrum type query",
-        paste("Available types:", paste(available_type_st, collapse = ", "), "\nEnter spectrum.type(s) for the query (comma separated if multiple):")
-      )
-      if (is.null(type_input_st)) {
-        cat("Operation cancelled by user.\n")
-        return(data.frame())
-      }
-      
-      chosen_type_st <- unlist(strsplit(type_input_st, ","))
-      chosen_type_st <- trimws(chosen_type_st)
-      
-      # Debug: Afficher les valeurs saisies et disponibles
-      cat("You entered:", paste(chosen_type_st, collapse = ", "), "\n")
-      cat("Available types:", paste(available_type_st, collapse = ", "), "\n")
-      
-      # Vérifier si toutes les entrées sont valides
-      if (all(chosen_type_st %in% available_type_st)) break
-      
-      cat("Invalid input. Please choose from:", paste(available_type_st, collapse = ", "), "\n")
-    }
-    
-    st_filtered <- st_filtered[spectraData(st_filtered)$spectrum.type %in% chosen_type_st]
-  }
-  
-  if ("spectrum.type" %in% names(spectraData(dy_filtered))) {
-    available_type_dy <- sort(unique(na.omit(spectraData(dy_filtered)$spectrum.type)))
-    cat("\nAvailable spectrum types for the target:\n")
-    print(available_type_dy)
-    
-    repeat {
-      type_input_dy <- rstudioapi::showPrompt(
-        "Spectrum type target",
-        paste("Available types:", paste(available_type_dy, collapse = ", "), "\nEnter spectrum.type(s) for target (comma separated if multiple):")
-      )
-      if (is.null(type_input_dy)) {
-        cat("Operation cancelled by user.\n")
-        return(data.frame())
-      }
-      
-      chosen_type_dy <- unlist(strsplit(type_input_dy, ","))
-      chosen_type_dy <- trimws(chosen_type_dy)
-      
-      # Debug: Afficher les valeurs saisies et disponibles
-      cat("You entered:", paste(chosen_type_dy, collapse = ", "), "\n")
-      cat("Available types:", paste(available_type_dy, collapse = ", "), "\n")
-      
-      if (all(chosen_type_dy %in% available_type_dy)) break
-      
-      cat("Invalid input. Please choose from:", paste(available_type_dy, collapse = ", "), "\n")
-    }
-    
-    dy_filtered <- dy_filtered[spectraData(dy_filtered)$spectrum.type %in% chosen_type_dy]
-  }
-  
-  
-  if (length(st_filtered) == 0 || length(dy_filtered) == 0)
-    return(data.frame())
   
   # Similarity calculation
   param <- MetaboAnnotation::CompareSpectraParam(
