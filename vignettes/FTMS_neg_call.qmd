@@ -88,7 +88,7 @@ ftms_matches <- similarity_RDynlib(
   polarity_query = 0,
   polarity_target = 0,
 
-  precursor_resolution = "unit.resolution",
+  precursor_resolution = "high.resolution",
   fragments_resolution = "unit.resolution",
 )
 
