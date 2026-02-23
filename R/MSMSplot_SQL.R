@@ -1,5 +1,7 @@
 MSMSplot_SQL <- function(sql_path,
                          dbkey,
+                         prdion,
+                         neutloss,
                          err = NULL,
                          minum = NULL,
                          oldpar = NULL,
@@ -16,11 +18,13 @@ MSMSplot_SQL <- function(sql_path,
   
   # Get precursor m/z 
   compound <- dbGetQuery(con, sprintf(
-    "SELECT compound_id, precursor_mz
-     FROM ms_compound
-     WHERE compound_id = %d",
+    "SELECT precursor_mz
+   FROM msms_spectrum
+   WHERE compound_id = %d
+   AND ms_level = 2",
     dbkey
   ))
+  
   
   if (nrow(compound) == 0)
     stop("Compound not found")
@@ -29,26 +33,25 @@ MSMSplot_SQL <- function(sql_path,
   
   #Get product ions and intensities 
   peaks <- dbGetQuery(con, sprintf(
-    "SELECT p.Mz, p.Intensity
+    "SELECT p.mz, p.intensity
      FROM msms_spectrum s
      JOIN msms_spectrum_peak p ON s.spectrum_id = p.spectrum_id
      WHERE s.compound_id = %d
-     ORDER BY p.Mz",
+     ORDER BY p.mz",
     dbkey
   ))
   
   if (nrow(peaks) == 0)
     stop("No MS/MS peaks found for this compound")
   
-  prod_ion.num <- round(peaks$Mz, 2)
-  intens_ion.num <- peaks$Intensity
+  prod_ion.num <- round(peaks$mz, 2)
+  intens_ion.num <- peaks$intensity
   
   # Candidate product ions 
   cat("\nCandidate product ions:\n")
   
-  # You must adapt these to SQLite if needed
-  # For now assumed available
-  ProdIonMatch(prod_ion.num, err = err)
+  
+  ProdIonMatch(prod_ion.num, prdion,  err = err)
   
   minum_sel <- which(intens_ion.num >= minum)
   
@@ -56,14 +59,14 @@ MSMSplot_SQL <- function(sql_path,
   neutprod.num <- round(precursor_mz - prod_ion.num, 2)
   
   cat("\nCandidate neutral losses:\n")
-  NeutLossMatch(neutprod.num, err = err)
+  NeutLossMatch(neutprod.num, neutloss, err = err)
   
   # Complementary ions
   cat("\nComplementary product ions:\n")
-  ComplemIons(prod_ion.num,
-              intens_ion.num,
-              neutprod.num,
-              err)
+  ComplemIons_SQL(prod_ion.num,
+                  intens_ion.num,
+                  neutprod.num,
+                  err)
   
   #  Plot 
   if (is.null(oldpar)) oldpar <- par(no.readonly = TRUE)

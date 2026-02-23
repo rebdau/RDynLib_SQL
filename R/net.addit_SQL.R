@@ -24,8 +24,6 @@ net.addit_SQL <- function(sql_path,
   if (nrow(compounds) == 0)
     stop("No compounds found for expid = ", exp.id)
   
-  compid.start <- min(compounds$compound_id)
-  compid.end   <- max(compounds$compound_id)
   
   if (is.null(min)) {
     min <- 5   # default safe value (you can store analyzer in DB later)
@@ -40,33 +38,25 @@ net.addit_SQL <- function(sql_path,
   
   ##Edges 
   if (nettype == "CSPP") {
-    
     if (is.null(nr_col)) nr_col <- 35
-    
     edges.net <- allCSPP_SQL(
       sql_path = sql_path,
-      compid.start = compid.start,
-      compid.end = compid.end,
+      exp.id = exp.id,
       nr_col = nr_col,
       thr1 = thr1,
       thr2 = thr2,
       thr3 = thr3
     )
-    
   } else if (nettype == "GNPS") {
-    
     if (is.null(nr_col)) nr_col <- 6
-    
     edges.net <- allGNPS_SQL(
       sql_path = sql_path,
-      compid.start = compid.start,
-      compid.end = compid.end,
+      exp.id = exp.id,
       nr_col = nr_col,
       thr1 = thr1,
       thr2 = thr2,
       thr3 = thr3
     )
-    
   } else {
     stop("Type of net should be CSPP or GNPS.")
   }

@@ -7,7 +7,9 @@ Overall.net_SQL <- function(sql_path,
                             thr3 = 0.2) {
   
   oldpar <- par(no.readonly = TRUE)
-  on.exit(par(oldpar), add = TRUE)
+  on.exit({
+    try(par(oldpar), silent = TRUE)
+  }, add = TRUE)
   
   par(mfrow = c(1,2), mar = c(1,1,1,1))
   
@@ -20,7 +22,6 @@ Overall.net_SQL <- function(sql_path,
                             thr3 = thr3)
   
   locNET1.list <- Local.net_SQL(net.lst1,
-                                sql_path = sql_path,
                                 dbkey = dbkey,
                                 nettype = "CSPP",
                                 nr_of_seq = nr_of_seq)
@@ -35,7 +36,6 @@ Overall.net_SQL <- function(sql_path,
                             thr3 = thr3)
   
   locNET2.list <- Local.net_SQL(net.lst2,
-                                sql_path = sql_path,
                                 dbkey = dbkey,
                                 nettype = "GNPS",
                                 nr_of_seq = nr_of_seq)

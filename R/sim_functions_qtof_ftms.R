@@ -5,6 +5,8 @@ library(Spectra)
 neutral_loss <- function(mz_values, precursorMz) {
   round_perl(precursorMz) - mz_values
 }
+
+
 round_perl <- function(number) {
   return(floor(number + 0.5))
 }

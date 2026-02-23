@@ -41,30 +41,18 @@
 #' @author Ahlam Mentag
 #'
 #' @export
-conv.CSPP_SQL <- function(inp.x, mzdiff, direc,
-                          peakwidth, mzerr = 0.015,
-                          data_con) {
+conv.CSPP_SQL <- function(inp.x,
+                          mzdiff,
+                          direc,
+                          peakwidth,
+                          mzerr = 0.015,
+                          ms2_split) {
   
   Prod.dat <- inp.x[order(inp.x$mass_measured), ]
   Sub.dat  <- Prod.dat
   
-  cspp.df <- data.frame(
-    COMPID.sub   = integer(),
-    MZ.sub       = numeric(),
-    IONS.sub     = integer(),
-    COMPID.prod  = integer(),
-    MZ.prod      = numeric(),
-    IONS.prod    = integer(),
-    COMMON_IONS  = integer(),
-    DOT_IONS     = numeric(),
-    COMMON_LOSS  = integer(),
-    DOT_LOSS     = numeric(),
-    FORW_IONS    = numeric(),
-    REV_IONS     = numeric(),
-    FORW_LOSS    = numeric(),
-    REV_LOSS     = numeric(),
-    stringsAsFactors = FALSE
-  )
+  cspp.list <- list()
+  idx <- 1
   
   i <- 1
   repeat {
@@ -90,20 +78,23 @@ conv.CSPP_SQL <- function(inp.x, mzdiff, direc,
         out <- targMS2comp_SQL(
           Sub.dat$compound_id[i],
           Prod.dat$compound_id[j],
-          data_con,
-          IntThres
+          ms2_split
         )
         
-        rt.sub  <- Sub.dat$retention_time[i]
-        rt.prod <- Prod.dat$retention_time[j]
-        
-        if (
-          (direc == 1 && rt.prod < rt.sub - peakwidth) ||
-          (direc == 2 && rt.prod > rt.sub + peakwidth) ||
-          (direc == 3 && (rt.prod < rt.sub - peakwidth ||
-                          rt.prod > rt.sub + peakwidth))
-        ) {
-          cspp.df <- rbind(cspp.df, out)
+        if (!is.null(out)) {
+          
+          rt.sub  <- Sub.dat$retention_time[i]
+          rt.prod <- Prod.dat$retention_time[j]
+          
+          if (
+            (direc == 1 && rt.prod < rt.sub - peakwidth) ||
+            (direc == 2 && rt.prod > rt.sub + peakwidth) ||
+            (direc == 3 && (rt.prod < rt.sub - peakwidth ||
+                            rt.prod > rt.sub + peakwidth))
+          ) {
+            cspp.list[[idx]] <- out
+            idx <- idx + 1
+          }
         }
         
         j <- j + 1
@@ -117,7 +108,9 @@ conv.CSPP_SQL <- function(inp.x, mzdiff, direc,
     i <- i + 1
   }
   
-  return(cspp.df)
+  if (length(cspp.list) == 0)
+    return(data.frame())
+  
+  do.call(rbind, cspp.list)
 }
-
 
