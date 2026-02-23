@@ -127,5 +127,32 @@ MultExp_CSPP_SQL("C:/Users/ament/Desktop/sql_data/DYL_FLAX_QTOFneg.sqlite",
                              IntThres  = 5, cspp = cspp)
 ```
 
+GNPS and CSPP Network
 
+```{r}
+Overall.net_SQL(sql_path = sql_path, exp.id = 1, dbkey = 26,
+                            nr_of_seq = 2,
+                            thr1 = 3,
+                            thr2 = 0.1,
+                            thr3 = 0.2)
+```
+
+```{r}
+Overall.net_SQL(sql_path = sql_path, exp.id = 1, dbkey = 20,
+                            nr_of_seq = 2,
+                            thr1 = 3,
+                            thr2 = 0.1,
+                            thr3 = 0.2)
+```
+
+```{r}
+net.lst1 <- net.addit_SQL(sql_path = sql_path, exp.id= 1, nettype="CSPP", thr1=0, thr2=0, thr3=0)
+edges.net <- net.lst1[[2]]
+head(edges.net)
+```
+
+```{r}
+net.lst1 <- net.addit_SQL(sql_path = sql_path, exp.id = 1, nettype = "CSPP", thr1 = 0, thr2 = 0, thr3 = 0)
+net.lst1
+```
 
