@@ -1,25 +1,63 @@
+#' @title generating compound pairs with their associated similarity metrics.
+#' 
+#' @description
+#' allCSPP_SQL() connects to a SQLite database, retrieves CSPP-based 
+#' relationships between compounds for a given experiment (exp.id), parses 
+#' pairwise similarity information from the gnps_add table, filters the results 
+#' using defined thresholds (thr1, thr2, thr3).
+#' 
+#' @param sql_path 'character(1)' path to the sqlite database.
+#' 
+#' @param exp.id 'number(1)' experiment to use for network generation.
+#' 
+#' @param nr_col number of columns in the compound_add table.
+#' 
+#' @param thr1 'number(1)' minimum number of product ions (varying between 0 
+#' and 1) of one CID spectrum that can be traced in another CID spectrum,
+#' set on 1 by default.
+#' 
+#' @param thr2 'number(1)' dot product threshold for the common ions 
+#' between two CID spectra, set on 0.9 by default.
+#' 
+#' @param thr3 'number(1)' average of the dot products obtained for the common 
+#' product ions and the common neutral losses, by default set on 0.4.
+#' 
+#' @returns a data frame of compound pairs with their associated CSPP similarity
+#'          metrics.
+#'          
+#' @import DBI
+#' @import RSQLite
+#' 
+#' @author Ahlam Mentag
+#' 
+#' @export
+
 allCSPP_SQL <- function(sql_path,
                         exp.id,
-                        nr_col = 35,
-                        thr1 = 3,
-                        thr2 = 0.1,
-                        thr3 = 0.1) {
+                        nr_col = NULL,
+                        thr1 = 1,
+                        thr2 = 0.9,
+                        thr3 = 0.4) {
   
   con <- dbConnect(RSQLite::SQLite(), sql_path)
   on.exit(dbDisconnect(con), add = TRUE)
   
+  if (is.null(nr_col)) {
+    table_info <- dbGetQuery(con, "PRAGMA table_info(compound_add)")
+    nr_col <- nrow(table_info)
+  }
   
   compounds <- dbGetQuery(
     con,
     sprintf("SELECT compound_id FROM ms_compound WHERE expid = %d", exp.id)
   )
   
-  if (nrow(compounds) == 0) return(data.frame())
+  if (nrow(compounds) == 0) 
+    return(data.frame())
   
   comp_ids <- compounds$compound_id
   
   compound_add <- dbGetQuery(con, "SELECT * FROM compound_add")
-  
   compound_add <- compound_add[compound_add[,1] %in% comp_ids, ]
   
   cspp.res <- data.frame(
@@ -33,7 +71,7 @@ allCSPP_SQL <- function(sql_path,
   )
   
   k <- 1
-  max_col <- min(nr_col, ncol(compound_add))  # éviter dépassement de colonnes
+  max_col <- min(nr_col, ncol(compound_add))
   
   for (i in seq_len(nrow(compound_add))) {
     
