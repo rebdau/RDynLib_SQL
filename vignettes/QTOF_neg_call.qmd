@@ -23,7 +23,7 @@ pth
 We start by loading the [similarity_functions.R](https://github.com/rebdau/RDynLib_SQL/blob/Ahlam/R/similarity_functions.R) file to import the similarity function.
 
 ```{r}
-source("similarity_functions.R")
+source("C:/Users/ament/Desktop/Github/RDynLib_SQL/R/similarity_functions.R")
 ```
 
 Then, install the new CompoundDb version:
@@ -74,14 +74,14 @@ spectraData(qtof_neg)
 Next we calculate the similarity score between the dynlib and flax seed QTOF negative integuments.
 
 ```{r}
-qtof_matches <- symmetric_dotproduct_combined(
+qtof_matches <- similarity_RDynlib(
   qtof_neg,
   dy_sps,
   polarity_query = 0,
   polarity_target = 0,
 
-  precursor_resolution = "unit.resolution",
-  fragments_resolution = "unit.resolution",
+  precursor_resolution = "high.resolution",
+  fragments_resolution = "high.resolution",
 )
 ```
 
@@ -95,5 +95,5 @@ nrow(qtof_matches)
 save the resulting object:
 
 ```{r}
-save(qtof_matches, file = "data/qtof_matches.RData")
+save(qtof_matches, file = "data/qtof_matches_11.RData")
 ```
