@@ -248,11 +248,14 @@ dynlib_map <- function(x, y,
 #' @param threshold 'numeric(1)' the score threshold to select a best match, by 
 #'        default it is 0.8.
 #'        
-#' @param ppm 'numeric(1)' define an acceptable difference between m/z values of  
-#'        the compared peaks by default it is 0. 
-#'        
-#' @param tolerance 'numeric(1)' define an acceptable difference between m/z  
-#'        values of the compared peaks by default it is 0,005. 
+#' @param ppm numeric(1). Defines the acceptable difference between m/z values
+#'        of the compared peaks. The default is 0. It is overridden here because
+#'        the dynlib_map() function requires exact m/z matching.
+#'
+#' @param tolerance numeric(1). Defines the acceptable absolute difference
+#'        between m/z values of the compared peaks. The default is 0.005. 
+#'        It is overridden here because the dynlib_map() function requires 
+#'         exact m/z matching.
 #'       
 #' @param digits 'numeric(1)' rounding number, by default it is 4.  
 #'      
