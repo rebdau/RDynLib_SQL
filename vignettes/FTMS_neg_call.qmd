@@ -2,27 +2,64 @@
 title: "Untitled"
 format: html
 server: shiny
+
 ---
 
 In this quarto document we call the "sim_functions.R" file code to use functions
 for similarity calculation between FTMS data and the RDynLib FTMS database.
 
+## Directory Organization
 
+This project follows an  R package layout as follows:
+
+The main project folder is:
+
+RDynLib_SQL/
+
+
+Within this directory, the structure is organized as follows:
+
+RDynLib_SQL/
+├── data/
+├── R/
+└── vignettes/
+
+
+### `data/`
+
+Contains the SQLite database files used in the workflow (e.g., `ftms_flax_neg.sqlite`).
+
+### `R/`
+
+Contains the R source files (`.R`) that define the package functions and core implementation.
+
+### `vignettes/`
+
+Contains Quarto (`.qmd`) files that document the workflow and provide reproducible examples.
+
+In this workflow, the working directory is set to the project root:
+
+RDynLib_SQL/
+
+## Loading required packages
 ```{r}
+library(here)
 library(Spectra)
 library(CompoundDb)
-pth <- getwd()
-pth
-setwd("C:/Users/amentag/Desktop/these/These/clones/new_clones/RDynLib/Similarity/FTMS")
-pth <- getwd()
-pth
+library(MetaboAnnotation)
+library(DBI)
+library(RSQLite)
+library(devtools)
+
+#` Uploading RDynLibSQL: Load all functions of the RDynlib directory
+load_all()
 ```
 
 
 First we load the "sim_functions.R" file that contains functions for similarity 
 calculation.
 ```{r}
-source("sim_functions_ftmsneg.R")
+source(here("R","sim_functions_ftmsneg.R"))
 ```
 
 Here we install the new CompoundDb version
@@ -31,12 +68,11 @@ Here we install the new CompoundDb version
 ```
 
 
-
+## convert the "Dynlib_FTMS_neg.sqlite" database to a spectra object
 Next we convert the "Dynlib_FTMS_neg.sqlite" database to a spectra object
 ```{r}
-library(DBI)
-library(RSQLite)
-dbf <- file.path(pth,"/data", "DyLib_FTMS_neg_or.sqlite")
+
+dbf <- here("data", "DyLib_FTMS_neg_or.sqlite")
 db <- dbConnect(SQLite(), dbf)
 dbExecute(db, "DROP TABLE IF EXISTS feature_matrix ")
 experiment_df <- dbGetQuery(db, "SELECT * FROM experiment")
@@ -57,14 +93,14 @@ dy_sps <- Spectra(cdb)
 
 
 ```{r}
-spectraData(dy_sps, columns = c("rtime"))
+spectraData(dy_sps, columns = c("retention_time"))
 ```
 
 
 
 Here we load the FTMS of flax seed database (it's already a spectra object)  
 ```{r}
-load("data/ftms_one_merged_tree.RData")
+load(here("data","ftms_one_merged_tree.RData"))
 ft_neg <- ftms_one_merged_tree
 spectraData(ft_neg)
 ```
