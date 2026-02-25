@@ -48,100 +48,119 @@
 #' 
 #' @export
 cspp.tot_SQL <- function(sql_path, expid, mzerr = 0.015,
-                         cspp = "cspp.txt", peakwidth = NULL, IntThres  = 100) {
-  
-
-  data_con <- dbConnect(RSQLite::SQLite(), sql_path)
-  on.exit(dbDisconnect(data_con), add = TRUE)
+                         cspp = "cspp.txt",
+                         peakwidth = NULL,
+                         IntThres = 100) {
   
   if (is.null(peakwidth)) peakwidth <- 0.2
-
+  
+  data_con <- dbConnect(SQLite(), sql_path)
+  on.exit(dbDisconnect(data_con), add = TRUE)
+  
+  # Load compounds
   inp.x <- dbGetQuery(
     data_con,
     sprintf(
-      "SELECT compound_id,
-              mass_measured,
-              retention_time
+      "SELECT compound_id, mass_measured, retention_time
        FROM ms_compound
-       WHERE expid = %d",
-      expid
+       WHERE expid = %d", expid
     )
   )
   
-  if (nrow(inp.x) == 0) {
+  if (nrow(inp.x) == 0)
     stop("No compounds found for expid = ", expid)
-  }
-
-  comp_add <- dbGetQuery(
-    data_con,
-    "SELECT * FROM compound_add"
-  )
   
-
-  conv.table <- read.table(
-    cspp,
-    header = TRUE,
-    sep = "\t",
-    stringsAsFactors = FALSE
-  )
+  inp.x <- inp.x[order(inp.x$mass_measured), ]
+  
+  
+  # Load compound_add
+  comp_add <- dbReadTable(data_con, "compound_add")
+  
+  
+  # Load conversion table
+  conv.table <- fread(cspp, header = TRUE, sep = "\t")
   
   conver <- data.frame(
-    conv.type  = as.character(conv.table[, 1]),
-    conv.mz    = as.numeric(conv.table[, 3]),
-    conv.direc = as.integer(conv.table[, 5]),
-    conv.colmn = as.integer(conv.table[, 6]),
+    conv.type  = as.character(conv.table[[1]]),
+    conv.mz    = as.numeric(conv.table[[3]]),
+    conv.direc = as.integer(conv.table[[5]]),
+    conv.colmn = as.integer(conv.table[[6]]),
     stringsAsFactors = FALSE
   )
   
-
+  
+  # LOAD ALL MS2 ONCE 
+  message("Loading all MS2 spectra into memory...")
+  
+  # One MS2 spectrum per compound
+  spec_df <- dbGetQuery(
+    data_con,
+    "
+    SELECT s.spectrum_id,
+           s.compound_id,
+           s.precursor_mz
+    FROM msms_spectrum s
+    WHERE s.ms_level = 2
+      AND s.spectrum_id = (
+          SELECT MIN(s2.spectrum_id)
+          FROM msms_spectrum s2
+          WHERE s2.compound_id = s.compound_id
+            AND s2.ms_level = 2
+      )
+    "
+  )
+  
+  if (nrow(spec_df) == 0)
+    stop("No MS2 spectra found.")
+  
+  peak_df <- dbGetQuery(
+    data_con,
+    "SELECT spectrum_id, mz, intensity FROM msms_spectrum_peak"
+  )
+  
+  ms2_df <- merge(peak_df, spec_df, by = "spectrum_id")
+  
+  # Filter by intensity threshold here (faster later)
+  ms2_df <- ms2_df[ms2_df$intensity >= IntThres, ]
+  
+  ms2_split <- split(ms2_df, ms2_df$compound_id)
+  
+  message("Loaded MS2 for ", length(ms2_split), " compounds.")
+  
+  
+  # Process conversions
   for (k in seq_len(nrow(conver))) {
+    
+    message("Processing conversion: ", k, "/", nrow(conver))
     
     cspp.df <- conv.CSPP_SQL(
       inp.x,
       mzdiff    = conver$conv.mz[k],
       direc     = conver$conv.direc[k],
       peakwidth = peakwidth,
-      mzerr     = mzerr
+      mzerr     = mzerr,
+      ms2_split = ms2_split
     )
     
-    comp_add <- rank.cspp(
-      cspp.df,
-      conver$conv.colmn[k],
-      comp_add
-    )
-  }
-
-  comp_add$compound_id <- inp.x$compound_id[
-    seq_len(nrow(comp_add))
-  ]
-  
-
-  cols_to_update <- setdiff(colnames(comp_add), "compound_id")
-  
-  dbBegin(data_con)
-  
-  for (i in seq_len(nrow(comp_add))) {
-    
-    cid <- comp_add$compound_id[i]
-    
-    for (col in cols_to_update) {
-      
-      dbExecute(
-        data_con,
-        sprintf(
-          "UPDATE compound_add
-           SET %s = ?
-           WHERE compound_id = ?",
-          col
-        ),
-        params = list(comp_add[i, col], cid)
-      )
-    }
+    comp_add <- rank.cspp(cspp.df,
+                          conver$conv.colmn[k],
+                          comp_add)
   }
   
-  dbCommit(data_con)
+  comp_add$compound_id <- inp.x$compound_id[seq_len(nrow(comp_add))]
   
-
+  
+  # Rewrite table 
+  message("Writing results to database...")
+  
+  dbExecute(data_con, "DROP TABLE IF EXISTS compound_add_new")
+  dbWriteTable(data_con, "compound_add_new", comp_add)
+  
+  dbExecute(data_con, "DROP TABLE compound_add")
+  dbExecute(data_con, "ALTER TABLE compound_add_new RENAME TO compound_add")
+  
+  message("Done.")
+  
   invisible(comp_add)
 }
 

@@ -1,3 +1,28 @@
+#' @title generating the nodes and edges for the experiment-based global network.
+#'
+#' @description 
+#' The net.addit_SQL() function is responsible for generating lists of network  
+#' nodes and edges by the net.nodes_SQL() and either the allCSPP_SQL() 
+#' or allGNPS_SQL() functions, respectively. This generates the nodes and edges 
+#' for the experiment-based global network. Only edges are retained that pass 
+#' certain CID spectral similarity thresholds.
+#' 
+#' @param sql_path 'character(1)' path to the sqlite database.
+#' 
+#' @param exp.id 'number(1)' experiment to use for network generation.
+#' 
+#' @param nettype 'character(1)' the graph type the user want to display, 
+#' it could be either 
+#' 
+#' @param nr_col number of columns in the compound_add and gnps_add tables.
+#' 
+#' @return list of edges and nodes.
+#' 
+#' @import DBI
+#' @import RSQLite
+#' @author Ahlam Mentag
+#' 
+#' @export
 net.addit_SQL <- function(sql_path,
                           exp.id,
                           nettype,
@@ -24,29 +49,37 @@ net.addit_SQL <- function(sql_path,
   if (nrow(compounds) == 0)
     stop("No compounds found for expid = ", exp.id)
   
-  compid.start <- min(compounds$compound_id)
-  compid.end   <- max(compounds$compound_id)
-  
   if (is.null(min)) {
-    min <- 5   # default safe value (you can store analyzer in DB later)
+    min <- 5  
   }
   
-  ##Nodes 
+  ## Nodes
   nodes.net <- net.nodes_SQL(
     sql_path = sql_path,
     exp.id = exp.id,
     min = min
   )
   
-  ##Edges 
-  if (nettype == "CSPP") {
+  ## If nr_col is NULL, detect automatically from database
+  if (is.null(nr_col)) {
     
-    if (is.null(nr_col)) nr_col <- 35
+    if (nettype == "CSPP") {
+      table_info <- dbGetQuery(con, "PRAGMA table_info(compound_add)")
+    } else if (nettype == "GNPS") {
+      table_info <- dbGetQuery(con, "PRAGMA table_info(gnps_add)")
+    } else {
+      stop("Type of net should be CSPP or GNPS.")
+    }
+    
+    nr_col <- nrow(table_info)
+  }
+  
+  ## Edges
+  if (nettype == "CSPP") {
     
     edges.net <- allCSPP_SQL(
       sql_path = sql_path,
-      compid.start = compid.start,
-      compid.end = compid.end,
+      exp.id = exp.id,
       nr_col = nr_col,
       thr1 = thr1,
       thr2 = thr2,
@@ -55,23 +88,17 @@ net.addit_SQL <- function(sql_path,
     
   } else if (nettype == "GNPS") {
     
-    if (is.null(nr_col)) nr_col <- 6
-    
     edges.net <- allGNPS_SQL(
       sql_path = sql_path,
-      compid.start = compid.start,
-      compid.end = compid.end,
+      exp.id = exp.id,
       nr_col = nr_col,
       thr1 = thr1,
       thr2 = thr2,
       thr3 = thr3
     )
-    
-  } else {
-    stop("Type of net should be CSPP or GNPS.")
   }
   
-  ##Additional metrics
+  ## Additional metrics
   common.nr <- edges.net[,4] * edges.net[,5]
   edges.net <- data.frame(edges.net, common.nr)
   

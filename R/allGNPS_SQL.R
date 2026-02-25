@@ -1,9 +1,42 @@
+#' @title generating compound pairs with their associated similarity metrics.
+#' 
+#' @description
+#' allGNPS_SQL() connects to a SQLite database, retrieves GNPS-based 
+#' relationships between compounds for a given experiment (exp.id), parses 
+#' pairwise similarity information from the gnps_add table, filters the results 
+#' using defined thresholds (thr1, thr2, thr3).
+#' 
+#' @param sql_path 'character(1)' path to the sqlite database.
+#' 
+#' @param exp.id 'number(1)' experiment to use for network generation.
+#' 
+#' @param nr_col number of columns in the gnps_add table.
+#' 
+#' @param thr1 'number(1)' minimum number of product ions (varying between 0 
+#' and 1) of one CID spectrum that can be traced in another CID spectrum,
+#' set on 1 by default.
+#' 
+#' @param thr2 'number(1)' dot product threshold for the common ions 
+#' between two CID spectra, set on 0.9 by default.
+#' 
+#' @param thr3 'number(1)' average of the dot products obtained for the common 
+#' product ions and the common neutral losses, by default set on 0.4.
+#' 
+#' @returns a data frame of compound pairs with their associated GNPS similarity
+#'          metrics.
+#'          
+#' @import DBI
+#' @import RSQLite
+#' 
+#' @author Ahlam Mentag
+#' 
+#' @export
 allGNPS_SQL <- function(sql_path,
                         exp.id,
                         nr_col = 6,
-                        thr1 = 3,
-                        thr2 = 0.1,
-                        thr3 = 0.1) {
+                        thr1 = 1,
+                        thr2 = 0.9,
+                        thr3 = 0.4) {
   
   con <- dbConnect(RSQLite::SQLite(), sql_path)
   on.exit(dbDisconnect(con), add = TRUE)

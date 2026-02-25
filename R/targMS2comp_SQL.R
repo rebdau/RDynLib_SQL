@@ -45,85 +45,61 @@
 #' @author Ahlam Mentag
 #'
 #' @export
-targMS2comp_SQL <- function(compid1, compid2,
-                            data_con, IntThres) {
-
-    
-    
-    ## get one MS2 spectrum per compound 
-    spec_q <- "
-    SELECT spectrum_id, compound_id, precursor_mz
-    FROM msms_spectrum
-    WHERE compound_id = ?
-      AND ms_level = 2
-    ORDER BY spectrum_id
-    LIMIT 1
-  "
-    
-    s1 <- dbGetQuery(data_con, spec_q, params = list(compid1))
-    s2 <- dbGetQuery(data_con, spec_q, params = list(compid2))
-    
-    if (nrow(s1) == 0 || nrow(s2) == 0) {
-      return(NULL)
-    }
-    
-    ##get fragment peaks
-    peak_q <- "
-    SELECT mz, intensity
-    FROM msms_spectrum_peak
-    WHERE spectrum_id = ?
-  "
-    
-    p1 <- dbGetQuery(data_con, peak_q, params = list(s1$spectrum_id))
-    p2 <- dbGetQuery(data_con, peak_q, params = list(s2$spectrum_id))
-    
-    if (nrow(p1) == 0 || nrow(p2) == 0) {
-      return(NULL)
-    }
-    
-    ## relative intensities
-    p1$rint <- as.integer(p1$intensity / max(p1$intensity) * 100)
-    p2$rint <- as.integer(p2$intensity / max(p2$intensity) * 100)
-    
-    ##  filter by intensity 
-    ac <- p1[p1$intensity >= IntThres, c("mz", "rint", "intensity")]
-    bd <- p2[p2$intensity >= IntThres, c("mz", "rint", "intensity")]
-    
-    if (nrow(ac) == 0 || nrow(bd) == 0) {
-      return(NULL)
-    }
-    
-    ##dot product on ions
-    DotIons <- CommonDotProd(ac, bd)
-    
-    ## neutral losses 
-    ac$nloss <- round(s1$precursor_mz) - ac$mz
-    bd$nloss <- round(s2$precursor_mz) - bd$mz
-    
-    ac_n <- ac[, c("nloss", "rint", "intensity")]
-    bd_n <- bd[, c("nloss", "rint", "intensity")]
-    
-    DotLoss <- CommonDotProd(ac_n, bd_n)
-    
-    ## final output
-    fin <- data.frame(
-      COMPID.sub   = compid1,
-      MZ.sub       = s1$precursor_mz,
-      IONS.sub     = nrow(ac),
-      COMPID.prod  = compid2,
-      MZ.prod      = s2$precursor_mz,
-      IONS.prod    = nrow(bd),
-      COMMON_IONS  = DotIons[[1]],
-      DOT_IONS     = round(DotIons[[2]], 3),
-      COMMON_LOSS  = DotLoss[[1]],
-      DOT_LOSS     = round(DotLoss[[2]], 3),
-      FORW_IONS    = round(DotIons[[1]] / nrow(ac), 3),
-      REV_IONS     = round(DotIons[[1]] / nrow(bd), 3),
-      FORW_LOSS    = round(DotLoss[[1]] / nrow(ac), 3),
-      REV_LOSS     = round(DotLoss[[1]] / nrow(bd), 3),
-      stringsAsFactors = FALSE
-    )
-    
-    return(fin)
-  }
+targMS2comp_SQL <- function(compid1,
+                            compid2,
+                            ms2_split) {
   
+  ms2_sub  <- ms2_split[[as.character(compid1)]]
+  ms2_prod <- ms2_split[[as.character(compid2)]]
+  
+  if (is.null(ms2_sub) || is.null(ms2_prod))
+    return(NULL)
+  
+  if (nrow(ms2_sub) == 0 || nrow(ms2_prod) == 0)
+    return(NULL)
+  
+  precursor1 <- ms2_sub$precursor_mz[1]
+  precursor2 <- ms2_prod$precursor_mz[1]
+  
+  # Relative intensities
+  ms2_sub$rint  <- as.integer(ms2_sub$intensity /
+                                max(ms2_sub$intensity) * 100)
+  
+  ms2_prod$rint <- as.integer(ms2_prod$intensity /
+                                max(ms2_prod$intensity) * 100)
+  
+  ac <- ms2_sub[, c("mz", "rint", "intensity")]
+  bd <- ms2_prod[, c("mz", "rint", "intensity")]
+  
+  if (nrow(ac) == 0 || nrow(bd) == 0)
+    return(NULL)
+  
+  DotIons <- CommonDotProd(ac, bd)
+  
+  # Neutral losses
+  ac$nloss <- round(precursor1) - ac$mz
+  bd$nloss <- round(precursor2) - bd$mz
+  
+  DotLoss <- CommonDotProd(
+    ac[, c("nloss", "rint", "intensity")],
+    bd[, c("nloss", "rint", "intensity")]
+  )
+  
+  data.frame(
+    COMPID.sub   = compid1,
+    MZ.sub       = precursor1,
+    IONS.sub     = nrow(ac),
+    COMPID.prod  = compid2,
+    MZ.prod      = precursor2,
+    IONS.prod    = nrow(bd),
+    COMMON_IONS  = DotIons[[1]],
+    DOT_IONS     = round(DotIons[[2]], 3),
+    COMMON_LOSS  = DotLoss[[1]],
+    DOT_LOSS     = round(DotLoss[[2]], 3),
+    FORW_IONS    = round(DotIons[[1]] / nrow(ac), 3),
+    REV_IONS     = round(DotIons[[1]] / nrow(bd), 3),
+    FORW_LOSS    = round(DotLoss[[1]] / nrow(ac), 3),
+    REV_LOSS     = round(DotLoss[[1]] / nrow(bd), 3),
+    stringsAsFactors = FALSE
+  )
+}

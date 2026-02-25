@@ -1,30 +1,33 @@
 ---
-title: "Untitled"
-format: html
-server: shiny
+title: "workflow to test the similarity_RDynlib() function on qtof data"
+format:
+  html:
+    toc: true
+    self-contained: true
+author: "Ahlam Mentag, Rebecca Dauwe, Johannes Rainer"
 ---
 
-In this quarto document we call the "sim_functions_qtofneg.R" file code to use 
-functions for similarity calculation between QTOF data and the RDynLib QTOF 
-negative database.
+## Shiny Documents
 
+This quarto document represents the workflow for calling the `similarity_RDynlib()` from the [similarity_functions.R](https://github.com/rebdau/RDynLib_SQL/blob/Ahlam/R/similarity_functions.R) file to calculate the similarity between QTOF flax data and the RDynLib QTOFdatabase.
+
+# Required packages
 
 ```{r}
 library(Spectra)
 library(CompoundDb)
-setwd("C:/Users/ament/Desktop/Github/RDynLib/Similarity/QTOF")
 pth <- getwd()
 pth
 ```
 
+We start by loading the [similarity_functions.R](https://github.com/rebdau/RDynLib_SQL/blob/Ahlam/R/similarity_functions.R) file to import the similarity function.
 
-First we load the "sim_functions.R" file that contains functions for similarity 
-calculation.
 ```{r}
-source("sim_functions_qtofneg.R")
+source("C:/Users/ament/Desktop/Github/RDynLib_SQL/R/similarity_functions.R")
 ```
 
-Here we install the new CompoundDb version
+Then, install the new CompoundDb version:
+
 ```{r}
 BiocManager::install("RforMassSpectrometry/CompoundDb", ref = "jomain", force = TRUE)
 ```
@@ -37,10 +40,11 @@ ExpCompDb <- function(x) {
 ```
 
 Next we convert the "DyLib_QTOF_neg2.sqlite" database to a spectra object
+
 ```{r}
 library(DBI)
 library(RSQLite)
-dbf <- file.path("data", "DyLib_QTOF_neg.sqlite")
+dbf <- file.path("C:/Users/ament/Desktop/Github/RDynLib/Similarity/QTOF/data", "DyLib_QTOF_neg.sqlite")
 db <- dbConnect(SQLite(), dbf)
 dbExecute(db, "DROP TABLE IF EXISTS feature_matrix ")
 experiment_df <- dbGetQuery(db, "SELECT * FROM experiment")
@@ -59,55 +63,37 @@ cdb <- ExpCompDb(dbf)
 dy_sps <- Spectra(cdb)
 ```
 
-Here we load the QTOF of flax seed database (it's already a spectra object)  
+Here we load the QTOF of flax seed database (it's already a spectra object), you can load it from: [qtof_filtering.qmd](https://github.com/rebdau/RDynLib_qtof/blob/ahlam/qtof_filtering.qmd)
+
 ```{r}
-load("data/qtof_flax_final.RData")
+load("C:/Users/ament/Desktop/Github/RDynLib/Similarity/QTOF/data/qtof_flax_final.RData")
 qtof_neg <- qtof_flax_final
 spectraData(qtof_neg)
 ```
 
-```{r}
-dataStorageBasePath(qtof_flax_final) <- "D:/work/these/These/clones/new_clones/RDynLib_qtof/data/mzml"
-
-```
+Next we calculate the similarity score between the dynlib and flax seed QTOF negative integuments.
 
 ```{r}
-save(qtof_flax_final, file = "data/qtof_flax_final.RData")
+qtof_matches <- similarity_RDynlib(
+  qtof_neg,
+  dy_sps,
+  polarity_query = 0,
+  polarity_target = 0,
+
+  precursor_resolution = "high.resolution",
+  fragments_resolution = "high.resolution",
+)
 ```
 
+print the similarity matrix and the number of rows (matches)
 
 ```{r}
-load("data/qtof_flax_final.RData")
-qtof_neg <- qtof_flax_final
-spectraData(qtof_neg)
+print(qtof_matches)
+nrow(qtof_matches)
 ```
 
-
-
-Next we calculate the similarity score between the dynlib and flax seed QTOF
-negative integuments.
-
+save the resulting object:
 
 ```{r}
-source("sim_functions_qtofneg.R")
-result <- sim_final_final(qtof_neg, dy_sps, polarity_query = 0, polarity_target = 0, machine_target = "Synapt", threshold = 0.8)
-#save the result to a .RData object
-save(result, file = "data/match_results_qtofneg.RData")
-load("data/match_results_qtofneg.RData")
-
-print(result)
-nrow(result)
+save(qtof_matches, file = "data/qtof_matches_11.RData")
 ```
-
-
-the resulting table has 23 rows, which means 23 matches
-
-```{r}
-View(as.data.frame(result[, c("score","matched_peaks_count","target_spectrum_id",
-                              "spectrumId", "msLevel", "target_msLevel")]))
-
-```
-
-
-
-

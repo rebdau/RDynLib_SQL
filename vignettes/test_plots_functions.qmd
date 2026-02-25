@@ -1,0 +1,158 @@
+---
+title: "Untitled"
+format: html
+server: shiny
+---
+
+## Shiny Documents
+
+This Quarto document is made interactive using Shiny. Interactive documents allow readers to modify parameters and see the results immediately. Learn more about Shiny interactive documents at <https://quarto.org/docs/interactive/shiny/>.
+
+## Inputs and Outputs
+
+You can embed Shiny inputs and outputs in your document. Outputs are automatically updated whenever inputs change. This demonstrates how a standard R plot can be made interactive:
+
+```{r}
+#| message: false
+
+#' Load required libraries
+library(devtools)
+library(DBI)
+library(RSQLite)
+#rm(list = c("convert_compid_assoc"))
+#` Uploading RDynLib: Load all functions of the RDynlib directory
+load_all()
+```
+
+setting the arguments for MSnspecplot_assoc_SQL() function:
+
+```{r}
+#directory to the sql databases
+sql_dir <- "C:/Users/ament/Desktop/sql_data"
+
+#path to the file with the aligned compounds
+assoc_path <- "C:/Users/ament/Desktop/sql_data/assoc_flax.txt"
+
+#compound_id
+dbkey <- 101171
+
+#database name
+db_name <- "DYL_FLAX_FTMSneg.sqlite"
+```
+
+Plot the spectra of a given compound and the corrosponding compounds 
+in the "assoc_path".
+
+```{r}
+test <- MSnspecplot_assoc_SQL(sql_dir, db_name, dbkey, assoc_path, nr_col = 35, 
+                      nr_col2 = 6, lc.err = 0.02, mz.err = 0.001, MS1 = NULL,
+                      prcx = 0.6) 
+```
+The output of 'MSnspecplot_assoc_SQL()' shows that the 45816 is the aligned 
+compound from Qtofneg with 101171 compound from FTMSneg.
+
+Plot just the spectra of the 45816 compound from Qtof database:
+
+```{r}
+MSnplot_SQL("C:/Users/ament/Desktop/sql_data/DYL_FLAX_QTOFneg.sqlite", 45816)
+```
+
+Plot just the spectra of the 101171 compound from FTMS database:
+```{r}
+MSnplot_SQL("C:/Users/ament/Desktop/sql_data/DYL_FLAX_FTMSneg.sqlite", 101171)
+```
+
+Test the MS2plot to plot just the MS2 spectrum
+```{r} 
+MS2plot_SQL("C:/Users/ament/Desktop/sql_data/DYL_FLAX_FTMSneg.sqlite", 101171)
+
+```
+
+
+test cspp.display function
+```{r}
+cspp.display_SQL("C:/Users/ament/Desktop/sql_data/DYL_FLAX_FTMSneg.sqlite", 1, nr_col = 35) 
+```
+
+test gnps.display function
+```{r}
+gnps.display_SQL("C:/Users/ament/Desktop/sql_data/DYL_FLAX_QTOFneg.sqlite", 26, nr_col2 = 6) 
+
+```
+
+test MSMSplot_SQL function
+
+```{r}
+prdion <- read.table(
+  "C:/Users/ament/Desktop/sql_data/product_ion_candid.txt",
+  header = TRUE,
+  sep = "\t",
+  stringsAsFactors = FALSE
+)
+
+neutloss <- read.table(
+  "C:/Users/ament/Desktop/sql_data/neutral_loss_candid.txt",
+  header = TRUE,
+  sep = "\t",
+  stringsAsFactors = FALSE
+)
+
+
+MSMSplot_SQL("C:/Users/ament/Desktop/sql_data/DYL_FLAX_QTOFneg.sqlite", 26,
+             prdion = prdion, neutloss = neutloss, err = NULL, minum = 2, 
+             oldpar = NULL, nl = NULL)
+```
+
+
+```{r}
+MSMSspecplot_SQL("C:/Users/ament/Desktop/sql_data/DYL_FLAX_QTOFneg.sqlite", 26, 
+                 prdion = prdion, neutloss = neutloss, err = NULL, 
+                 minum = NULL, nr_col = NULL,   nr_col2 = NULL)
+```
+
+
+```{r}
+cspp <- "C:/Users/ament/Desktop/sql_data/cspp_ftneg.txt"
+sql_path <- "C:/Users/ament/Desktop/sql_data/DYL_FLAX_QTOFneg.sqlite"
+cspp.tot_SQL(sql_path = sql_path, 1, mzerr = 0.015,
+                         cspp = cspp, peakwidth = NULL, IntThres  = 5)
+```
+
+
+
+```{r}
+
+MultExp_CSPP_SQL("C:/Users/ament/Desktop/sql_data/DYL_FLAX_QTOFneg.sqlite", 
+                 startexp = 1, stopexp = 5, peakwidth = NULL, mzerr = 0.015,
+                             IntThres  = 5, cspp = cspp)
+```
+
+GNPS and CSPP Network
+
+```{r}
+Overall.net_SQL(sql_path = sql_path, exp.id = 1, dbkey = 26,
+                            nr_of_seq = 2,
+                            thr1 = 3,
+                            thr2 = 0.1,
+                            thr3 = 0.2)
+```
+
+```{r}
+Overall.net_SQL(sql_path = sql_path, exp.id = 1, dbkey = 20,
+                            nr_of_seq = 2,
+                            thr1 = 3,
+                            thr2 = 0.1,
+                            thr3 = 0.2)
+```
+
+```{r}
+net.lst1 <- net.addit_SQL(sql_path = sql_path, exp.id= 1, nettype="CSPP", thr1=0, thr2=0, thr3=0)
+edges.net <- net.lst1[[2]]
+head(edges.net)
+```
+
+```{r}
+net.lst1 <- net.addit_SQL(sql_path = sql_path, exp.id = 1, nettype = "CSPP", thr1 = 0, thr2 = 0, thr3 = 0)
+net.lst1
+```
+

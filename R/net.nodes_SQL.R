@@ -1,7 +1,22 @@
+#' @title generating lists of network nodes and edges.
+#'
+#' @description
+#' net.nodes_SQL() connects to a SQLite database and returns a table of 
+#' compounds 'compound_id' for a given experiment 'exp.id', along with 
+#' the number of MS2 peaks 'nr_peaks' per compound whose intensity is greater 
+#' than or equal to a specified threshold 'min'.
+#' 
+#' @param sql_path 'character(1)' path to the sqlite database.
+#' 
+#' @param exp.id 'number(1)' experiment to use for network generation.
+#' 
+#' @import DBI
+#' @import RSQLite
+#' 
+#' @author Ahlam Mentag
+#' 
+#' @export
 net.nodes_SQL <- function(sql_path, exp.id, min = 5) {
-  
-  library(DBI)
-  library(RSQLite)
   
   con <- dbConnect(SQLite(), sql_path)
   on.exit(dbDisconnect(con), add = TRUE)

@@ -1,14 +1,18 @@
 ---
-title: "Untitled"
+title: "workflow to test the similarity_RDynlib() function on ftms data"
 format: html
-server: shiny
-
+  server: shiny
+    toc: true
+    self-contained: true
+author: "Ahlam Mentag, Rebecca Dauwe, Johannes Rainer"
 ---
 
-In this quarto document we call the "sim_functions.R" file code to use functions
-for similarity calculation between FTMS data and the RDynLib FTMS database.
+## Shiny Documents
 
-## Directory Organization
+
+This quarto document represents the workflow for calling the `similarity_RDynlib()` from the [similarity_functions.R](https://github.com/rebdau/RDynLib_SQL/blob/Ahlam/R/similarity_functions.R) file to calculate the similarity between FTMS flax data and the RDynLib FTMS database.
+
+# Required packages
 
 This project follows an  R package layout as follows:
 
@@ -55,21 +59,29 @@ library(devtools)
 load_all()
 ```
 
+We start by loading the [similarity_functions.R](https://github.com/rebdau/RDynLib_SQL/blob/Ahlam/R/similarity_functions.R) file to import the similarity function.
 
-First we load the "sim_functions.R" file that contains functions for similarity 
-calculation.
 ```{r}
 source(here("R","sim_functions_ftmsneg.R"))
 ```
 
-Here we install the new CompoundDb version
+Then, install the new CompoundDb version:
+
 ```{r}
-#BiocManager::install("RforMassSpectrometry/CompoundDb", ref = "jomain", force = TRUE)
+BiocManager::install("RforMassSpectrometry/CompoundDb", ref = "jomain", force = TRUE)
 ```
 
 
+```{r}
+ExpCompDb <- function(x) {
+    cdb <- CompDb(x)
+    CompoundDb::addJoinDefinition(cdb, "ms_compound", "experiment", "expid", "expid")
+}
+```
+
 ## convert the "Dynlib_FTMS_neg.sqlite" database to a spectra object
 Next we convert the "Dynlib_FTMS_neg.sqlite" database to a spectra object
+
 ```{r}
 
 dbf <- here("data", "DyLib_FTMS_neg_or.sqlite")
@@ -86,50 +98,55 @@ dbWriteTable(db, "experiment", experiment_df)
 dbGetQuery(db, "PRAGMA table_info(experiment)")
 dbDisconnect(db)
 #we convert the sql database to a Compdb object
-cdb <- CompDb(dbf)
+cdb <- ExpCompDb(dbf)
 #we convert the Compdb object to a spectra object
 dy_sps <- Spectra(cdb)
 ```
-
 
 ```{r}
 spectraData(dy_sps, columns = c("retention_time"))
 ```
 
-
-
-Here we load the FTMS of flax seed database (it's already a spectra object)  
-```{r}
-load(here("data","ftms_one_merged_tree.RData"))
-ft_neg <- ftms_one_merged_tree
-spectraData(ft_neg)
-```
-
-
-Next we calculate the similarity score between the dynlib and flax seed FTMS
-negative integuments.
-
+Here we load the FTMS of flax seed database that contains both spectrum types : the assembled and not assembled one (it's already a spectra object),\
+you can load it from: [ftmsneg_flax_sql.qmd](https://github.com/rebdau/RDynLib_ftms/blob/ahlam/ftmsneg_flax_sql.qmd)
 
 ```{r}
-result <- symmetric_dotproduct_combined(ft_neg, dy_sps, polarity_query = 0, polarity_target = 0, machine_target = "FTMS", threshold = 0.8)
-#save the result to a .RData object
-save(result, file = "data/match_DyFtms_neg.RData")
-load("data/match_DyFtms_neg.RData")
-nrow(result)
 
-print(result)
-```
-
-
-the resulting table has `r nrow(result)` rows, so in this comparison there is 
-`r nrow(result)` matches
-
-
-
-```{r}
-View(result[, c("score","matched_peaks_count","target_spectrum_id","spectrumId",
-                "msLevel","target_msLevel","rtime","target_rtime")])
+load("D:/work/these/These/clones/new_clones/RDynLib/Similarity/FTMS/data/ftms_all.RData")
+ftms_all <- ftms_all
+spectraData(ftms_all)
 
 ```
 
+Next we calculate the similarity score between the dynlib and flax seed FTMS negative integuments.
 
+#test the new function(where the user should enter the spectrum type and mslevel )
+
+```{r}
+
+ftms_matches <- similarity_RDynlib(
+  ftms_all,
+  dy_sps,
+  polarity_query = 0,
+  polarity_target = 0,
+
+  precursor_resolution = "high.resolution",
+  fragments_resolution = "unit.resolution",
+)
+
+
+```
+
+print the similarity matrix and the number of rows (matches)
+
+```{r}
+
+print(ftms_matches)
+nrow(ftms_matches)
+```
+
+save the resulting object:
+
+```{r}
+save(ftms_matches, file = "data/ftms_mathes.RData")
+```
