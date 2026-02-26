@@ -112,12 +112,81 @@ MSMSspecplot_SQL("C:/Users/ament/Desktop/sql_data/DYL_FLAX_QTOFneg.sqlite", 26,
 
 
 ```{r}
-cspp <- "C:/Users/ament/Desktop/sql_data/cspp_ftneg.txt"
-sql_path <- "C:/Users/ament/Desktop/sql_data/DYL_FLAX_QTOFneg.sqlite"
-cspp.tot_SQL(sql_path = sql_path, 1, mzerr = 0.015,
-                         cspp = cspp, peakwidth = NULL, IntThres  = 5)
+#for flax ftms the conversion works
+cspp_ft <- "C:/Users/ament/Desktop/sql_data/cspp_ftneg.txt"
+ft_path <- "C:/Users/ament/Desktop/sql_data/DYL_FLAX_FTMSneg.sqlite"
+cspp.tot_SQL(sql_path = ft_path, 266, mzerr = 0.015,
+                         cspp = cspp_ft, peakwidth = NULL, IntThres  = 5)
 ```
 
+```{r}
+ft_con <- dbConnect(SQLite(), ft_path)
+dbGetQuery(ft_con, "
+  SELECT *
+  FROM compound_add
+  ORDER BY rowid DESC
+  LIMIT 10
+")
+
+```
+
+
+```{r}
+#for qtof flax the conversions does not match
+cspp_qtof <- "C:/Users/ament/Desktop/sql_data/cspp_qtofneg.txt"
+qtof_path <- "C:/Users/ament/Desktop/sql_data/DYL_FLAX_QTOFneg.sqlite"
+cspp.tot_SQL(sql_path = qtof_path, 52, mzerr = 0.015,
+                         cspp = cspp_qtof, peakwidth = NULL, IntThres  = 5)
+
+```
+
+```{r}
+#verification
+DBI::dbGetQuery(con_qtof, "
+  SELECT g.*
+  FROM compound_add g
+  INNER JOIN ms_compound c 
+      ON g.compound_id = c.compound_id
+  WHERE c.expid = 52
+    AND (
+         g.GNPS IS NOT NULL OR
+         g.CSPP_RED IS NOT NULL OR
+         g.CSPP_ROX IS NOT NULL OR
+         g.CSPP_MET IS NOT NULL OR
+         g.CSPP_OXY IS NOT NULL OR
+         g.CSPP_HYD IS NOT NULL OR
+         g.CSPP_BOX IS NOT NULL OR
+         g.CSPP_MOX IS NOT NULL OR
+         g.CSPP_ACE IS NOT NULL OR
+         g.CSPP_CAR IS NOT NULL OR
+         g.CSPP_PRE IS NOT NULL OR
+         g.CSPP_GLY IS NOT NULL OR
+         g.CSPP_MON IS NOT NULL OR
+         g.CSPP_HdN IS NOT NULL OR
+         g.CSPP_HBA IS NOT NULL OR
+         g.CSPP_PEN IS NOT NULL OR
+         g.CSPP_COU IS NOT NULL OR
+         g.CSPP_RHA IS NOT NULL OR
+         g.CSPP_HuN_C IS NOT NULL OR
+         g.CSPP_VAN IS NOT NULL OR
+         g.CSPP_HaN_C IS NOT NULL OR
+         g.CSPP_HEX IS NOT NULL OR
+         g.CSPP_DCA IS NOT NULL OR
+         g.CSPP_HUN IS NOT NULL OR
+         g.CSPP_URO IS NOT NULL OR
+         g.CSPP_FER IS NOT NULL OR
+         g.CSPP_GuN_C IS NOT NULL OR
+         g.CSPP_SYR IS NOT NULL OR
+         g.CSPP_GaN_C IS NOT NULL OR
+         g.CSPP_GUN IS NOT NULL OR
+         g.CSPP_SIN IS NOT NULL OR
+         g.CSPP_SuN_C IS NOT NULL OR
+         g.CSPP_SaN_C IS NOT NULL OR
+         g.CSPP_SUN IS NOT NULL
+        )
+  ORDER BY g.compound_id
+")
+```
 
 
 ```{r}
@@ -127,23 +196,125 @@ MultExp_CSPP_SQL("C:/Users/ament/Desktop/sql_data/DYL_FLAX_QTOFneg.sqlite",
                              IntThres  = 5, cspp = cspp)
 ```
 
+Test gnps conversion
+```{r}
+#qtof flax
+qtof_path <- "C:/Users/ament/Desktop/sql_data/DYL_FLAX_QTOFneg.sqlite"
+conv.GNPS_SQL(sql_path = qtof_path, expid= 52, mzerr = 0.015,
+              min = 5, adduct = 46.0055, thr1 = 3, thr2 = 0.1, thr3 = 0.4,
+              IntThres = 5)
+                          
+```
+
+```{r}
+con_qtof <- DBI::dbConnect(RSQLite::SQLite(), qtof_path)
+#show the latest compounds (the gnps rows of the flax compounds are all NA)
+DBI::dbGetQuery(con_qtof, "
+  SELECT *
+  FROM gnps_add
+  ORDER BY rowid DESC
+  LIMIT 10
+")
+
+#verify the latest compound experiment
+DBI::dbGetQuery(con_qtof, "
+   SELECT *
+  FROM ms_compound
+   WHERE compound_id = 45887
+ ")
+DBI::dbGetQuery(con_qtof, "
+  SELECT g.*
+  FROM gnps_add g
+  INNER JOIN ms_compound c 
+      ON g.compound_id = c.compound_id
+  WHERE c.expid = 52
+    AND (
+         g.GNPS_1 IS NOT NULL OR
+         g.GNPS_2 IS NOT NULL OR
+         g.GNPS_3 IS NOT NULL OR
+         g.GNPS_4 IS NOT NULL OR
+         g.GNPS_5 IS NOT NULL
+        )
+  ORDER BY g.compound_id
+")
+
+```
+
+```{r}
+#ftms flax
+ft_path <- "C:/Users/ament/Desktop/sql_data/DYL_FLAX_FTMSneg.sqlite"
+conv.GNPS_SQL(sql_path = ft_path, expid= 266, mzerr = 0.015,
+              min = 5, adduct = 46.0055, thr1 = 3, thr2 = 0.1, thr3 = 0.4,
+              IntThres = 5)
+                          
+```
+
+```{r}
+DBI::dbGetQuery(ft_con, "
+  SELECT g.*
+  FROM gnps_add g
+  INNER JOIN ms_compound c 
+      ON g.compound_id = c.compound_id
+  WHERE c.expid = 266
+    AND (
+         g.GNPS_1 IS NOT NULL OR
+         g.GNPS_2 IS NOT NULL OR
+         g.GNPS_3 IS NOT NULL OR
+         g.GNPS_4 IS NOT NULL OR
+         g.GNPS_5 IS NOT NULL
+        )
+  ORDER BY g.compound_id
+")
+
+#verify the latest compound experiment
+DBI::dbGetQuery(ft_con, "
+   SELECT *
+  FROM ms_compound
+   WHERE compound_id = 100944 
+ ")
+
+```
+
 GNPS and CSPP Network
 
 ```{r}
-Overall.net_SQL(sql_path = sql_path, exp.id = 1, dbkey = 26,
+#Qtof dynlib
+Overall.net_SQL(sql_path = qtof_path, exp.id = 1, dbkey = 26, min = 5,
                             nr_of_seq = 2,
-                            thr1 = 3,
+                            thr1 = 1,
                             thr2 = 0.1,
                             thr3 = 0.2)
 ```
 
 ```{r}
-Overall.net_SQL(sql_path = sql_path, exp.id = 1, dbkey = 20,
+#ftms Dynlib
+Overall.net_SQL(sql_path = ft_path, exp.id = 1, dbkey = 8, min = 100,
                             nr_of_seq = 2,
-                            thr1 = 3,
+                            thr1 = 1,
                             thr2 = 0.1,
                             thr3 = 0.2)
 ```
+
+```{r}
+#Qtof flax
+qtof_path <- "C:/Users/ament/Desktop/sql_data/DYL_FLAX_QTOFneg.sqlite"
+Overall.net_SQL(sql_path = qtof_path, exp.id = 52, dbkey = 45821 , min = 5,
+                            nr_of_seq = 2,
+                            thr1 = 1,
+                            thr2 = 0.1,
+                            thr3 = 0.2)
+```
+
+```{r}
+#ftms flax   
+Overall.net_SQL(sql_path = ft_path, exp.id = 266, dbkey = 100915, min = 100,
+                            nr_of_seq = 2,
+                            thr1 = 1,
+                            thr2 = 0.1,
+                            thr3 = 0.2)
+```
+
+
 
 ```{r}
 net.lst1 <- net.addit_SQL(sql_path = sql_path, exp.id= 1, nettype="CSPP", thr1=0, thr2=0, thr3=0)
