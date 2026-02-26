@@ -327,3 +327,9 @@ net.lst1 <- net.addit_SQL(sql_path = sql_path, exp.id = 1, nettype = "CSPP", thr
 net.lst1
 ```
 
+test MultMatchCID_SQL() function
+
+```{r}
+MultMatchCID_SQL(qtof_path, 45887, minIons = 1)
+```
+

@@ -1,7 +1,7 @@
 ---
 title: "workflow to test the similarity_RDynlib() function on ftms data"
-format:
-  html:
+format: html
+  server: shiny
     toc: true
     self-contained: true
 author: "Ahlam Mentag, Rebecca Dauwe, Johannes Rainer"
@@ -13,23 +13,59 @@ This quarto document represents the workflow for calling the `similarity_RDynlib
 
 # Required packages
 
+This project follows an R package layout as follows:
+
+The main project folder is:
+
+RDynLib_SQL/
+
+Within this directory, the structure is organized as follows:
+
+RDynLib_SQL/ ├── data/ ├── R/ └── vignettes/
+
+### `data/`
+
+Contains the SQLite database files used in the workflow (e.g., `ftms_flax_neg.sqlite`).
+
+### `R/`
+
+Contains the R source files (`.R`) that define the package functions and core implementation.
+
+### `vignettes/`
+
+Contains Quarto (`.qmd`) files that document the workflow and provide reproducible examples.
+
+In this workflow, the working directory is set to the project root:
+
+RDynLib_SQL/
+
+## Loading required packages
+
+First, install the new CompoundDb version:
+
 ```{r}
+BiocManager::install("RforMassSpectrometry/CompoundDb", ref = "jomain", force = TRUE)
+```
+
+1
+
+```{r}
+library(here)
 library(Spectra)
 library(CompoundDb)
-pth <- getwd()
-pth
+library(MetaboAnnotation)
+library(DBI)
+library(RSQLite)
+library(devtools)
+
+#` Uploading RDynLibSQL: Load all functions of the RDynlib directory
+load_all()
 ```
 
 We start by loading the [similarity_functions.R](https://github.com/rebdau/RDynLib_SQL/blob/Ahlam/R/similarity_functions.R) file to import the similarity function.
 
 ```{r}
-source("similarity_functions.R")
-```
-
-Then, install the new CompoundDb version:
-
-```{r}
-BiocManager::install("RforMassSpectrometry/CompoundDb", ref = "jomain", force = TRUE)
+source(here("R","similarity_functions.R"))
 ```
 
 ```{r}
@@ -39,12 +75,13 @@ ExpCompDb <- function(x) {
 }
 ```
 
+## convert the "Dynlib_FTMS_neg.sqlite" database to a spectra object
+
 Next we convert the "Dynlib_FTMS_neg.sqlite" database to a spectra object
 
 ```{r}
-library(DBI)
-library(RSQLite)
-dbf <- file.path(pth,"/data", "DyLib_FTMS_neg_or.sqlite")
+
+dbf <- here("data", "DyLib_FTMS_neg_or.sqlite")
 db <- dbConnect(SQLite(), dbf)
 dbExecute(db, "DROP TABLE IF EXISTS feature_matrix ")
 experiment_df <- dbGetQuery(db, "SELECT * FROM experiment")
@@ -64,16 +101,18 @@ dy_sps <- Spectra(cdb)
 ```
 
 ```{r}
-spectraData(dy_sps, columns = c("rtime"))
+spectraData(dy_sps, columns = c("retention_time"))
 ```
 
 Here we load the FTMS of flax seed database that contains both spectrum types : the assembled and not assembled one (it's already a spectra object),\
 you can load it from: [ftmsneg_flax_sql.qmd](https://github.com/rebdau/RDynLib_ftms/blob/ahlam/ftmsneg_flax_sql.qmd)
 
 ```{r}
-load("D:/work/these/These/clones/new_clones/RDynLib/Similarity/FTMS/data/ftms_all.RData")
+
+load(here("data","database_FTMS_neg","ftms_all.RData"))
 ftms_all <- ftms_all
 spectraData(ftms_all)
+
 ```
 
 Next we calculate the similarity score between the dynlib and flax seed FTMS negative integuments.
