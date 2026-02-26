@@ -16,6 +16,8 @@
 #' 
 #' @param nr_col number of columns in the compound_add and gnps_add tables.
 #' 
+#' @param min 'numeric(1)' minimum intensity for the spectra.
+#' 
 #' @return list of edges and nodes.
 #' 
 #' @import DBI
@@ -49,9 +51,6 @@ net.addit_SQL <- function(sql_path,
   if (nrow(compounds) == 0)
     stop("No compounds found for expid = ", exp.id)
   
-  if (is.null(min)) {
-    min <- 5  
-  }
   
   ## Nodes
   nodes.net <- net.nodes_SQL(

@@ -19,6 +19,10 @@
 #' the specified number of sequential connections (`nr_of_seq`) are included 
 #' in the displayed CSPP and GNPS local networks.
 #' 
+#' @param min numeric(1) Minimum intensity for the spectra. 
+#' For instruments with high sensitivity, a value like 5 can be used, whereas  
+#' for instruments with lower sensitivity, a value like 100 may be appropriate.
+#' 
 #' @param nr_of_seq 'number(1)' size of local network, i.e., number of 
 #' subsequent edges starting from the node representing the selected COMPID.
 #' 
@@ -38,7 +42,7 @@
 #' @author Ahlam Mentag
 #' 
 #' @export
-Overall.net_SQL <- function(sql_path, exp.id, dbkey, nr_of_seq = 2, thr1 = 1,
+Overall.net_SQL <- function(sql_path, exp.id, dbkey, min , nr_of_seq = 2, thr1 = 1,
                             thr2 = 0.9, thr3 = 0.4) {
   
   oldpar <- par(no.readonly = TRUE)
@@ -52,6 +56,7 @@ Overall.net_SQL <- function(sql_path, exp.id, dbkey, nr_of_seq = 2, thr1 = 1,
   net.lst1 <- net.addit_SQL(sql_path = sql_path,
                             exp.id = exp.id,
                             nettype = "CSPP",
+                            min = min,
                             thr1 = thr1,
                             thr2 = thr2,
                             thr3 = thr3)
@@ -66,6 +71,7 @@ Overall.net_SQL <- function(sql_path, exp.id, dbkey, nr_of_seq = 2, thr1 = 1,
   net.lst2 <- net.addit_SQL(sql_path = sql_path,
                             exp.id = exp.id,
                             nettype = "GNPS",
+                            min = min,
                             thr1 = thr1,
                             thr2 = thr2,
                             thr3 = thr3)

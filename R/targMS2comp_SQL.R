@@ -47,7 +47,8 @@
 #' @export
 targMS2comp_SQL <- function(compid1,
                             compid2,
-                            ms2_split) {
+                            ms2_split,
+                            IntThres = 5) {
   
   ms2_sub  <- ms2_split[[as.character(compid1)]]
   ms2_prod <- ms2_split[[as.character(compid2)]]
@@ -58,33 +59,49 @@ targMS2comp_SQL <- function(compid1,
   if (nrow(ms2_sub) == 0 || nrow(ms2_prod) == 0)
     return(NULL)
   
-  precursor1 <- ms2_sub$precursor_mz[1]
-  precursor2 <- ms2_prod$precursor_mz[1]
+  precursor1 <- suppressWarnings(as.numeric(ms2_sub$precursor_mz[1]))
+  precursor2 <- suppressWarnings(as.numeric(ms2_prod$precursor_mz[1]))
+  
+  if (is.na(precursor1) || is.na(precursor2))
+    return(NULL)
+  
+  # Force numeric
+  ms2_sub$mz        <- as.numeric(ms2_sub$mz)
+  ms2_sub$intensity <- as.numeric(ms2_sub$intensity)
+  ms2_prod$mz        <- as.numeric(ms2_prod$mz)
+  ms2_prod$intensity <- as.numeric(ms2_prod$intensity)
   
   # Relative intensities
-  ms2_sub$rint  <- as.integer(ms2_sub$intensity /
-                                max(ms2_sub$intensity) * 100)
+  ms2_sub$rint  <- as.integer(ms2_sub$intensity / max(ms2_sub$intensity, na.rm = TRUE) * 100)
+  ms2_prod$rint <- as.integer(ms2_prod$intensity / max(ms2_prod$intensity, na.rm = TRUE) * 100)
   
-  ms2_prod$rint <- as.integer(ms2_prod$intensity /
-                                max(ms2_prod$intensity) * 100)
+  
+  # IONS 
+  
   
   ac <- ms2_sub[, c("mz", "rint", "intensity")]
+  ac <- ac[ac$intensity >= IntThres & !is.na(ac$intensity), ]
+  
   bd <- ms2_prod[, c("mz", "rint", "intensity")]
+  bd <- bd[bd$intensity >= IntThres & !is.na(bd$intensity), ]
   
   if (nrow(ac) == 0 || nrow(bd) == 0)
     return(NULL)
   
   DotIons <- CommonDotProd(ac, bd)
   
-  # Neutral losses
-  ac$nloss <- round(precursor1) - ac$mz
-  bd$nloss <- round(precursor2) - bd$mz
   
-  DotLoss <- CommonDotProd(
-    ac[, c("nloss", "rint", "intensity")],
-    bd[, c("nloss", "rint", "intensity")]
-  )
+  # NEUTRAL LOSSES
   
+  ac$nloss <- as.integer(round(precursor1) - ac$mz)
+  bd$nloss <- as.integer(round(precursor2) - bd$mz)
+  
+  ac_loss <- ac[, c("nloss", "rint", "intensity")]
+  bd_loss <- bd[, c("nloss", "rint", "intensity")]
+  
+  DotLoss <- CommonDotProd(ac_loss, bd_loss)
+  
+  # Final output (same structure as original)
   data.frame(
     COMPID.sub   = compid1,
     MZ.sub       = precursor1,
@@ -93,13 +110,13 @@ targMS2comp_SQL <- function(compid1,
     MZ.prod      = precursor2,
     IONS.prod    = nrow(bd),
     COMMON_IONS  = DotIons[[1]],
-    DOT_IONS     = round(DotIons[[2]], 3),
+    DOT_IONS     = round(DotIons[[2]], 2),
     COMMON_LOSS  = DotLoss[[1]],
-    DOT_LOSS     = round(DotLoss[[2]], 3),
-    FORW_IONS    = round(DotIons[[1]] / nrow(ac), 3),
-    REV_IONS     = round(DotIons[[1]] / nrow(bd), 3),
-    FORW_LOSS    = round(DotLoss[[1]] / nrow(ac), 3),
-    REV_LOSS     = round(DotLoss[[1]] / nrow(bd), 3),
+    DOT_LOSS     = round(DotLoss[[2]], 2),
+    FORW_IONS    = round(DotIons[[1]] / nrow(ac), 2),
+    REV_IONS     = round(DotIons[[1]] / nrow(bd), 2),
+    FORW_LOSS    = round(DotLoss[[1]] / nrow(ac), 2),
+    REV_LOSS     = round(DotLoss[[1]] / nrow(bd), 2),
     stringsAsFactors = FALSE
   )
 }

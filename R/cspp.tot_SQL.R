@@ -44,6 +44,10 @@
 #'   corresponding to the processed experiment. The primary effect of the
 #'   function is the update of the SQL table.
 #'
+#' @import DBI
+#' @import RSQLite
+#' @import data.table
+#' 
 #' @author Ahlam Mentag
 #' 
 #' @export
@@ -72,10 +76,8 @@ cspp.tot_SQL <- function(sql_path, expid, mzerr = 0.015,
   
   inp.x <- inp.x[order(inp.x$mass_measured), ]
   
-  
   # Load compound_add
   comp_add <- dbReadTable(data_con, "compound_add")
-  
   
   # Load conversion table
   conv.table <- fread(cspp, header = TRUE, sep = "\t")
@@ -88,11 +90,9 @@ cspp.tot_SQL <- function(sql_path, expid, mzerr = 0.015,
     stringsAsFactors = FALSE
   )
   
-  
-  # LOAD ALL MS2 ONCE 
+  # LOAD ALL MS2 ONCE
   message("Loading all MS2 spectra into memory...")
   
-  # One MS2 spectrum per compound
   spec_df <- dbGetQuery(
     data_con,
     "
@@ -113,14 +113,26 @@ cspp.tot_SQL <- function(sql_path, expid, mzerr = 0.015,
   if (nrow(spec_df) == 0)
     stop("No MS2 spectra found.")
   
-  peak_df <- dbGetQuery(
+  # peak_df <- dbGetQuery(
+  #   data_con,
+  #   "SELECT spectrum_id, mz, intensity FROM msms_spectrum_peak"
+  # )
+  
+  
+  peak_df <- DBI::dbGetQuery(
     data_con,
-    "SELECT spectrum_id, mz, intensity FROM msms_spectrum_peak"
+    sprintf("
+      SELECT p.spectrum_id, p.mz, p.intensity
+      FROM msms_spectrum_peak p
+      INNER JOIN msms_spectrum s
+        ON p.spectrum_id = s.spectrum_id
+      INNER JOIN ms_compound c
+        ON s.compound_id = c.compound_id
+      WHERE c.expid = %d
+    ", expid)
   )
   
   ms2_df <- merge(peak_df, spec_df, by = "spectrum_id")
-  
-  # Filter by intensity threshold here (faster later)
   ms2_df <- ms2_df[ms2_df$intensity >= IntThres, ]
   
   ms2_split <- split(ms2_df, ms2_df$compound_id)
@@ -128,7 +140,6 @@ cspp.tot_SQL <- function(sql_path, expid, mzerr = 0.015,
   message("Loaded MS2 for ", length(ms2_split), " compounds.")
   
   
-  # Process conversions
   for (k in seq_len(nrow(conver))) {
     
     message("Processing conversion: ", k, "/", nrow(conver))
@@ -142,15 +153,29 @@ cspp.tot_SQL <- function(sql_path, expid, mzerr = 0.015,
       ms2_split = ms2_split
     )
     
+    
+    if (is.null(cspp.df) || nrow(cspp.df) == 0) {
+      message("  No matches found for conversion ", conver$conv.type[k])
+      next
+    }
+    
+    if (ncol(cspp.df) < 14) {
+      warning("  Unexpected column structure for conversion ",
+              conver$conv.type[k], ". Skipping.")
+      next
+    }
+    
     comp_add <- rank.cspp(cspp.df,
                           conver$conv.colmn[k],
                           comp_add)
   }
   
-  comp_add$compound_id <- inp.x$compound_id[seq_len(nrow(comp_add))]
+  # Ensure correct compound_id alignment
+  if (nrow(comp_add) <= nrow(inp.x)) {
+    comp_add$compound_id <- inp.x$compound_id[seq_len(nrow(comp_add))]
+  }
   
-  
-  # Rewrite table 
+  # Rewrite table
   message("Writing results to database...")
   
   dbExecute(data_con, "DROP TABLE IF EXISTS compound_add_new")
@@ -163,6 +188,7 @@ cspp.tot_SQL <- function(sql_path, expid, mzerr = 0.015,
   
   invisible(comp_add)
 }
+
 
 
 # cspp_add<-cspp.tot(base.dir,finlist,SubDB="FTneg",Prod.exp=2)

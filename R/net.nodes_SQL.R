@@ -10,13 +10,15 @@
 #' 
 #' @param exp.id 'number(1)' experiment to use for network generation.
 #' 
+#' @param min 'numeric(1)' minimum intensity for the spectra.
+#' 
 #' @import DBI
 #' @import RSQLite
 #' 
 #' @author Ahlam Mentag
 #' 
 #' @export
-net.nodes_SQL <- function(sql_path, exp.id, min = 5) {
+net.nodes_SQL <- function(sql_path, exp.id, min) {
   
   con <- dbConnect(SQLite(), sql_path)
   on.exit(dbDisconnect(con), add = TRUE)
