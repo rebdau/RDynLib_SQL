@@ -46,6 +46,12 @@ In this workflow, the working directory is set to the project root:
 RDynLib_SQL/
 
 ## Loading required packages
+First, install the new CompoundDb version:
+
+```{r}
+BiocManager::install("RforMassSpectrometry/CompoundDb", ref = "jomain", force = TRUE)
+```
+1
 ```{r}
 library(here)
 library(Spectra)
@@ -62,14 +68,10 @@ load_all()
 We start by loading the [similarity_functions.R](https://github.com/rebdau/RDynLib_SQL/blob/Ahlam/R/similarity_functions.R) file to import the similarity function.
 
 ```{r}
-source(here("R","sim_functions_ftmsneg.R"))
+source(here("R","similarity_functions.R"))
 ```
 
-Then, install the new CompoundDb version:
 
-```{r}
-BiocManager::install("RforMassSpectrometry/CompoundDb", ref = "jomain", force = TRUE)
-```
 
 
 ```{r}
@@ -112,7 +114,7 @@ you can load it from: [ftmsneg_flax_sql.qmd](https://github.com/rebdau/RDynLib_f
 
 ```{r}
 
-load("D:/work/these/These/clones/new_clones/RDynLib/Similarity/FTMS/data/ftms_all.RData")
+load(here("data","database_FTMS_neg","ftms_all.RData"))
 ftms_all <- ftms_all
 spectraData(ftms_all)
 
