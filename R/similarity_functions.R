@@ -119,12 +119,12 @@ dynlib_symmetric_dotproduct <- function(x, y, n = 3, m = 0.6, ...) {
 #' matrix is returned as an attribute `"wintensity_sum"` to each table.
 #'
 #' @author Ahlam Mentag
-dynlib_map <- function(x, y,
-                       xPrecursorMz, yPrecursorMz,
-                       n = 3, m = 0.6,
-                       fragments_method = c("unit.resolution", "high.resolution"),
-                       precursor_method = c("unit.resolution", "high.resolution"),
-                       digits = 4, ...) {
+dynlibmatch_map <- function(x, y,
+                           xPrecursorMz, yPrecursorMz,
+                           n = 3, m = 0.6,
+                           fragments_method = c("unit.resolution", "high.resolution"),
+                           precursor_method = c("unit.resolution", "high.resolution"),
+                           digits = 4, ...) {
   
   fragments_method <- match.arg(fragments_method)
   precursor_method <- match.arg(precursor_method)
@@ -221,7 +221,6 @@ dynlib_map <- function(x, y,
 
 
 
-
 #' @description
 #'
 #' Main function to calculate the spectral similarity between spectra produced 
@@ -272,7 +271,7 @@ dynlib_map <- function(x, y,
 #' @author Ahlam Mentag
 #' 
 #' @export
-similarity_RDynlib <- function(
+similarity_RDynlib_match <- function(
     st_sps, dy_sps,
     polarity_query, polarity_target,
     precursor_resolution = c("unit.resolution", "high.resolution"),
@@ -425,7 +424,7 @@ similarity_RDynlib <- function(
     tolerance = tolerance,
     threshold = threshold,
     requirePrecursor = TRUE,
-    MAPFUN = dynlib_map,
+    MAPFUN = dynlibmatch_map,
     FUN = dynlib_symmetric_dotproduct,
     matchedPeaksCount = TRUE,
     fragments_method = fragments_resolution,
@@ -442,7 +441,7 @@ similarity_RDynlib <- function(
   df <- as.data.frame(
     MetaboAnnotation::matchedData(matches)
   )
-  
+  print(environment(dynlib_map))
   df <- df[!is.na(df$score) & df$score >= threshold, ]
   
   if (nrow(df) == 0)
