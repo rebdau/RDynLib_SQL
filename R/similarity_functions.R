@@ -119,24 +119,29 @@ dynlib_symmetric_dotproduct <- function(x, y, n = 3, m = 0.6, ...) {
 #' matrix is returned as an attribute `"wintensity_sum"` to each table.
 #'
 #' @author Ahlam Mentag
-dynlibmatch_map <- function(x, y,
-                           xPrecursorMz, yPrecursorMz,
-                           n = 3, m = 0.6,
-                           fragments_method = c("unit.resolution", "high.resolution"),
-                           precursor_method = c("unit.resolution", "high.resolution"),
-                           digits = 4, ...) {
+dynlibmatch2_map <- function(
+    x, y,
+    xPrecursorMz, yPrecursorMz,
+    n = 3, m = 0.6,
+    fragments_method = c("unit.resolution", "high.resolution"),
+    precursor_method = c("unit.resolution", "high.resolution"),
+    digits = 4,
+    tolerance = 0, ppm = 0,
+    ...
+) {
   
   fragments_method <- match.arg(fragments_method)
   precursor_method <- match.arg(precursor_method)
   
+  ## Return empty aligned matrices if one spectrum has no peaks
   if (!nrow(x) || !nrow(y)) {
-    return(list(
-      x = matrix(numeric(), ncol = 2, nrow = 0),
-      y = matrix(numeric(), ncol = 2, nrow = 0)
-    ))
+    empty <- matrix(numeric(), ncol = 2, nrow = 0)
+    return(list(empty, empty))
   }
   
-  ##Fragment resolution (mz peaks)
+
+  ## Clean fragment peaks
+
   cleaned1 <- remove_duplicates(
     x[, 1], x[, 2],
     method = fragments_method,
@@ -150,72 +155,94 @@ dynlibmatch_map <- function(x, y,
   )
   
   mz1 <- cleaned1$mz
-  intensity1 <- cleaned1$intensity
+  int1 <- cleaned1$intensity
+  
   mz2 <- cleaned2$mz
-  intensity2 <- cleaned2$intensity
+  int2 <- cleaned2$intensity
   
+
   ## Exact fragment matching
-  common_mz <- intersect(mz1, mz2)
+
+  idx2 <- match(mz1, mz2)
+  valid_frag <- !is.na(idx2)
   
-  keep_mz1 <- mz1 %in% common_mz
-  keep_mz2 <- mz2 %in% common_mz
+  matched1_frag <- cbind(
+    mz = mz1[valid_frag],
+    intensity = int1[valid_frag]
+  )
   
-  matched1 <- cbind(mz = mz1[keep_mz1],
-                    intensity = intensity1[keep_mz1])
+  matched2_frag <- cbind(
+    mz = mz2[idx2[valid_frag]],
+    intensity = int2[idx2[valid_frag]]
+  )
   
-  matched2 <- cbind(mz = mz2[keep_mz2],
-                    intensity = intensity2[keep_mz2])
+
+  ## Neutral loss matching
+
+  remaining1 <- !valid_frag
+  used2 <- rep(FALSE, length(mz2))
+  used2[idx2[valid_frag]] <- TRUE
+  remaining2 <- !used2
   
-  ##Neutral loss (precursor resolution) 
-  remaining_mz1 <- !keep_mz1
-  remaining_mz2 <- !keep_mz2
+  matched1_nl <- NULL
+  matched2_nl <- NULL
   
-  if (any(remaining_mz1) && any(remaining_mz2)) {
+  if (any(remaining1) && any(remaining2)) {
     
     nl1 <- neutral_loss(
-      mz1[remaining_mz1],
+      mz1[remaining1],
       xPrecursorMz,
       method = precursor_method,
       digits = digits
     )
     
     nl2 <- neutral_loss(
-      mz2[remaining_mz2],
+      mz2[remaining2],
       yPrecursorMz,
       method = precursor_method,
       digits = digits
     )
     
-    common_nl <- intersect(nl1, nl2)
+    idx_nl2 <- match(nl1, nl2)
+    valid_nl <- !is.na(idx_nl2)
     
-    if (length(common_nl)) {
+    if (any(valid_nl)) {
       
-      keep_nl1 <- nl1 %in% common_nl
-      keep_nl2 <- nl2 %in% common_nl
-      
-      matched_nl1 <- cbind(
-        mz = mz1[remaining_mz1][keep_nl1],
-        intensity = intensity1[remaining_mz1][keep_nl1]
+      matched1_nl <- cbind(
+        mz = mz1[remaining1][valid_nl],
+        intensity = int1[remaining1][valid_nl]
       )
       
-      matched_nl2 <- cbind(
-        mz = mz2[remaining_mz2][keep_nl2],
-        intensity = intensity2[remaining_mz2][keep_nl2]
+      matched2_nl <- cbind(
+        mz = mz2[remaining2][idx_nl2[valid_nl]],
+        intensity = int2[remaining2][idx_nl2[valid_nl]]
       )
-      
-      matched1 <- rbind(matched1, matched_nl1)
-      matched2 <- rbind(matched2, matched_nl2)
     }
   }
   
-  ## Weighted intensity sums (always computed on cleaned peaks)
+
+  ## Combine matched peaks
+
+  matched1 <- matched1_frag
+  matched2 <- matched2_frag
+  
+  if (!is.null(matched1_nl)) {
+    matched1 <- rbind(matched1, matched1_nl)
+    matched2 <- rbind(matched2, matched2_nl)
+  }
+  
+  
+  if (nrow(matched1) != nrow(matched2)) {
+    stop("dynlibmatch_map(): internal error - unmatched row counts.")
+  }
+  
   attr(matched1, "wintensity_sum") <-
-    sum(((intensity1^n) * (mz1^m))^2)
+    sum(((int1^n) * (mz1^m))^2)
   
   attr(matched2, "wintensity_sum") <-
-    sum(((intensity2^n) * (mz2^m))^2)
+    sum(((int2^n) * (mz2^m))^2)
   
-  list(x = matched1, y = matched2)
+  return(list(matched1, matched2))
 }
 
 
@@ -246,15 +273,6 @@ dynlibmatch_map <- function(x, y,
 #'        
 #' @param threshold 'numeric(1)' the score threshold to select a best match, by 
 #'        default it is 0.8.
-#'        
-#' @param ppm numeric(1). Defines the acceptable difference between m/z values
-#'        of the compared peaks. The default is 0. It is overridden here because
-#'        the dynlib_map() function requires exact m/z matching.
-#'
-#' @param tolerance numeric(1). Defines the acceptable absolute difference
-#'        between m/z values of the compared peaks. The default is 0.005. 
-#'        It is overridden here because the dynlib_map() function requires 
-#'         exact m/z matching.
 #'       
 #' @param digits 'numeric(1)' rounding number, by default it is 4.  
 #'      
@@ -277,8 +295,6 @@ similarity_RDynlib_match <- function(
     precursor_resolution = c("unit.resolution", "high.resolution"),
     fragments_resolution = c("unit.resolution", "high.resolution"),
     threshold = 0.8,
-    ppm = 0,
-    tolerance = 0.005,
     digits = 4
 ) {
   
@@ -420,11 +436,10 @@ similarity_RDynlib_match <- function(
   
   #Similarity calculation
   param <- MetaboAnnotation::CompareSpectraParam(
-    ppm = ppm,
-    tolerance = tolerance,
+
     threshold = threshold,
     requirePrecursor = TRUE,
-    MAPFUN = dynlibmatch_map,
+    MAPFUN = dynlibmatch2_map,
     FUN = dynlib_symmetric_dotproduct,
     matchedPeaksCount = TRUE,
     fragments_method = fragments_resolution,
