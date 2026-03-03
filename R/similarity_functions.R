@@ -295,6 +295,8 @@ similarity_RDynlib_match <- function(
     precursor_resolution = c("unit.resolution", "high.resolution"),
     fragments_resolution = c("unit.resolution", "high.resolution"),
     threshold = 0.8,
+    ppm = 2,
+    tolerance = 0.5,
     digits = 4
 ) {
   
@@ -328,7 +330,7 @@ similarity_RDynlib_match <- function(
   }
   
   
-
+  
   interactive_filter <- function(sps, label) {
     
     # Spectrum type filtering 
@@ -433,25 +435,44 @@ similarity_RDynlib_match <- function(
   if (is.null(dy_filtered) || length(dy_filtered) == 0)
     return(data.frame())
   
+  if (fragments_resolution == "unit.resolution"){
+    #Similarity calculation
+    param <- MetaboAnnotation::CompareSpectraParam(
+      
+      threshold = threshold,
+      requirePrecursor = TRUE,
+      MAPFUN = dynlibmatch2_map,
+      FUN = dynlib_symmetric_dotproduct,
+      matchedPeaksCount = TRUE,
+      fragments_method = fragments_resolution,
+      precursor_method = precursor_resolution,
+      digits = digits
+    )
+    
+    matches <- MetaboAnnotation::matchSpectra(
+      query = st_filtered,
+      target = dy_filtered,
+      param = param
+    )}
   
-  #Similarity calculation
-  param <- MetaboAnnotation::CompareSpectraParam(
-
-    threshold = threshold,
-    requirePrecursor = TRUE,
-    MAPFUN = dynlibmatch2_map,
-    FUN = dynlib_symmetric_dotproduct,
-    matchedPeaksCount = TRUE,
-    fragments_method = fragments_resolution,
-    precursor_method = precursor_resolution,
-    digits = digits
-  )
-  
-  matches <- MetaboAnnotation::matchSpectra(
-    query = st_filtered,
-    target = dy_filtered,
-    param = param
-  )
+  else {
+    param <- CompareSpectraParam(
+      ppm = ppm,
+      tolerance = tolerance,
+      MAPFUN = joinPeaksGnps,
+      FUN = MsCoreUtils::gnps,
+      threshold = threshold,
+      requirePrecursor = TRUE,
+      matchedPeaksCount = TRUE
+    )
+    
+    matches <- matchSpectra(
+      query = st_filtered,
+      target = dy_filtered,
+      param = param
+    )
+    
+  }
   
   df <- as.data.frame(
     MetaboAnnotation::matchedData(matches)
@@ -470,10 +491,6 @@ similarity_RDynlib_match <- function(
   
   return(df)
 }
-
-
-
-
 
 
 
