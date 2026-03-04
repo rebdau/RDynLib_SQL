@@ -52,24 +52,23 @@ convert_compid_assoc <- function(input_path, output_path) {
 }
 
 ## Run the conversion.
-setwd("C:/Users/amentag/Desktop/these/These/clones/new_clones/RDynLib/New_Dynlib")
 
 
 # Process each file and store the results
-ftneg_df  <- convert_compid_assoc("data/DynLib_subDB_alignment/DynLibDBassociation.txt",
-                                  "data/New_assoc/ftneg.txt")
-
-ftpos_df  <- convert_compid_assoc("data/DynLib_subDB_alignment/DynLibDBassociation2.txt",
-                                  "data/New_assoc/ftpos.txt")
-
-qtofneg_df <- convert_compid_assoc("data/DynLib_subDB_alignment/DynLibDBassociation3.txt",
-                                   "data/New_assoc/qtofneg.txt")
+# ftneg_df  <- convert_compid_assoc("data/DynLib_subDB_alignment/DynLibDBassociation.txt",
+#                                   "data/New_assoc/ftneg.txt")
+# 
+# ftpos_df  <- convert_compid_assoc("data/DynLib_subDB_alignment/DynLibDBassociation2.txt",
+#                                   "data/New_assoc/ftpos.txt")
+# 
+# qtofneg_df <- convert_compid_assoc("data/DynLib_subDB_alignment/DynLibDBassociation3.txt",
+#                                    "data/New_assoc/qtofneg.txt")
 
 # Combine all three into one data.frame
-combined_df <- rbind(ftneg_df, ftpos_df, qtofneg_df)
-
-write.table(combined_df, "data/combined_assoc.txt",
-            sep = "\t", quote = FALSE, row.names = FALSE)
+# combined_df <- rbind(ftneg_df, ftpos_df, qtofneg_df)
+# 
+# write.table(combined_df, "data/combined_assoc.txt",
+#             sep = "\t", quote = FALSE, row.names = FALSE)
 
 # Check the result
-head(combined_df)
+#head(combined_df)
