@@ -330,6 +330,19 @@ net.lst1
 test MultMatchCID_SQL() function
 
 ```{r}
-MultMatchCID_SQL(qtof_path, 45887, minIons = 1)
+MultMatchCID_SQL(qtof_path, 45887, minIons = 4)
+```
+
+```{r}
+MultMatchMS3MS2_SQL(qtof_path, 45887, minIons = 4)
+```
+
+
+```{r}
+MultMatchMS3_SQL(qtof_path, 45887, minIons = 4)
+```
+
+```{r}
+MultMatchCIDall_SQL(qtof_path, 45887, minIons = 4)
 ```
 

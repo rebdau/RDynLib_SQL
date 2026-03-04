@@ -14,16 +14,16 @@ This quarto document represents the workflow for calling the `similarity_RDynlib
 # Required packages
 
 ```{r}
+library(here)
 library(Spectra)
 library(CompoundDb)
-pth <- getwd()
-pth
-```
+library(MetaboAnnotation)
+library(DBI)
+library(RSQLite)
+library(devtools)
 
-We start by loading the [similarity_functions.R](https://github.com/rebdau/RDynLib_SQL/blob/Ahlam/R/similarity_functions.R) file to import the similarity function.
-
-```{r}
-source("C:/Users/ament/Desktop/Github/RDynLib_SQL/R/similarity_functions.R")
+#` Uploading RDynLibSQL: Load all functions of the RDynlib directory
+load_all()
 ```
 
 Then, install the new CompoundDb version:
@@ -74,14 +74,15 @@ spectraData(qtof_neg)
 Next we calculate the similarity score between the dynlib and flax seed QTOF negative integuments.
 
 ```{r}
-qtof_matches <- similarity_RDynlib(
+qtof_matches <- similarity_RDynlib_match(
   qtof_neg,
   dy_sps,
   polarity_query = 0,
   polarity_target = 0,
-
-  precursor_resolution = "high.resolution",
   fragments_resolution = "high.resolution",
+  threshold = 0.5,
+  ppm = 20,
+  tolerance = 0.5
 )
 ```
 
@@ -91,6 +92,8 @@ print the similarity matrix and the number of rows (matches)
 print(qtof_matches)
 nrow(qtof_matches)
 ```
+
+
 
 save the resulting object:
 
