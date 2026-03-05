@@ -47,7 +47,6 @@ First, install the new CompoundDb version:
 BiocManager::install("RforMassSpectrometry/CompoundDb", ref = "jomain", force = TRUE)
 ```
 
-
 ```{r}
 library(here)
 library(Spectra)
@@ -134,7 +133,6 @@ ftms_matches <- similarity_RDynlib_match(
 
 ```
 
-
 ```{r}
 test2 <- MultMatchCID_Spectra(
   dy_sps,
@@ -151,7 +149,6 @@ test2 <- MultMatchCID_Spectra(
 
 ```
 
-
 ```{r}
 sum(round(test2$`m/z`,2) != 355.07)
 ```
@@ -163,13 +160,10 @@ sps_test<- dy_sps[
   ]
 ```
 
-
 ```{r}
 print(test2)
 nrow(test2)
 ```
-
-
 
 print the similarity matrix and the number of rows (matches)
 
