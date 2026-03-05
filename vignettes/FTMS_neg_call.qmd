@@ -141,14 +141,26 @@ test2 <- MultMatchCID_Spectra(
   14084,
   polarity_query = 0,
   polarity_target = 0,
-  tolerance = 0.5,
-  ppm = 30,
-  minIons = 3,
+  tolerance = 0,
+  ppm = 10,
+  minIons = 2,
   fragments_resolution = "unit.resolution",
-  requirePrecursor = F,
+  requirePrecursor = T,
 )
 
 
+```
+
+
+```{r}
+sum(round(test2$`m/z`,2) != 355.07)
+```
+
+```{r}
+sps_test<- dy_sps[
+    spectraData(dy_sps)$compound_id == 14084 &
+      spectraData(dy_sps)$polarity == 0
+  ]
 ```
 
 

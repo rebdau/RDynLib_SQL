@@ -60,7 +60,7 @@ dbDisconnect(db)
 #we convert the sql database to a Compdb object
 cdb <- ExpCompDb(dbf)
 #we convert the Compdb object to a spectra object
-dy_sps <- Spectra(cdb)
+qt_dy_sps <- Spectra(cdb)
 ```
 
 Here we load the QTOF of flax seed database (it's already a spectra object), you can load it from: [qtof_filtering.qmd](https://github.com/rebdau/RDynLib_qtof/blob/ahlam/qtof_filtering.qmd)
@@ -75,7 +75,7 @@ Next we calculate the similarity score between the dynlib and flax seed QTOF neg
 
 ```{r}
 qtof_matches <- similarity_RDynlib_match(
-  qtof_neg,
+  qt_dy_sps,
   dy_sps,
   polarity_query = 0,
   polarity_target = 0,
