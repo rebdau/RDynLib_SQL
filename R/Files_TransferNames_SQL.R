@@ -18,13 +18,14 @@
 #'   \item{Assoc}{The association data frame as read from \code{assoc_path}.}
 #' }
 #'
+#' @import DBI
+#' @import RSQLite
+#' 
 #' @author Ahlam Mentag
 #' 
 #' @export
 Files_TransferNames_SQL <- function(sqlite_dir, assoc_path) {
-  
-  library(DBI)
-  library(RSQLite)
+
   
   # Read association file
   Assoc <- read.table(

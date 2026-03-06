@@ -1,4 +1,30 @@
-
+#' @title Merge two SQLite spectral databases.
+#'
+#' @description
+#' Merges two SQLite databases containing mass spectrometry data into a
+#' single output database. The function aligns tables present in both
+#' databases, shifts identifier columns to avoid ID conflicts,
+#' and combines the records. Tables that exist in only
+#' one database are copied directly to the output database.
+#'
+#' Identifier columns (`expid`, `compound_id`, `spectrum_id`, `peak_id`)
+#' are automatically shifted to ensure uniqueness across the merged data.
+#' Retention times (`rtime`, `retention_time`) from the additional database
+#' are converted from seconds to minutes before merging.
+#'
+#' @param main_db 'Character(1)' Path to the primary SQLite database.
+#' 
+#' @param add_db 'Character(1)' Path to the second SQLite database that would be 
+#' added to the main database.
+#' 
+#' @param output_db Character. Path where the merged SQLite database will
+#'   be written.
+#'
+#' @return No value is returned. The function writes the merged database
+#'   to `output_db` and prints progress messages during execution.
+#'
+#' @author Ahlam Mentag
+#' @export
 merge_databases <- function(main_db, add_db, output_db) {
   
   # Connect to databases

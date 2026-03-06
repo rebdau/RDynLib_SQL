@@ -230,28 +230,35 @@ dynlibmatch2_map <- function(
 #' Main function to calculate the spectral similarity between spectra produced 
 #' from a high or unit resolution instrument.
 #' 
-#' @param st_sps spectra object, represents the query data 
+#' @param st_sps spectra object, represents the query data. 
 #'
-#' @param dy_sps spectra object, represents the target data 
+#' @param dy_sps spectra object, represents the target data.
 #' 
 #' @param polarity_query 'numeric' the query polarity, 0  if negative,
-#'         and 1 for positive polarity
+#'         and 1 for positive polarity.
 #'        
 #' @param polarity_target 'numeric' the target polarity, 0  if negative,
-#'         and 1 for positive polarity
-#'        
-#' @param precursor_resolution 'character' the resolution type of the precursor  
-#'        masses, it is used to define the rounding type of the precursorMz(),
-#'        it could be either "unit.resolution" or "high.resolution".
+#'         and 1 for positive polarity.
 #'        
 #' @param fragments_resolution 'character(1)' the resolution type of the fragments  
 #'        masses, it is used to define the rounding type of the fragments,
 #'        it could be either "unit.resolution" or "high.resolution".
 #'        
+#' @param requirePrecursor 'logical(1)' by default true, it allows to pre-filter
+#'        the target spectra prior to the actual similarity calculation for 
+#'        each individual query spectrum. 
+#'        
 #' @param threshold 'numeric(1)' the score threshold to select a best match, by 
 #'        default it is 0.8.
-#'       
-#' @param digits 'numeric(1)' rounding number, by default it is 4.  
+#'        
+#' @param ppm 'numeric(1)' the acceptable difference between m/z values of the
+#'        compared peaks:
+#'        - For high resolution : ppm is applied for matching the product ions 
+#'          and match precursorMz if requirePrecursor is TRUE.
+#'        - For unit resolution : ppm is used for matching precursorMz. 
+#'        
+#' @param tolerance 'numeric(1)' the acceptable difference between m/z values
+#'         of the compared peaks.
 #'      
 #' @return
 #'
@@ -279,7 +286,7 @@ similarity_RDynlib_match <- function(
   if (!requireNamespace("rstudioapi", quietly = TRUE)) {
     install.packages("rstudioapi", repos = "https://cloud.r-project.org/")
   }
-  library(rstudioapi)
+  
   
   fragments_resolution <- match.arg(fragments_resolution)
   

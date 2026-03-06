@@ -1,7 +1,12 @@
+#' @title plot MS3 spectra 
+#'
+#' @import DBI
+#' @import RSQLite
+#' 
+#' @author Ahlam Mentag
+#' 
+#' @export
 MS3plot_SQL <- function(sql_path, dbkey, prcx = 0.7, wh = 1) {
-  
-  library(DBI)
-  library(RSQLite)
   
   con <- dbConnect(SQLite(), sql_path)
   on.exit(dbDisconnect(con), add = TRUE)

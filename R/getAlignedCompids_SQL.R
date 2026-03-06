@@ -14,7 +14,7 @@
 #' @author Ahlam Mentag
 #'
 #' @export
-getAlignedCompids <- function(compound_id, database_name, alignment_file) {
+getAlignedCompids_SQL <- function(compound_id, database_name, alignment_file) {
   
   # Read alignment file
   assoc <- read.table(alignment_file, header = TRUE, sep = "\t", stringsAsFactors = FALSE)

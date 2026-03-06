@@ -1,11 +1,17 @@
+#' @title plot MS3 spectra 
+#'
+#' @import DBI
+#' @import RSQLite
+#' 
+#' @author Ahlam Mentag
+#' 
+#' @export
 MS3specplot_SQL <- function(sql_path,
                             dbkey,
                             prcx = NULL,
                             wh = NULL,
                             single = NULL) {
-  
-  library(DBI)
-  library(RSQLite)
+
 
   if (is.null(prcx)) prcx <- 0.7
   if (is.null(wh))   wh   <- 1

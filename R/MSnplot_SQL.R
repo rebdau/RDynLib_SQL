@@ -1,8 +1,13 @@
+#' @title plot MSnspectra 
+#'
+#' @import DBI
+#' @import RSQLite
+#' 
+#' @author Ahlam Mentag
+#' 
+#' @export
 MSnplot_SQL <- function(sql_path, dbkey, prcx = 0.6) {
-  
-  library(DBI)
-  library(RSQLite)
-  
+
   con <- dbConnect(SQLite(), sql_path)
   on.exit(dbDisconnect(con), add = TRUE)
   

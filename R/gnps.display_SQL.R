@@ -1,3 +1,33 @@
+#' @title Display GNPS similarity results from an SQLite database.
+#' 
+#' @description
+#'
+#' Extracts and formats GNPS-based similarity information from the
+#' `gnps_add` table in an SQLite database for a given `compound_id`.
+#' Encoded similarity values stored in the table columns are parsed
+#' and returned as a structured data frame.
+#' 
+#' @param sql_path `Character(1)` string giving the path to the SQLite database.
+#' 
+#' @param dbkey 'numeric(1)' the compound_id used to select the corresponding 
+#' row in the `compound_add` table.
+#' 
+#' @param nr_col 'numeric(1)' maximum number of columns to scan in the table.
+#' Default is 6.
+#' 
+#' @return A `data.frame` containing GNPS similarity results with the columns:
+#' \describe{
+#'   \item{massdiff}{Mass difference associated with the match.}
+#'   \item{compid.prod}{Product compound identifier.}
+#'   \item{ions.prod}{Number of product ions.}
+#'   \item{ave.common}{Average number of common ions.}
+#'   \item{ave.dot}{Average dot-product similarity score.}
+#' }
+#'
+#' Returns an empty `data.frame` if no matching `compound_id` is found.
+#'
+#' @author Ahlam Mentag
+#' @export 
 gnps.display_SQL <- function(sql_path, dbkey, nr_col2 = 6) {
   
   con <- dbConnect(RSQLite::SQLite(), sql_path)

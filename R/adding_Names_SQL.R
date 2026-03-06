@@ -1,8 +1,22 @@
+#' @tiltle adding names from a similarity table to the 'name' column in a sql 
+#'         database.
+#'         
+#' @param con_merged 'character(1)' connection to the sqlite database.
+#' 
+#' @param sim_table 'character(1)' path to the similarity table with the matches 
+#'  of some compounds.
+#'  
+#'  @return fill the 'name' column in the ms_compounds table the names from 
+#'  similar compounds.
+#'  
+#'  @import DBI
+#'  @import dplyr
+#'  @import tools
+#'  
+#'  @author Ahlam Mentag
+#'  
+#'  @export
 adding_Names_SQL <- function(con_merged, sim_table) {
-  
-  library(DBI)
-  library(dplyr)
-  library(tools) 
   
   # Read tables
   ms_compound <- dbReadTable(con_merged, "ms_compound")

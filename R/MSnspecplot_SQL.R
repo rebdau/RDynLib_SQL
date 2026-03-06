@@ -1,6 +1,11 @@
-#'@title 
-
-
+#' @title plot MSnspectra 
+#'
+#' @import DBI
+#' @import RSQLite
+#' 
+#' @author Ahlam Mentag
+#' 
+#' @export
 MSnspecplot_SQL <- function(sql_path,
                             dbkey,
                             nr_col = 35,
@@ -9,9 +14,6 @@ MSnspecplot_SQL <- function(sql_path,
                             mz.err = 0.001,
                             MS1 = NULL,
                             prcx = NULL) {
-  
-  library(DBI)
-  library(RSQLite)
   
   if (is.null(prcx)) prcx <- 0.6
   

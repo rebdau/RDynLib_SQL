@@ -1,3 +1,12 @@
+#' @title plot MS2 spectra 
+#'
+#' @import DBI
+#' @import RSQLite
+#' 
+#' @author Ahlam Mentag
+#' 
+#' @export
+
 MSMSspecplot_SQL <- function(sql_path,
                              dbkey,
                              prdion,
@@ -6,10 +15,6 @@ MSMSspecplot_SQL <- function(sql_path,
                              minum = NULL,
                              nr_col = NULL,
                              nr_col2 = NULL) {
-  
-  library(DBI)
-  library(RSQLite)
-  
   # Defaults
   if (is.null(err)) err <- 0.015
   if (is.null(minum)) minum <- 2
