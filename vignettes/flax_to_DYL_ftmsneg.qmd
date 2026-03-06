@@ -4,7 +4,7 @@ format:
   html:
     toc: true
     self-contained: true
-author: "Ahlam Mentag, Johannes Rainer"
+author: "Ahlam Mentag, Rebecca Dauwe, Johannes Rainer"
 editor: 
   markdown: 
     wrap: 72

@@ -4,7 +4,7 @@ format:
   html:
     toc: true
     self-contained: true
-author: "Ahlam Mentag"
+author: "Ahlam Mentag, Rebecca Dauwe, Johannes Rainer"
 ---
 
 # Introduction
@@ -22,11 +22,9 @@ in the RDynLib folder and subfolders.
 
 ```{r}
 #| message: false
-setwd("C:/Users/amentag/Desktop/these/These/clones/new_clones/RDynLib/R")
 #' Load required libraries
 library(devtools)
 library(DBI)
-rm(list = c("convert_compid_assoc"))
 #` Uploading RDynLib: Load all functions of the RDynlib directory
 load_all()
 ```
@@ -41,9 +39,10 @@ err <- 0.02
 t.ini <- 5
 
 #SQL databases paths
-FT_path <- "C:/Users/amentag/Desktop/these/These/clones/new_clones/RDynLib/Similarity/FTMS/data/DYL_FLAX_FTMSneg.sqlite"
-QTOF_path <- "C:/Users/amentag/Desktop/these/These/clones/new_clones/RDynLib/Similarity/QTOF/data/DYL_FLAX_QTOFneg.sqlite"
-assoc_path <- "C:/Users/amentag/Desktop/these/These/clones/new_clones/RDynLib/New_Dynlib/data/combined_assoc.txt"
+
+FT_path <- here("data", "DYL_FLAX_FTMSneg.sqlite")
+QTOF_path <- here("data", "DYL_FLAX_QTOFneg.sqlite")
+assoc_path <- here("data", "combined_assoc.txt")
 FT_con <- DBI::dbConnect(RSQLite::SQLite(), FT_path)
 QTOF_con <- DBI::dbConnect(RSQLite::SQLite(), QTOF_path)
   
@@ -145,4 +144,67 @@ n_new
 ```
 
 
+#testing the getAlignedCompids() function that extract the the aligned 
+#compound IDs with their database names of given  compounds.
+     
+```{r}
+alignment_file <- here("data", "assoc_flax.txt")
+
+getAlignedCompids_SQL(
+  compound_id = 101030,
+  database_name = "DYL_FLAX_FTMSneg.sqlite",
+  alignment_file = alignment_file
+)
+```
+
+```{r}
+getAlignedCompids_SQL(
+  compound_id = 45927,
+  database_name = "DYL_FLAX_QTOFneg.sqlite",
+  alignment_file = alignment_file
+)
+```
+
+
+
+```{r}
+getAlignedCompids_SQL(
+  compound_id = c(101030, 101159),
+  database_name = "DYL_FLAX_FTMSneg.sqlite",
+  alignment_file = alignment_file
+)
+```
+
+#testing the NodenameMass_SQL() function that extract the additional cololumns
+#and rows from ms_compound table of a given experiment, precursor_mz or name 
+#or nodename.
+
+Here we test using expid and precursor mz:
+```{r}
+FT_path <- here("data", "DYL_FLAX_FTMSneg.sqlite")
+
+NodenameMass_SQL(
+  sql_path = FT_path,
+  expid = 1,
+  mz = 537.1976
+)
+```
+
+Here we test using expid and a part of the name of the compounds we want to show:
+```{r}
+NodenameMass_SQL(
+  sql_path = FT_path,
+  expid = 1,
+  name = "hexoside"
+)
+```
+
+Here we test using expid and nodename:
+```{r}
+NodenameMass_SQL(
+  sql_path = FT_path,
+  expid = 1,
+  nodename = "M299T356"
+)
+```
 
