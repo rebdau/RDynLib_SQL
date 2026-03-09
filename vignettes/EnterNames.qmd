@@ -1,0 +1,84 @@
+---
+title: "workflow of adding names of  newly characterized Compounds"
+format:
+  html:
+    toc: true
+    self-contained: true
+author: "Ahlam Mentag, Rebecca Dauwe, Johannes Rainer"
+---
+
+## Shiny Documents
+
+This quarto document represents the workflow for calling the `NodenameMass_SQL()` 
+to show all the ms_compoud table of a given compound based on the mass, 
+retention time, name or node_name. then using the returned compound_id we can 
+call the `EnterName_SQL()` function to Interactively annotate and update 
+compound names in an SQLite database.
+
+
+
+# Required packages
+
+This project follows an R package layout as follows:
+
+The main project folder is:
+
+RDynLib_SQL/
+
+Within this directory, the structure is organized as follows:
+
+RDynLib_SQL/ ├── data/ ├── R/ └── vignettes/
+
+### `data/`
+
+Contains the SQLite database files used in the workflow (e.g., `ftms_flax_neg.sqlite`).
+
+### `R/`
+
+Contains the R source files (`.R`) that define the package functions and core implementation.
+
+### `vignettes/`
+
+Contains Quarto (`.qmd`) files that document the workflow and provide reproducible examples.
+
+In this workflow, the working directory is set to the project root:
+
+RDynLib_SQL/
+
+## Loading required packages
+
+```{r}
+library(here)
+library(Spectra)
+library(DBI)
+library(RSQLite)
+library(devtools)
+
+#` Uploading RDynLibSQL: Load all functions of the RDynlib directory
+load_all()
+```
+
+#(1) database file: 
+
+```{r}
+dbf <- here("data", "DYL_FLAX_FTMSneg.sqlite")
+db <- dbConnect(SQLite(), dbf)
+```
+
+
+#(2) Print the ms_compound table of a given masses and retention time range:
+```{r}
+NodenameMass_SQL(dbf, expid = 266,
+                             mass_measured = 1083.28,
+                             rt = 26.76,
+                             mass_range = 0,
+                             rt_range = 0)
+```
+
+
+#(3) Update the ms_compound fields related to the previously extracted
+# compound_id from the NodenameMass_SQL: 
+```{r}
+EnterName_SQL(dbf, CoMPID = )
+```
+
