@@ -224,6 +224,14 @@ print(ftms_matches)
 
 
 # Add automatically generated names of matching compounds to the merged experiment in compoundDb
+
+connect to the database:
+```{r}
+dbf <- here("data", "DYL_FLAX_FTMSneg.sqlite")
+con_merged <- dbConnect(RSQLite::SQLite(), dbf)
+```
+
+
 ```{r}
 adding_Names_SQL(con_merged, ftms_matches)
 ```

@@ -69,10 +69,10 @@ db <- dbConnect(SQLite(), dbf)
 #(2) Print the ms_compound table of a given masses and retention time range:
 ```{r}
 NodenameMass_SQL(dbf, expid = 266,
-                             mass_measured = 1083.28,
-                             rt = 26.76,
-                             mass_range = 0,
-                             rt_range = 0)
+                            # mass_measured = 1333.2920,
+                             rt = 35,
+                             rt_range = 3
+                            )
 ```
 
 
