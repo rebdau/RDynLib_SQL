@@ -17,9 +17,11 @@
 #'  
 #' @param name 'character(1)'  name or a part of the name of the compounds.
 #'  
-#' @param precursor_Mz 'numeric(1)' the precursor mz of the compounds.
+#' @param mass_measured 'numeric(1)' the measured mass of the compounds.
 #' 
-#' @param err the window error of the precursorMz.
+#' @param mass_range the window error of the compound mass.
+#' 
+#' @param rt_range the window error of the compound retention time.
 #'  
 #' @return It returns the rows of the compound table that match the query.
 #' 
@@ -29,8 +31,10 @@
 NodenameMass_SQL <- function(sql_path, expid,
                              nodename = NULL,
                              name = NULL,
-                             precursor_Mz = NULL,
-                             err = 0.02) {
+                             mass_measured = NULL,
+                             rt = NULL,
+                             mass_range = 0.02,
+                             rt_range = 1) {
   
   # Create connection
   con <- DBI::dbConnect(RSQLite::SQLite(), sql_path)
@@ -60,7 +64,7 @@ NodenameMass_SQL <- function(sql_path, expid,
                            params = list(expid, paste0('%', name, '%'))))
   }
   
-  if (!is.null(precursor_Mz)) {
+  if (!is.null(mass_measured)) {
     query <- "
     SELECT *
     FROM ms_compound
@@ -69,8 +73,24 @@ NodenameMass_SQL <- function(sql_path, expid,
     "
     
     return(DBI::dbGetQuery(con, query,
-                           params = list(expid, precursor_Mz - err, 
-                                         precursor_Mz + err)))
+                           params = list(expid, mass_measured - mass_range, 
+                                         mass_measured + mass_range)))
+  }
+  
+  if (!is.null(rt)) {
+    
+    cat("the retention time should be in minutes")
+    
+    query <- "
+    SELECT *
+    FROM ms_compound
+    WHERE expid = ?
+    AND retention_time BETWEEN ? AND ?
+    "
+    
+    return(DBI::dbGetQuery(con, query,
+                           params = list(expid, retention_time - rt_range, 
+                                         retention_time + rt_range)))
   }
   
 }
