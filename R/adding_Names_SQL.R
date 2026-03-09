@@ -26,14 +26,14 @@ adding_Names_SQL <- function(con_merged, sim_table) {
   sim_sub <- sim_table %>%
     select(
       feature_id,
-      dataStorage,
+      dataOrigin,
       matched_peaks_count,
       score,
       target_name
     ) %>%
     distinct() %>%
     # Extract just the filename
-    mutate(file_name = basename(dataStorage))
+    mutate(file_name = basename(dataOrigin))
   
   # extract just the filename in msms_spectrum
   msms_spectrum <- msms_spectrum %>%

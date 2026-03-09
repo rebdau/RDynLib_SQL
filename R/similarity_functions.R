@@ -355,7 +355,7 @@ similarity_RDynlib_match <- function(
   
   #select just the variables needed fer match spectra function
   dy_filtered <- selectSpectraVariables(dy_filtered, c("msLevel", "rtime", 
-                                                       "precursorMz"))
+                                                       "precursorMz", "name"))
   
   # Match spectra 
   if (fragments_resolution == "unit.resolution") {
