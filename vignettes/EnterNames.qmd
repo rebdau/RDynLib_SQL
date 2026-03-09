@@ -77,7 +77,7 @@ NodenameMass_SQL(dbf, expid = 266,
 
 
 #(3) Update the ms_compound fields related to the previously extracted
-# compound_id from the NodenameMass_SQL: 
+# compound_id using the NodenameMass_SQL: 
 ```{r}
 EnterName_SQL(dbf, CoMPID = )
 ```
