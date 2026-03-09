@@ -283,142 +283,82 @@ similarity_RDynlib_match <- function(
     tolerance = 0.5
 ) {
   
-  if (!requireNamespace("rstudioapi", quietly = TRUE)) {
-    install.packages("rstudioapi", repos = "https://cloud.r-project.org/")
-  }
-  
-  
   fragments_resolution <- match.arg(fragments_resolution)
   
-  # polarity filter
-  st_filtered <- st_sps[st_sps$polarity == polarity_query]
+  # Polarity filter 
+  pol_st <- spectraData(st_sps, "polarity")[["polarity"]]
+  st_filtered <- st_sps[pol_st == polarity_query]
   
-  dy_filtered <- dy_sps[
-    dy_sps$polarity == polarity_target &
-      !is.na(dy_sps$name) & dy_sps$name != "" &
-      !grepl("^!", dy_sps$name)
-  ]
+  dy_meta <- spectraData(dy_sps, c("polarity", "name"))
+  keep_dy <- dy_meta$polarity == polarity_target &
+    !is.na(dy_meta$name) &
+    dy_meta$name != "" &
+    !grepl("^!", dy_meta$name)
+  dy_filtered <- dy_sps[keep_dy]
   
   if (length(st_filtered) == 0 || length(dy_filtered) == 0)
     return(data.frame())
   
-  
-  # detect spectrum type column 
+  # Detect spectrum type column 
   detect_spectrum_type_column <- function(sps) {
-    cols <- names(spectraData(sps))
+    cols <- spectraVariables(sps)
     if ("spectrum.type" %in% cols) return("spectrum.type")
     if ("spectrum_type" %in% cols) return("spectrum_type")
     return(NULL)
   }
   
-  
-  
+  # Interactive filtering
   interactive_filter <- function(sps, label) {
-    
-    # Spectrum type filtering 
     type_col <- detect_spectrum_type_column(sps)
-    
     if (!is.null(type_col)) {
-      
-      available_types <- sort(unique(na.omit(
-        spectraData(sps)[[type_col]]
-      )))
-      
-      if (length(available_types) == 0)
-        return(sps)
-      
-      cat("\nAvailable spectrum types for", label, ":\n")
-      print(available_types)
-      
-      repeat {
-        type_input <- rstudioapi::showPrompt(
-          paste("Spectrum type -", label),
-          paste("Available types:",
-                paste(available_types, collapse = ", "))
-        )
-        
-        if (is.null(type_input)) {
-          cat("Operation cancelled by user.\n")
-          return(NULL)
+      type_data <- spectraData(sps, type_col)[[type_col]]
+      available_types <- sort(unique(na.omit(type_data)))
+      if (length(available_types) > 0) {
+        repeat {
+          type_input <- rstudioapi::showPrompt(
+            paste("Spectrum type -", label),
+            paste("Available types:", paste(available_types, collapse = ", "))
+          )
+          if (is.null(type_input)) return(NULL)
+          chosen_types <- trimws(unlist(strsplit(type_input, ",")))
+          if (all(chosen_types %in% available_types)) break
         }
-        
-        chosen_types <- trimws(unlist(strsplit(type_input, ",")))
-        
-        if (all(chosen_types %in% available_types)) break
-        
-        cat("Invalid input. Please choose from:",
-            paste(available_types, collapse = ", "), "\n")
+        sps <- sps[type_data %in% chosen_types]
       }
-      
-      sps <- sps[
-        spectraData(sps)[[type_col]] %in% chosen_types
-      ]
     }
+    if (length(sps) == 0) return(NULL)
     
-    
-    if (length(sps) == 0)
-      return(NULL)
-    
-    
-    # MS level filtering after spectrum.type filtering 
-    if ("msLevel" %in% names(spectraData(sps))) {
-      
-      available_ms <- sort(unique(na.omit(
-        spectraData(sps)$msLevel
-      )))
-      
-      if (length(available_ms) == 0)
-        return(sps)
-      
-      cat("\nAvailable MS levels for selected spectrum.type (", 
-          label, "):\n", sep = "")
-      print(available_ms)
-      
-      repeat {
-        ms_input <- rstudioapi::showPrompt(
-          paste("MS level -", label),
-          paste("Available MS levels:",
-                paste(available_ms, collapse = ", "))
-        )
-        
-        if (is.null(ms_input)) {
-          cat("Operation cancelled by user.\n")
-          return(NULL)
+    if ("msLevel" %in% spectraVariables(sps)) {
+      ms_data <- spectraData(sps, "msLevel")[["msLevel"]]
+      available_ms <- sort(unique(na.omit(ms_data)))
+      if (length(available_ms) > 0) {
+        repeat {
+          ms_input <- rstudioapi::showPrompt(
+            paste("MS level -", label),
+            paste("Available MS levels:", paste(available_ms, collapse = ", "))
+          )
+          if (is.null(ms_input)) return(NULL)
+          chosen_ms <- suppressWarnings(as.numeric(unlist(strsplit(ms_input, ","))))
+          chosen_ms <- chosen_ms[!is.na(chosen_ms)]
+          if (length(chosen_ms) > 0 && all(chosen_ms %in% available_ms)) break
         }
-        
-        chosen_ms <- suppressWarnings(
-          as.numeric(unlist(strsplit(ms_input, ",")))
-        )
-        
-        chosen_ms <- chosen_ms[!is.na(chosen_ms)]
-        
-        if (length(chosen_ms) > 0 &&
-            all(chosen_ms %in% available_ms)) break
-        
-        cat("Invalid input. Please choose from:",
-            paste(available_ms, collapse = ", "), "\n")
+        sps <- sps[ms_data %in% chosen_ms]
       }
-      
-      sps <- sps[
-        spectraData(sps)$msLevel %in% chosen_ms
-      ]
     }
-    
     return(sps)
   }
   
-  
-  # Apply interactive filtering 
   st_filtered <- interactive_filter(st_filtered, "query")
-  if (is.null(st_filtered) || length(st_filtered) == 0)
-    return(data.frame())
-  
+  if (is.null(st_filtered) || length(st_filtered) == 0) return(data.frame())
   dy_filtered <- interactive_filter(dy_filtered, "target")
-  if (is.null(dy_filtered) || length(dy_filtered) == 0)
-    return(data.frame())
+  if (is.null(dy_filtered) || length(dy_filtered) == 0) return(data.frame())
   
-  if (fragments_resolution == "unit.resolution"){
-    #Similarity calculation
+  #select just the variables needed fer match spectra function
+  dy_filtered <- selectSpectraVariables(dy_filtered, c("msLevel", "rtime", 
+                                                       "precursorMz"))
+  
+  # Match spectra 
+  if (fragments_resolution == "unit.resolution") {
     param <- MetaboAnnotation::CompareSpectraParam(
       ppm = ppm,
       tolerance = tolerance,
@@ -427,18 +367,14 @@ similarity_RDynlib_match <- function(
       MAPFUN = dynlibmatch2_map,
       FUN = dynlib_symmetric_dotproduct,
       matchedPeaksCount = TRUE,
-      fragments_method = fragments_resolution,
-      #precursor_method = precursor_resolution,
-      #digits = digits
+      fragments_method = fragments_resolution
     )
-    
     matches <- MetaboAnnotation::matchSpectra(
       query = st_filtered,
       target = dy_filtered,
       param = param
-    )}
-  
-  else {
+    )
+  } else {
     param <- CompareSpectraParam(
       ppm = ppm,
       tolerance = tolerance,
@@ -448,32 +384,22 @@ similarity_RDynlib_match <- function(
       requirePrecursor = requirePrecursor,
       matchedPeaksCount = TRUE
     )
-    
     matches <- matchSpectra(
       query = st_filtered,
       target = dy_filtered,
       param = param
     )
-    
   }
   
-  df <- as.data.frame(
-    MetaboAnnotation::matchedData(matches)
-  )
-  print(environment(dynlib_map))
+  #results
+  df <- as.data.frame(MetaboAnnotation::matchedData(matches))
   df <- df[!is.na(df$score) & df$score >= threshold, ]
-  
-  if (nrow(df) == 0)
-    return(df)
+  if (nrow(df) == 0) return(df)
   
   df <- dplyr::group_by(df, acquisitionNum)
   df <- dplyr::slice_max(df, score, n = 1, with_ties = TRUE)
-  df <- dplyr::slice_max(df, matched_peaks_count,
-                         n = 1, with_ties = FALSE)
+  df <- dplyr::slice_max(df, matched_peaks_count, n = 1, with_ties = FALSE)
   df <- dplyr::ungroup(df)
   
   return(df)
 }
-
-
-
