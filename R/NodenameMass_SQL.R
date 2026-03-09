@@ -79,7 +79,7 @@ NodenameMass_SQL <- function(sql_path, expid,
   
   if (!is.null(rt)) {
     
-    cat("the retention time should be in minutes")
+    cat("the retention time should be in minutes\n")
     
     query <- "
     SELECT *
@@ -89,8 +89,7 @@ NodenameMass_SQL <- function(sql_path, expid,
     "
     
     return(DBI::dbGetQuery(con, query,
-                           params = list(expid, retention_time - rt_range, 
-                                         retention_time + rt_range)))
+                           params = list(expid, rt - rt_range, rt + rt_range)))
   }
   
 }
