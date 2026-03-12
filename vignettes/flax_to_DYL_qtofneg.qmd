@@ -4,7 +4,7 @@ format:
   html:
     toc: true
     self-contained: true
-author: "Ahlam Mentag, Johannes Rainer"
+author: "Ahlam Mentag, Rbecca Dauwe, Johannes Rainer"
 ---
 
 ## Shiny Documents
@@ -18,28 +18,67 @@ and convert the retention times of flax data to minutes.
 Note: In this file we will need the similarity output file between the
 existing database and the new experiment that we would like to to add,
 that's why we have to run first this quarto document: \
-[QTOF_neg_call.qmd](https://github.com/rebdau/RDynLib/blob/dev_Ahlam/Similarity/QTOF/QTOF_neg_call.qmd)
+[QTOF_neg_call.qmd](https://github.com/rebdau/RDynLib_SQL/blob/Ahlam/vignettes/QTOF_neg_call.qmd)
 and load the output here.
 
+# Directroy layout
+
+This project follows an  R package layout as follows:
+
+The main project folder is:
+
+RDynLib_SQL/
+
+
+Within this directory, the structure is organized as follows:
+
+RDynLib_SQL/
+├── data/
+├── R/
+└── vignettes/
+
+
+### `data/`
+
+Contains the SQLite database files used in the workflow (e.g., `Qtof_flax_neg.sqlite`).
+
+### `R/`
+
+Contains the R source files (`.R`) that define the package functions and core implementation.
+
+### `vignettes/`
+
+Contains Quarto (`.qmd`) files that document the workflow and provide reproducible examples.
+
+In this workflow, the working directory is set to the project root:
+
+RDynLib_SQL/
+
+# Required packages
 ```{r}
 library(Spectra)
 library(CompoundDb)
 library(DBI)
 library(dplyr)
 library(RSQLite)
+library(here)
 register(SerialParam())
-pth <- getwd()
-pth
+library(devtools)
+
+#` Uploading RDynLibSQL: Load all functions of the RDynlib directory
+load_all()
 ```
 
 Loading the sql database of flax qtof negative
 ```{r}
-con_flax <- dbConnect(RSQLite::SQLite(), "data/QTOF_flax_neg.sqlite")
+db_flax <- here("data", "QTOF_flax_neg.sqlite")
+con_flax <- dbConnect(RSQLite::SQLite(), db_flax)
 ```
 
 Loading the sql database of Dynlib qtof negative
 ```{r}
-con_dyL <- dbConnect(RSQLite::SQLite(), "data/DyLib_QTOF_neg.sqlite")
+db_dyl <- here("data", "QTOF_flax_neg.sqlite")
+con_dyL <- dbConnect(RSQLite::SQLite(), db_dyl)
 ```
 
 
@@ -53,205 +92,27 @@ dbListTables(con_dyL)
 
 ```{r}
 # Create new database
-con_merged <- dbConnect(SQLite(), "data/DYL_FLAX_QTOFneg.sqlite")
+dbf <- here("data", "DYL_FLAX_QTOFneg.sqlite")
+con_merged <- dbConnect(SQLite(), dbf)
 ```
 
 
 ```{r}
-merge_databases <- function(main_db, add_db, output_db) {
-  
-  # Connect to databases
-  con_main <- dbConnect(SQLite(), main_db)
-  con_add  <- dbConnect(SQLite(), add_db)
-  con_out  <- dbConnect(SQLite(), output_db)
-  
-  tables_main <- setdiff(dbListTables(con_main), "sqlite_sequence")
-  tables_add  <- setdiff(dbListTables(con_add), "sqlite_sequence")
-  
-  # Intersect the columns of both databases
-  common_tables <- intersect(tolower(tables_main), tolower(tables_add))
-  
-  # ID shifting function
-  shift_ids <- function(df, exp_shift, spectrum_shift, peak_shift, compound_shift) {
-    if ("expid" %in% names(df))        df$expid       <- as.integer(df$expid) + exp_shift
-    if ("spectrum_id" %in% names(df))  df$spectrum_id <- as.integer(df$spectrum_id) + spectrum_shift
-    if ("peak_id" %in% names(df))      df$peak_id     <- as.integer(df$peak_id) + peak_shift
-    if ("compound_id" %in% names(df))  df$compound_id <- as.character(as.integer(df$compound_id) + compound_shift)
-    if ("subsid" %in% names(df))       df$subsid      <- as.integer(df$subsid)
-    return(df)
-  }
-  
-  # Compute ID shift
-  compute_shift <- function(con_main, con_add, table, key) {
-    if (!(table %in% tolower(tables_main)) || !(table %in% tolower(tables_add))) return(0)
-    main_tbl <- dbReadTable(con_main, tables_main[tolower(tables_main) == table])
-    add_tbl  <- dbReadTable(con_add, tables_add[tolower(tables_add) == table])
-    if (!key %in% names(main_tbl) || !key %in% names(add_tbl)) return(0)
-    main_vals <- suppressWarnings(as.integer(main_tbl[[key]]))
-    add_vals  <- suppressWarnings(as.integer(add_tbl[[key]]))
-    max_main <- if(any(!is.na(main_vals))) max(main_vals, na.rm=TRUE) else 0
-    min_add  <- if(any(!is.na(add_vals)))  min(add_vals, na.rm=TRUE) else 0
-    return(max_main + 1 - min_add)
-  }
-  
-  exp_shift      <- compute_shift(con_main, con_add, "experiment", "expid")
-  compound_shift <- compute_shift(con_main, con_add, "ms_compound", "compound_id")
-  spectrum_shift <- compute_shift(con_main, con_add, "msms_spectrum", "spectrum_id")
-  peak_shift     <- compute_shift(con_main, con_add, "msms_spectrum_peak", "peak_id")
-  
-  # Fix column types
-  fix_column_types <- function(df, table_name) {
-    if (nrow(df) == 0) return(df)
-    
-    if (table_name == "msms_spectrum") {
-      df$spectrum_id <- as.integer(df$spectrum_id)
-      df$compound_id <- as.character(df$compound_id)
-      df$ms_level <- as.integer(df$ms_level)
-      df$polarity <- as.integer(df$polarity)
-      df$spectrum_type <- as.character(df$spectrum_type)
-      df$precursor_mz <- as.numeric(df$precursor_mz)
-      df$precursorIntensity <- as.numeric(df$precursorIntensity)
-      df$precursorCharge <- as.integer(df$precursorCharge)
-      df$collision_energy <- as.character(df$collision_energy)
-      df$isolationWindowLowerMz <- as.numeric(df$isolationWindowLowerMz)
-      df$isolationWindowTargetMz <- as.numeric(df$isolationWindowTargetMz)
-      df$isolationWindowUpperMz <- as.numeric(df$isolationWindowUpperMz)
-      df$peaks_count <- as.integer(df$peaks_count)
-      df$totIonCurrent <- as.numeric(df$totIonCurrent)
-      df$basePeakMZ <- as.numeric(df$basePeakMZ)
-      df$basePeakIntensity <- as.numeric(df$basePeakIntensity)
-      df$ionisationEnergy <- as.numeric(df$ionisationEnergy)
-      df$lowMZ <- as.numeric(df$lowMZ)
-      df$highMZ <- as.numeric(df$highMZ)
-      df$mergedScan <- as.integer(df$mergedScan)
-      df$mergedResultScanNum <- as.integer(df$mergedResultScanNum)
-      df$mergedResultStartScanNum <- as.integer(df$mergedResultStartScanNum)
-      df$mergedResultEndScanNum <- as.integer(df$mergedResultEndScanNum)
-      df$injectionTime <- as.numeric(df$injectionTime)
-      df$filterString <- as.character(df$filterString)
-      df$spectrumId <- as.integer(df$spectrumId)
-      df$ionMobilityDriftTime <- as.numeric(df$ionMobilityDriftTime)
-      df$scanWindowLowerLimit <- as.numeric(df$scanWindowLowerLimit)
-      df$scanWindowUpperLimit <- as.numeric(df$scanWindowUpperLimit)
-      df$electronBeamEnergy <- as.numeric(df$electronBeamEnergy)
-      df$originalPrecursorMz <- as.numeric(df$originalPrecursorMz)
-      df$precursorPurity <- as.numeric(df$precursorPurity)
-      df$chromPeakRT <- as.numeric(df$chromPeakRT)
-      df$chromPeakMz <- as.numeric(df$chromPeakMz)
-      df$chromPeakId <- as.character(df$chromPeakId)
-      df$rtime <- as.numeric(df$rtime)
-      df$scanIndex <- as.integer(df$scanIndex)
-      df$dataStorage <- as.character(df$dataStorage)
-      df$centroided <- as.integer(df$centroided)
-      df$smoothed <- as.integer(df$smoothed)
-      df$instrument <- as.character(df$instrument)
-      df$splash <- as.character(df$splash)
-      df$instrument_type <- as.character(df$instrument_type)
-      df$acquisitionNum <- as.integer(df$acquisitionNum)
-      df$precScanNum <- as.integer(df$precScanNum)
-      df$predicted <- as.numeric(df$predicted)
-      df$dataOrigin <- as.character(df$dataOrigin)
-      df$original_id <- as.character(df$original_id)
-      
-    } else if (table_name == "ms_compound") {
-      df$compound_id <- as.character(df$compound_id)
-      df$expid <- as.integer(df$expid)
-      df$exactmass <- as.numeric(df$exactmass)
-      df$subsid <- as.integer(df$subsid)
-      df$retention_time <- as.numeric(df$retention_time)
-      df$mass_measured <- as.numeric(df$mass_measured)
-      df$wavelen <- as.numeric(df$wavelen)
-      df$isotope_ratio <- as.numeric(df$isotope_ratio)
-      df$drift_time <- as.numeric(df$drift_time)
-    } else if (table_name == "msms_spectrum_peak") {
-      df$peak_id <- as.integer(df$peak_id)
-      df$spectrum_id <- as.integer(df$spectrum_id)
-      df$mz <- as.numeric(df$mz)
-      df$intensity <- as.numeric(df$intensity)
-    }
-    return(df)
-  }
-  
-  # Merge common tables
-  for(tbl_name in common_tables) {
-    tbl_main <- dbReadTable(con_main, tables_main[tolower(tables_main) == tbl_name])
-    tbl_add  <- dbReadTable(con_add, tables_add[tolower(tables_add) == tbl_name])
-    
-    if(nrow(tbl_add) > 0) {
-      tbl_add <- shift_ids(tbl_add, exp_shift, spectrum_shift, peak_shift, compound_shift)
-      
-      # Convert times to minutes in add_db
-      if ("rtime" %in% names(tbl_add)) {
-        tbl_add$rtime <- as.numeric(tbl_add$rtime) / 60
-      }
-      if ("retention_time" %in% names(tbl_add)) {
-        tbl_add$retention_time <- as.numeric(tbl_add$retention_time) / 60
-      }
-    }
-    
-    all_cols <- union(names(tbl_main), names(tbl_add))
-    for(col in setdiff(all_cols, names(tbl_main))) tbl_main[[col]] <- rep(NA, nrow(tbl_main))
-    for(col in setdiff(all_cols, names(tbl_add))) tbl_add[[col]] <- rep(NA, nrow(tbl_add))
-    
-    tbl_main <- tbl_main[, all_cols]
-    tbl_add  <- tbl_add[, all_cols]
-    
-    tbl_main[] <- lapply(tbl_main, as.character)
-    tbl_add[]  <- lapply(tbl_add, as.character)
-    
-    merged_tbl <- bind_rows(tbl_main, tbl_add)
-    merged_tbl <- fix_column_types(merged_tbl, tbl_name)
-    
-    dbWriteTable(con_out, tbl_name, merged_tbl, overwrite = TRUE)
-    cat("Merged:", tbl_name, "\n")
-  }
-  
-  # Copy unique tables
-  for(tbl_name in setdiff(tables_main, tables_add)) {
-    tbl <- dbReadTable(con_main, tbl_name)
-    tbl <- fix_column_types(tbl, tbl_name)
-    dbWriteTable(con_out, tbl_name, tbl, overwrite = TRUE)
-  }
-  
-  for(tbl_name in setdiff(tables_add, tables_main)) {
-    tbl <- dbReadTable(con_add, tbl_name)
-    if(nrow(tbl) > 0) tbl <- shift_ids(tbl, exp_shift, spectrum_shift, peak_shift, compound_shift)
-    
-    # Convert times to minutes in add_db
-    if ("rtime" %in% names(tbl)) {
-      tbl$rtime <- as.numeric(tbl$rtime) / 60
-    }
-    if ("retention_time" %in% names(tbl)) {
-      tbl$retention_time <- as.numeric(tbl$retention_time) / 60
-    }
-    
-    tbl <- fix_column_types(tbl, tbl_name)
-    dbWriteTable(con_out, tbl_name, tbl, overwrite = TRUE)
-  }
-  
-  dbDisconnect(con_main)
-  dbDisconnect(con_add)
-  dbDisconnect(con_out)
-  
-  cat("Database merge completed. Output saved to:", output_db, "\n")
-}
-
-
-
+main_db <- here("data", "DyLib_QTOF_neg.sqlite")
+add_db <- here("data", "QTOF_flax_neg.sqlite")
+output_db <- here("data", "DYL_FLAX_QTOFneg.sqlite")
 merge_databases(
-  main_db   = "data/DyLib_QTOF_neg.sqlite",
-  add_db    = "data/QTOF_flax_neg.sqlite",
-  output_db = "data/DYL_FLAX_QTOFneg.sqlite"
+  main_db   = main_db,
+  add_db    = add_db,
+  output_db = output_db
 )
 
-
-
-
 ```
 
 
 ```{r}
-con_merged <- dbConnect(SQLite(), "data/DYL_FLAX_QTOFneg.sqlite")
+dbf <- here("data", "DYL_FLAX_QTOFneg.sqlite")
+con_merged <- dbConnect(SQLite(), dbf)
 dbListTables(con_merged)
 ```
 
@@ -326,6 +187,8 @@ dbGetQuery(con_merged, "Select * from feature_matrix where expid = 52 LIMIT 10")
 cdb <- CompDb(con_merged)
 cdb
 ```
+
+
 ```{r}
 compounds(cdb) |> head()
 ```
@@ -340,133 +203,37 @@ spectraData(sp, columns = c("msLevel", "compound_id", "nodename", "rtime", "rete
 ```
 
 
-Load the similarity table between flax and Dynlib ftms negative data
+# Load the similarity table between flax and Dynlib qtof negative data
+We need the similarity output between the
+existing database and the new experiment that we added. The object was called 
+`qtof_matches`, and generated in this quarto document: \
+[QTOF_neg_call.qmd](https://github.com/rebdau/RDynLib_SQL/blob/Ahlam/vignettes/QTOF_neg_call.qmd).
+We load the object here.
+
 
 ```{r}
-load("data/match_results_qtofneg.RData")
-```
-
-```{r}
-sim_table <- as_tibble(result)
-print(sim_table)
-```
-
-```{r}
-adding_Names_SQL <- function(con_merged, sim_table) {
-
-  library(DBI)
-  library(dplyr)
-  library(tools) 
-
-  # Read tables
-  ms_compound <- dbReadTable(con_merged, "ms_compound")
-  msms_spectrum <- dbReadTable(con_merged, "msms_spectrum")
-
-  # Keep only relevant columns from sim_table
-  sim_sub <- sim_table %>%
-    select(
-      feature_id,
-      dataOrigin ,
-      matched_peaks_count,
-      score,
-      target_name
-    ) %>%
-    distinct() %>%
-    # Extract just the filename
-    mutate(file_name = basename(dataOrigin ))
-
-  # extract just the filename in msms_spectrum
-  msms_spectrum <- msms_spectrum %>%
-    mutate(file_name = basename(dataOrigin))
-
-  # Join sim_table with msms_spectrum using only the file name
-  sim_msms <- sim_sub %>%
-    inner_join(
-      msms_spectrum %>% select(compound_id, file_name),
-      by = "file_name"
-    )
-
-  # Join with ms_compound via nodename = feature_id
-  sim_compound <- sim_msms %>%
-    inner_join(
-      ms_compound %>% select(compound_id, nodename),
-      by = "compound_id"
-    ) %>%
-    filter(nodename == feature_id) %>%
-    mutate(
-      # Build the name in the desired format
-      name = paste0(
-        "!",
-        matched_peaks_count,
-        "!",
-        score,
-        "!",
-        target_name
-      )
-    ) %>%
-    select(compound_id, name) %>%
-    distinct()
-
-  # Update ms_compound 
-  tryCatch({
-
-    dbExecute(con_merged, "BEGIN TRANSACTION")
-
-    dbWriteTable(
-      con_merged,
-      "tmp_update_name",
-      sim_compound,
-      temporary = TRUE,
-      overwrite = TRUE
-    )
-
-    dbExecute(con_merged, "
-      UPDATE ms_compound
-      SET name = (
-        SELECT tmp_update_name.name
-        FROM tmp_update_name
-        WHERE tmp_update_name.compound_id = ms_compound.compound_id
-      )
-      WHERE compound_id IN (
-        SELECT compound_id FROM tmp_update_name
-      )
-    ")
-
-    dbExecute(con_merged, "COMMIT")
-
-  }, error = function(e) {
-    dbExecute(con_merged, "ROLLBACK")
-    stop(e)
-  })
-
-  invisible(nrow(sim_compound))
-}
-
-```
-
-```{r}
-
-#dbDisconnect(con_merged)
-```
-
-```{r}
-con_merged <- dbConnect(SQLite(), "data/DYL_FLAX_QTOFneg.sqlite")
-adding_Names_SQL(con_merged, sim_table)
-```
-```{r}
-check_feature_match <- sim_features %>%
-  inner_join(
-    ms_compound,
-    by = c("feature_id" = "nodename")
-  )
-
-nrow(check_feature_match)
+load(here("data/database_QTOF_neg","qtof_matches.RData"))
+print(qtof_matches)
 ```
 
 
+# Add automatically generated names of matching compounds to the merged experiment in compoundDb
+
+connect to the database:
+
+```{r}
+dbf <- here("data", "DYL_FLAX_QTOFneg.sqlite")
+con_merged <- dbConnect(RSQLite::SQLite(), dbf)
+
+adding_Names_SQL(con_merged, qtof_matches)
+```
 
 
+#check if the names have been added to the database:
 
 ```{r}
 dbGetQuery(con_merged, "Select * from ms_compound where expid = 52 and name IS NOT NULL")
 ```
+
+
+

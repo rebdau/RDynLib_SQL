@@ -112,7 +112,7 @@ ftms_matches <- similarity_RDynlib_match(
   dy_sps,
   polarity_query = 0,
   polarity_target = 0,
-  requirePrecursor = TRUE,
+  requirePrecursor = FALSE,
   tolerance = 0,
   ppm = 5,
   fragments_resolution = "unit.resolution",
@@ -126,17 +126,17 @@ print the similarity matrix and the number of rows (matches)
 ```{r}
 
 print(ftms_matches)
-nrow(ftms_matches)
+nrow(ftms_matches) # 324 
 ```
 
 save the resulting object:
 
 ```{r}
-save(ftms_matches, file = here("data", "ftms_matches.RData"))
+save(ftms_matches, file = here("data/database_FTMS_neg", "ftms_matches.RData"))
 
 ```
 
 ```{r}
-load(here("data","ftms_matches.RData"))
+load(here("data/database_FTMS_pos","ftms_matches.RData"))
 ```
 
