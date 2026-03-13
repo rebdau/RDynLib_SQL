@@ -524,6 +524,7 @@ MultMatchCID_Spectra <- function(
 
   
   df <- as.data.frame(MetaboAnnotation::matchedData(matches))
+  df <- df[!is.na(df$score) & df$score >= threshold, ]
   
   if (nrow(df) == 0)
     return("No matches found.")
@@ -569,11 +570,11 @@ MultMatchCID_Spectra <- function(
   if (fragments_resolution == "unit.resolution") {
     
     if ("query_precursorMz" %in% colnames(df)) {
-      df$query_precursorMz <- round(df$query_precursorMz)
+      df$query_precursorMz <- round(df$query_precursorMz,2)
     }
     
     if ("target_precursorMz" %in% colnames(df)) {
-      df$target_precursorMz <- round(df$target_precursorMz)
+      df$target_precursorMz <- round(df$target_precursorMz,2)
     }
     
   }
