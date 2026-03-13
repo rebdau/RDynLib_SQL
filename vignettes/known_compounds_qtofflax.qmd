@@ -70,16 +70,16 @@ test
 
 cmp <- MultMatchCID_Spectra(
   dy_sps,
-  45820,
+  7704,
   ms_level_query = 2,
   ms_level_target = 2,
   polarity_query = 0,
   polarity_target = 0,
   tolerance = 0,
-  ppm = 10,
+  ppm = 500,
   minIons = 5,
   fragments_resolution = "high.resolution",
-  requirePrecursor = T,
+  requirePrecursor = F,
 )
 cmp
 ```
@@ -163,15 +163,16 @@ run the function using the merged energies as a spectrum type:
 res_merged <- run_multmatch(
   compound_ids, spectra_db = dy_sps,
   spectrum_type_query  = "merged_MSMS_all_energies",
+  fragments_resolution = "unit.resolution",
   polarity_query = 0,
   polarity_target = 0,
   ms_query = 2,
   ms_target = 2,
-  threshold = 0.9,
+  threshold = 0.8,
   minIons = 3,
-  ppm = 0,
-  tolerance = 0.5,
-  requirePrecursor = F
+  ppm = 10,
+  tolerance = 0,
+  requirePrecursor = T
 )
 res_merged
 ```
@@ -181,14 +182,15 @@ run the function using the single energy as a spectrum type:
 res_single <- run_multmatch(
   compound_ids, spectra_db = dy_sps,
   spectrum_type_query = "intersect_single_energy",
+  fragments_resolution = "unit.resolution",
   polarity_query = 0,
   polarity_target = 0,
   ms_query = 2,
   ms_target = 2,
   threshold = 0.8,
-  ppm = 10
-  tolerance = 0.8,
-  requirePrecursor = F
+  ppm = 10,
+  tolerance = 0,
+  requirePrecursor = T
 )
 res_single
 ```
@@ -211,6 +213,28 @@ res_single$spectrum_type <- "intersect_single_energy"
 res_all <- rbind(res_merged, res_single)
 
 
-write_xlsx(res_single, here("data", "qtofneg_multmatch.xlsx"))
+write_xlsx(res_all, here("data", "qtofneg_multmatch.xlsx"))
+```
+
+
+
+```{r}
+cid <- spectraData(dy_sps, columns = "compound_id")$compound_id
+idx <- which(cid == "4359")
+nrow(peaksData(dy_sps[idx])[[1]])
+idx
+peaksData(dy_sps[idx])[[1]]
+```
+
+
+```{r}
+cid <- spectraData(dy_sps, columns = "compound_id")$compound_id
+idx <- which(cid == "7704")
+nrow(peaksData(dy_sps[idx])[[1]])
+idx
+peaksData(dy_sps[idx])[[1]]
+```
+```{r}
+
 ```
 

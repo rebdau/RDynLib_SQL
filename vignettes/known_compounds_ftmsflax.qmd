@@ -27,6 +27,7 @@ library(RSQLite)
 library(devtools)
 library(openxlsx)
 library(here)
+library(dplyr)
 #` Uploading RDynLib: Load all functions of the RDynlib directory
 load_all()
 ```
@@ -95,9 +96,9 @@ matches from the dynlib ftms database:
 cmp <- MultMatchCID_Spectra(
   dy_sps,
   101280,
-  spectrum_type = "not_assembled",
-  ms_level_query = 2,
-  ms_level_target = 2,
+   spectrum_type_query = "not_assembled",
+   ms_level_query = 2,
+   ms_level_target = 2,
   polarity_query = 0,
   polarity_target = 0,
   tolerance = 0,
@@ -121,7 +122,7 @@ function to apply the MultMatchCID_spectra() function across compound_ids:
 
 ```{r}
 run_multmatch <- function(ids, spectra_db, polarity_query, polarity_target,
-                          spectrum_type, ms_query, ms_target, minIons = 3,
+                          spectrum_type_query , spectrum_type_target = "NA",  ms_query, ms_target, minIons = 3,
                           requirePrecursor = TRUE, threshold = 0.9, ppm = 5,
                           tolerance = 0, fragments_resolution = "unit.resolution" ) {
 
@@ -133,13 +134,13 @@ run_multmatch <- function(ids, spectra_db, polarity_query, polarity_target,
     message("Processing compound_id: ", id)
 
     res <- tryCatch({
-
       df <- MultMatchCID_Spectra(
         spectra_db = spectra_db,
         compound_id = id,
         polarity_query = polarity_query,
         polarity_target = polarity_target,
-        spectrum_type = spectrum_type,
+        spectrum_type_query  = spectrum_type_query,
+        spectrum_type_target = spectrum_type_target,
         ms_level_query = ms_query,
         ms_level_target = ms_target,
         requirePrecursor = requirePrecursor,
@@ -184,10 +185,14 @@ res_MS2_MS2 <- run_multmatch(
   compound_ids, spectra_db = dy_sps,
   polarity_query = 0,
   polarity_target = 0,
-  spectrum_type = "not_assembled",
+  spectrum_type_query = "not_assembled",
+  minIons = 3,
   ms_query = 2,
   ms_target = 2,
-  threshold = 0.9
+  threshold = 0.9,
+  ppm = 5,
+ tolerance = 0,
+ requirePrecursor = TRUE
 )
 res_MS2_MS2
 ```
@@ -197,10 +202,11 @@ res_MS2_MS3 <- run_multmatch(
   compound_ids, spectra_db = dy_sps,
   polarity_query = 0,
   polarity_target = 0,
-  spectrum_type = "not_assembled",
+  spectrum_type_query = "not_assembled",
   ms_query = 2,
   ms_target = 3,
-  tolerance = 0.6
+  tolerance = 0.6,
+  requirePrecursor = TRUE
 )
 res_MS2_MS3
 ```
@@ -211,10 +217,11 @@ res_MS3_MS2 <- run_multmatch(
   compound_ids, spectra_db = dy_sps,
   polarity_query = 0,
   polarity_target = 0,
-  spectrum_type = "not_assembled",
+  spectrum_type_query = "not_assembled",
   ms_query = 3,
   ms_target = 2,
-  tolerance = 0.6
+  tolerance = 0.6,
+  requirePrecursor = TRUE
 )
 res_MS3_MS2
 ```
@@ -224,10 +231,12 @@ res_MS3_MS3 <- run_multmatch(
   compound_ids, spectra_db = dy_sps,
   polarity_query = 0,
   polarity_target = 0,
-  spectrum_type = "not_assembled",
+  spectrum_type_query = "not_assembled",
   ms_query = 3,
   ms_target = 3,
-  tolerance = 0.6
+  tolerance = 0.6,
+  requirePrecursor = TRUE
+
 )
 res_MS3_MS3
 ```
@@ -238,10 +247,12 @@ res_MS4_MS2 <- run_multmatch(
   compound_ids, spectra_db = dy_sps,
   polarity_query = 0,
   polarity_target = 0,
-  spectrum_type = "not_assembled",
+  spectrum_type_query = "not_assembled",
   ms_query = 4,
   ms_target = 2,
-  tolerance = 0.6
+  tolerance = 0.6,
+  requirePrecursor = TRUE
+
 )
 res_MS4_MS2
 ```
@@ -251,7 +262,7 @@ res_MS4_MS3 <- run_multmatch(
   compound_ids, spectra_db = dy_sps,
   polarity_query = 0,
   polarity_target = 0,
-  spectrum_type = "not_assembled",
+  spectrum_type_query = "not_assembled",
   ms_query = 4,
   ms_target = 3,
   tolerance = 0.6
@@ -296,5 +307,28 @@ writeData(wb, "All_Results", all_results)
 
 # Save the workbook
 saveWorkbook(wb, here("data", "FTMSneg_multmatch.xlsx"), overwrite = TRUE)
+```
+
+
+
+```{r}
+cid <- spectraData(dy_sps, columns = "compound_id")$compound_id
+idx <- which(cid == "101280")
+nrow(peaksData(dy_sps[idx])[[1]])
+idx
+#peaksData(dy_sps[idx])[[1]][1:5, ]
+peaksData(dy_sps[idx])[[1]]
+spectraData(dy_sps[idx], columns = "precursorMz")
+```
+
+
+```{r}
+cid <- spectraData(dy_sps, columns = "compound_id")$compound_id
+idx <- which(cid == "1913")
+nrow(peaksData(dy_sps[idx])[[1]])
+idx
+peaksData(dy_sps[idx])[[1]][1:5, ]
+peaksData(dy_sps[idx])[[1]]
+spectraData(dy_sps[idx], columns = "precursorMz")
 ```
 
