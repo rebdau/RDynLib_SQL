@@ -132,15 +132,6 @@ nrow(cmp_matches)
 sum(round(test2$`m/z`,2) != 355.07)
 ```
 
-```{r}
-sps_test<- dy_sps[
-    spectraData(dy_sps)$compound_id == 14084 &
-      spectraData(dy_sps)$polarity == 0
-  ]
-```
-
-
-
 
 
 save the resulting object:

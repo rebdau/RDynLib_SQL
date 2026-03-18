@@ -21,7 +21,7 @@ unify the units and convert the retention times of flax data to minutes.
 Note: In this file we will need the similarity output file between the
 existing database and the new experiment that we would like to  add,
 that's why we have to run first this quarto document: \
-[FTMS_neg_call.qmd](https://github.com/rebdau/RDynLib/blob/dev_Ahlam/Similarity/FTMS/FTMS_neg_call.qmd)
+[FTMS_neg_call.qmd](https://github.com/rebdau/RDynLib_SQL/blob/Ahlam/vignettes/FTMS_neg_call.qmd)
 and load the output here.
 
 # Directroy layout
@@ -218,12 +218,20 @@ in this quarto document: \
 We load the object here.
 
 ```{r}
-load(here("data","ftms_matches.RData"))
+load(here("data/database_FTMS_neg","ftms_matches.RData"))
 print(ftms_matches)
 ```
 
 
 # Add automatically generated names of matching compounds to the merged experiment in compoundDb
+
+connect to the database:
+```{r}
+dbf <- here("data", "DYL_FLAX_FTMSneg.sqlite")
+con_merged <- dbConnect(RSQLite::SQLite(), dbf)
+```
+
+
 ```{r}
 adding_Names_SQL(con_merged, ftms_matches)
 ```

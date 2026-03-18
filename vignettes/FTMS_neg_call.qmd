@@ -112,7 +112,7 @@ ftms_matches <- similarity_RDynlib_match(
   dy_sps,
   polarity_query = 0,
   polarity_target = 0,
-  requirePrecursor = TRUE,
+  requirePrecursor = FALSE,
   tolerance = 0,
   ppm = 5,
   fragments_resolution = "unit.resolution",
@@ -121,53 +121,22 @@ ftms_matches <- similarity_RDynlib_match(
 
 ```
 
-```{r}
-test2 <- MultMatchCID_Spectra(
-  dy_sps,
-  14084,
-  polarity_query = 0,
-  polarity_target = 0,
-  tolerance = 0,
-  ppm = 10,
-  minIons = 2,
-  fragments_resolution = "unit.resolution",
-  requirePrecursor = T,
-)
-
-
-```
-
-```{r}
-sum(round(test2$`m/z`,2) != 355.07)
-```
-
-```{r}
-sps_test<- dy_sps[
-    spectraData(dy_sps)$compound_id == 14084 &
-      spectraData(dy_sps)$polarity == 0
-  ]
-```
-
-```{r}
-print(test2)
-nrow(test2)
-```
-
 print the similarity matrix and the number of rows (matches)
 
 ```{r}
 
 print(ftms_matches)
-nrow(ftms_matches)
+nrow(ftms_matches) # 324 
 ```
 
 save the resulting object:
 
 ```{r}
-save(ftms_matches, file = "data/ftms_matches.RData")
+save(ftms_matches, file = here("data/database_FTMS_neg", "ftms_matches.RData"))
+
 ```
 
 ```{r}
-load("data/ftms_matches.RData")
+load(here("data/database_FTMS_pos","ftms_matches.RData"))
 ```
 

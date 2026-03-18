@@ -279,7 +279,8 @@ MultMatchCID_Spectra <- function(
     compound_id,
     polarity_query,
     polarity_target,
-    spectrum_type = NULL,
+    spectrum_type_query = NULL,
+    spectrum_type_target = NULL,
     ms_level_query = NULL,
     ms_level_target = NULL,
     minIons = 3,
@@ -290,62 +291,84 @@ MultMatchCID_Spectra <- function(
     tolerance = 0.5
 ) {
   
-  if (!requireNamespace("rstudioapi", quietly = TRUE))
-    stop("Please install the 'rstudioapi' package for interactive prompts.")
+  fragments_resolution <- match.arg(fragments_resolution)
   
-  fragments_resolution  <- match.arg(fragments_resolution)
   
-
   # FILTER QUERY
-
+  
+  query_meta_cols <- intersect(
+    c("compound_id","polarity","name","spectrum_type","spectrum.type",
+      "msLevel","precursorMz","rtime","expid", "retention_time"),
+    spectraVariables(spectra_db)
+  )
+  
+  meta_query <- spectraData(spectra_db, query_meta_cols)
   
   query_sps <- spectra_db[
-    spectraData(spectra_db)$compound_id == compound_id &
-      spectraData(spectra_db)$polarity == polarity_query
+    meta_query$compound_id == compound_id &
+      meta_query$polarity == polarity_query
   ]
-  
   
   if (length(query_sps) == 0)
     stop("Compound not found with given polarity.")
   
-  spectrum_col <- intersect(
-    c("spectrum_type","spectrum.type"),
-    names(spectraData(query_sps))
-  )
-  spectrum_col <- if (length(spectrum_col) > 0) spectrum_col[1] else NULL
+  
+  # Detect spectrum type column
+  spectrum_col <- intersect(c("spectrum_type","spectrum.type"), query_meta_cols)
+  spectrum_col <- if(length(spectrum_col) > 0) spectrum_col[1] else NULL
+  
+  
+  # Select only needed variables
+  vars_keep <- c("compound_id","polarity","msLevel", "name", "rtime","precursorMz","expid", "retention_time")
+  if (!is.null(spectrum_col))
+    vars_keep <- c(spectrum_col, vars_keep)
+  
+  query_sps <- selectSpectraVariables(query_sps, vars_keep)
+  
+  
+  # spectrum_type filter
   
   if (!is.null(spectrum_col)) {
     
-    available_types <- unique(spectraData(query_sps)[[spectrum_col]])
+    available_types <- unique(spectraData(query_sps, spectrum_col)[[1]])
     
-    if (is.null(spectrum_type)) {
-      spectrum_type <- rstudioapi::showPrompt(
-        "Spectrum type selection",
-        paste("Available types:",
-              paste(available_types, collapse = ", ")),
-        default = available_types[1]
-      )
+    if (is.null(spectrum_type_query)) {
+      
+      if (length(available_types) > 1) {
+        spectrum_type_query <- rstudioapi::showPrompt(
+          "Spectrum type selection (query)",
+          paste("Available types:", paste(available_types, collapse = ", ")),
+          default = available_types[1]
+        )
+      }
+      
     }
     
-    if (!spectrum_type %in% available_types)
-      stop("Selected spectrum_type does not exist.")
+    if (!is.null(spectrum_type_query) && spectrum_type_query %in% available_types) {
+      
+      query_sps <- query_sps[
+        spectraData(query_sps, spectrum_col)[[1]] == spectrum_type_query
+      ]
+      
+    }
     
-    query_sps <- query_sps[
-      spectraData(query_sps)[[spectrum_col]] == spectrum_type
-    ]
   }
+  
+  
+  # MS level query filter
   
   available_ms <- unique(msLevel(query_sps))
   
   if (is.null(ms_level_query)) {
+    
     ms_level_query <- as.numeric(
       rstudioapi::showPrompt(
         "MS level selection (query)",
-        paste("Available MS levels:",
-              paste(available_ms, collapse = ", ")),
+        paste("Available MS levels:", paste(available_ms, collapse = ", ")),
         default = available_ms[1]
       )
     )
+    
   }
   
   if (!(ms_level_query %in% available_ms))
@@ -356,50 +379,94 @@ MultMatchCID_Spectra <- function(
   if (length(query_sps) == 0)
     stop("No query spectra left after filtering.")
   
-  query_sp        <- query_sps[1]
-  query_peaks     <- peaksData(query_sp)[[1]]
-  precursor_query <- precursorMz(query_sp)
   
-  frag_count <- nrow(query_peaks)
+  query_sp <- query_sps[1]
+  query_peaks <- peaksData(query_sp)[[1]]
   
-  if (frag_count < minIons)
+  if (nrow(query_peaks) < minIons)
     stop("Not enough product ions in query spectrum.")
   
-
+  
+  
   # FILTER TARGET
-
+  
+  target_meta_cols <- intersect(
+    c("polarity","name","spectrum_type","spectrum.type",
+      "msLevel","precursorMz","rtime","expid", "retention_time"),
+    spectraVariables(spectra_db)
+  )
+  
+  meta_target <- spectraData(spectra_db, target_meta_cols)
   
   target_sps <- spectra_db[
-    spectraData(spectra_db)$polarity == polarity_target &
-      !is.na(spectra_db$name) & spectra_db$name != "" &
-      !grepl("^!", spectra_db$name)
+    meta_target$polarity == polarity_target &
+      !is.na(meta_target$name) &
+      meta_target$name != "" &
+      !grepl("^!", meta_target$name)
   ]
   
+  
+  vars_keep <- c("compound_id","polarity","msLevel","rtime", "name", "precursorMz","expid", "retention_time")
+  if (!is.null(spectrum_col))
+    vars_keep <- c(spectrum_col, vars_keep)
+  
+  target_sps <- selectSpectraVariables(target_sps, vars_keep)
+  
+  
+  
+  # spectrum_type filter target
   if (!is.null(spectrum_col)) {
+    
+    available_types_target <- unique(spectraData(target_sps, spectrum_col)[[1]])
+    
+    # Convert NA to a string for display
+    display_types <- ifelse(is.na(available_types_target), "NA", available_types_target)
+    
+    if (is.null(spectrum_type_target)) {
+      
+      cat("\nAvailable target spectrum types:\n")
+      print(display_types)
+      
+      spectrum_type_target <- rstudioapi::showPrompt(
+        "Spectrum type selection (target)",
+        "Enter one of the available spectrum types:",
+        default = display_types[1]
+      )
+      
+    }
+    
+    # Convert back if user selected "NA"
+    if (identical(spectrum_type_target, "NA"))
+      spectrum_type_target <- NA
+    
     target_sps <- target_sps[
-      spectraData(target_sps)[[spectrum_col]] == spectrum_type
+      spectraData(target_sps, spectrum_col)[[1]] == spectrum_type_target |
+        (is.na(spectraData(target_sps, spectrum_col)[[1]]) & is.na(spectrum_type_target))
     ]
+    
   }
+  
+  # MS level target filter
   
   available_target_ms <- unique(msLevel(target_sps))
   
   if (is.null(ms_level_target)) {
+    
     ms_level_target <- as.numeric(
       rstudioapi::showPrompt(
         "MS level selection (target)",
-        paste("Available MS levels:",
-              paste(available_target_ms, collapse = ", ")),
+        paste("Available MS levels:", paste(available_target_ms, collapse = ", ")),
         default = available_target_ms[1]
       )
     )
+    
   }
   
   if (!(ms_level_target %in% available_target_ms))
     stop("Invalid target MS level selected.")
   
-  target_sps <- target_sps[
-    msLevel(target_sps) == ms_level_target
-  ]
+  target_sps <- target_sps[msLevel(target_sps) == ms_level_target]
+  
   
   target_sps <- target_sps[
     sapply(peaksData(target_sps), nrow) >= minIons
@@ -408,11 +475,12 @@ MultMatchCID_Spectra <- function(
   if (length(target_sps) == 0)
     return("No target spectra left after filtering.")
   
-
+  
+  
   # MATCHING
-
-  if (fragments_resolution == "unit.resolution"){
-    #Similarity calculation
+  
+  if (fragments_resolution == "unit.resolution") {
+    
     param <- MetaboAnnotation::CompareSpectraParam(
       ppm = ppm,
       tolerance = tolerance,
@@ -421,18 +489,17 @@ MultMatchCID_Spectra <- function(
       MAPFUN = dynlibmatch2_map,
       FUN = dynlib_symmetric_dotproduct,
       matchedPeaksCount = TRUE,
-      fragments_method = fragments_resolution,
-      #precursor_method = precursor_resolution,
-      #digits = digits
+      fragments_method = fragments_resolution
     )
     
     matches <- MetaboAnnotation::matchSpectra(
-      query  = query_sp,
+      query = query_sp,
       target = target_sps,
       param = param
-    )}
-  
-  else {
+    )
+    
+  } else {
+    
     param <- CompareSpectraParam(
       ppm = ppm,
       tolerance = tolerance,
@@ -444,14 +511,20 @@ MultMatchCID_Spectra <- function(
     )
     
     matches <- matchSpectra(
-      query  = query_sp,
+      query = query_sp,
       target = target_sps,
       param = param
     )
     
   }
   
+  
+  
+  # RESULTS
+
+  
   df <- as.data.frame(MetaboAnnotation::matchedData(matches))
+  df <- df[!is.na(df$score) & df$score >= threshold, ]
   
   if (nrow(df) == 0)
     return("No matches found.")
@@ -461,54 +534,52 @@ MultMatchCID_Spectra <- function(
   if (nrow(df) == 0)
     return("No matches found after minIons filtering.")
   
+  
+  if ("target_compound_id" %in% colnames(df)) df$COMPID <- df$target_compound_id
+  if ("target_precursorMz" %in% colnames(df)) df$target_precursorMz <- df$target_precursorMz
+  if ("precursorMz" %in% colnames(df)) df$query_precursorMz <- df$precursorMz
+  
+  df$`#FragIon` <- nrow(query_peaks)
+  df$ComIons <- df$matched_peaks_count
+  df$DotIons <- df$score
 
   
-  if (!"target_compound_id" %in% colnames(df))
-    stop("target metadata not present in matchedData output.")
+  if ("target_retention_time" %in% colnames(df)) df$target_retention_time <- df$target_retention_time
+  if ("retention_time" %in% colnames(df)) df$query_retention_time <- df$retention_time
+  if ("target_expid" %in% colnames(df)) df$target_expid <- df$target_expid
+  if ("expid" %in% colnames(df)) df$query_expid <- df$expid
+  if ("target_msLevel" %in% colnames(df)) df$target_msLevel <- df$target_msLevel
+  if ("msLevel" %in% colnames(df)) df$query_msLevel <- df$msLevel
+  if ("target_name" %in% colnames(df)) df$target_name <- df$target_name
   
-  df$COMPID   <- df$target_compound_id
-  df$COMPNAME <- df$target_name
-  df$mz       <- df$target_precursorMz
+  cols_order <- c("target_compound_id", "target_msLevel", "query_msLevel", "query_precursorMz", "target_precursorMz","#FragIon",
+                  "ComIons","DotIons","target_name","target_retention_time","query_retention_time","target_expid",
+                  "query_expid")
+  cols_order <- cols_order[cols_order %in% colnames(df)]
   
-  df$`#FragIon` <- frag_count
-  df$ComIons    <- df$matched_peaks_count
-  df$DotIons    <- df$score
-  df$DotLoss    <- df$score
-  
-  if ("target_rtime" %in% colnames(df))
-    df$tR <- df$target_rtime
-  
-  if ("target_dataOrigin" %in% colnames(df))
-    df$EXPID <- df$target_dataOrigin
-  
+  df <- df[, cols_order, drop = FALSE]
 
-  # NEUTRAL LOSS MATCHING
-
-  nl_query <- neutral_loss(
-    query_peaks[,1],
-    precursor_query
-  )
+  # FORMAT OUTPUT
   
-  #cat("nl_query", nl_query)
-  # df$ComLoss <- sapply(seq_len(nrow(df)), function(i) {
-  #   
-  #   tgt_peaks <- peaksData(target_sps[i])[[1]][,1] 
-  #   tgt_prec <- df$target_precursorMz[i]
-  #   nl_target <- neutral_loss( tgt_peaks, tgt_prec ) 
-  #   #cat("nl_target", nl_target)
-  #   length(intersect(nl_query, nl_target))
-  # })
-  # 
-
+  # Round score
+  if ("DotIons" %in% colnames(df)) {
+    df$DotIons <- round(df$DotIons, 2)
+  }
   
-  df <- df[order(
-    df$ComIons * df$DotIons / df$`#FragIon`,
-    decreasing = TRUE
-  ), ]
+  # Round precursor m/z if unit resolution
+  if (fragments_resolution == "unit.resolution") {
+    
+    if ("query_precursorMz" %in% colnames(df)) {
+      df$query_precursorMz <- round(df$query_precursorMz,2)
+    }
+    
+    if ("target_precursorMz" %in% colnames(df)) {
+      df$target_precursorMz <- round(df$target_precursorMz,2)
+    }
+    
+  }
   
-  df <- df[, c("COMPID","mz","#FragIon","ComIons","DotIons",
-               "DotLoss","COMPNAME","tR","EXPID")]
-  colnames(df)[2] <- "m/z"
   
   return(df)
+  
 }

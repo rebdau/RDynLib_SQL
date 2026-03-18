@@ -1,0 +1,334 @@
+---
+title: "compound_id of identified compounds"
+format:
+  html:
+    toc: true
+    self-contained: true
+author: "Ahlam Mentag, Rebecca Dauwe, Johannes Rainer"
+---
+
+## Shiny Documents
+
+In this Quarto document we extract the compound_id from flax qtof negative that 
+were aligned with the known compounds of flax ftms negative, and we use the 
+MultMatchCID_Spectra() function to extract the matches of the flax ftms compounds, 
+that were aligned with the qtof flax data, with the dynlib ftms database.
+
+
+```{r}
+#| message: false
+#' Load required libraries
+library(here)
+library(Spectra)
+library(CompoundDb)
+library(MetaboAnnotation)
+library(DBI)
+library(RSQLite)
+library(devtools)
+library(openxlsx)
+library(here)
+library(dplyr)
+#` Uploading RDynLib: Load all functions of the RDynlib directory
+load_all()
+```
+
+Extracting the compounds that has been aligned with the following known ftms 
+compounds using getAlignedCompids_SQL():
+```{r}
+#loading the txt file that contains the alignment results
+alignment_file <- here("data", "assoc_flax.txt")
+
+getAlignedCompids <- getAlignedCompids_SQL(
+  compound_id = c(
+    101294, 101283, 101280, 101242, 101238, 101216, 101214, 101213, 101211, 101155,
+    101154, 101147, 101143, 101142, 101141, 101099, 101098, 101097, 101075, 101025,
+    101019, 101010, 101007, 100991, 100988, 100977, 100951, 100946, 100934
+  ),
+  database_name = "DYL_FLAX_FTMSneg.sqlite",
+  alignment_file = alignment_file
+)
+print(getAlignedCompids)
+```
+
+
+```{r}
+save(getAlignedCompids, file = here("data", "getAlignedCompids.RData"))
+```
+
+
+## convert the "Dynlib_FTMS_neg.sqlite" database to a spectra object
+
+Convert the "Dynlib_FTMS_neg.sqlite" database to a spectra object to use it in 
+MultmatchCID_spectra() function:
+
+```{r}
+
+dbf <- here("data", "DYL_FLAX_FTMSneg.sqlite")
+db <- dbConnect(SQLite(), dbf)
+dbListTables(db)
+#dbExecute(db, "DROP TABLE IF EXISTS feature_matrix ")
+experiment_df <- dbGetQuery(db, "SELECT * FROM experiment")
+
+#here we remove "x", "x.1" columns from experiment table 
+experiment_df <- experiment_df[, !names(experiment_df) %in% c("x", "x.1")]
+dbExecute(db, "DROP TABLE experiment")
+dbWriteTable(db, "experiment", experiment_df)
+
+#the columns have been successfully deleted
+dbGetQuery(db, "PRAGMA table_info(experiment)")
+dbDisconnect(db)
+#we convert the sql database to a Compdb object
+cdb <- ExpCompDb(dbf)
+#we convert the Compdb object to a spectra object
+dy_sps <- Spectra(cdb)
+```
+
+```{r}
+df <- spectraData(dy_sps, columns = c("msLevel", "compound_id", "expid", "retention_time"))
+df[df$compound_id == "101242", ]
+```
+
+Next we run the MultMatchCID_Spectra() on the ftms compounds to extract their 
+matches from the dynlib ftms database:
+
+```{r}
+#small test to the function
+cmp <- MultMatchCID_Spectra(
+  dy_sps,
+  101280,
+   spectrum_type_query = "not_assembled",
+   ms_level_query = 2,
+   ms_level_target = 2,
+  polarity_query = 0,
+  polarity_target = 0,
+  tolerance = 0,
+  ppm = 10,
+  minIons = 2,
+  fragments_resolution = "unit.resolution",
+  requirePrecursor = T,
+)
+cmp
+```
+```{r}
+compound_ids <- c(
+  101294, 101283, 101280, 101242, 101238, 101216, 101214, 101213, 101211, 101155,
+  101154, 101147, 101143, 101142, 101141, 101099, 101098, 101097, 101075, 101025,
+  101019, 101010, 101007, 100991, 100988, 100977, 100951, 100946, 100934
+)
+```
+
+
+function to apply the MultMatchCID_spectra() function across compound_ids:
+
+```{r}
+run_multmatch <- function(ids, spectra_db, polarity_query, polarity_target,
+                          spectrum_type_query , spectrum_type_target = "NA",  ms_query, ms_target, minIons = 3,
+                          requirePrecursor = TRUE, threshold = 0.9, ppm = 5,
+                          tolerance = 0, fragments_resolution = "unit.resolution" ) {
+
+  results <- list()
+
+  for (i in seq_along(ids)) {
+
+    id <- ids[i]
+    message("Processing compound_id: ", id)
+
+    res <- tryCatch({
+      df <- MultMatchCID_Spectra(
+        spectra_db = spectra_db,
+        compound_id = id,
+        polarity_query = polarity_query,
+        polarity_target = polarity_target,
+        spectrum_type_query  = spectrum_type_query,
+        spectrum_type_target = spectrum_type_target,
+        ms_level_query = ms_query,
+        ms_level_target = ms_target,
+        requirePrecursor = requirePrecursor,
+        threshold = threshold,
+        minIons = minIons,
+        fragments_resolution = fragments_resolution,
+        ppm = ppm,
+        tolerance = tolerance
+        
+      )
+
+      # if df is a character string (no matches), skip this compound
+      if (is.character(df)) {
+        message("No matches found for ", id)
+        next 
+      }
+
+      df$query_compound_id <- id
+      df
+
+    }, error = function(e) {
+      message("Skipped ", id, " : ", e$message)
+      NULL
+    })
+
+    if (!is.null(res))
+      results[[length(results) + 1]] <- res
+  }
+
+  if (length(results) == 0)
+    return(NULL)
+
+  do.call(rbind, results)
+}
+```
+
+Next we call the run_multmatch() function on different MS levels of the 
+compounds and the data:
+
+```{r}
+res_MS2_MS2 <- run_multmatch(
+  compound_ids, spectra_db = dy_sps,
+  polarity_query = 0,
+  polarity_target = 0,
+  spectrum_type_query = "not_assembled",
+  minIons = 3,
+  ms_query = 2,
+  ms_target = 2,
+  threshold = 0.9,
+  ppm = 5,
+ tolerance = 0,
+ requirePrecursor = TRUE
+)
+res_MS2_MS2
+```
+
+```{r}
+res_MS2_MS3 <- run_multmatch(
+  compound_ids, spectra_db = dy_sps,
+  polarity_query = 0,
+  polarity_target = 0,
+  spectrum_type_query = "not_assembled",
+  ms_query = 2,
+  ms_target = 3,
+  tolerance = 0.6,
+  requirePrecursor = TRUE
+)
+res_MS2_MS3
+```
+
+
+```{r}
+res_MS3_MS2 <- run_multmatch(
+  compound_ids, spectra_db = dy_sps,
+  polarity_query = 0,
+  polarity_target = 0,
+  spectrum_type_query = "not_assembled",
+  ms_query = 3,
+  ms_target = 2,
+  tolerance = 0.6,
+  requirePrecursor = TRUE
+)
+res_MS3_MS2
+```
+
+```{r}
+res_MS3_MS3 <- run_multmatch(
+  compound_ids, spectra_db = dy_sps,
+  polarity_query = 0,
+  polarity_target = 0,
+  spectrum_type_query = "not_assembled",
+  ms_query = 3,
+  ms_target = 3,
+  tolerance = 0.6,
+  requirePrecursor = TRUE
+
+)
+res_MS3_MS3
+```
+
+
+```{r}
+res_MS4_MS2 <- run_multmatch(
+  compound_ids, spectra_db = dy_sps,
+  polarity_query = 0,
+  polarity_target = 0,
+  spectrum_type_query = "not_assembled",
+  ms_query = 4,
+  ms_target = 2,
+  tolerance = 0.6,
+  requirePrecursor = TRUE
+
+)
+res_MS4_MS2
+```
+
+```{r}
+res_MS4_MS3 <- run_multmatch(
+  compound_ids, spectra_db = dy_sps,
+  polarity_query = 0,
+  polarity_target = 0,
+  spectrum_type_query = "not_assembled",
+  ms_query = 4,
+  ms_target = 3,
+  tolerance = 0.6
+)
+res_MS4_MS3
+```
+
+```{r}
+
+
+# List of your result objects
+res_list <- list(
+  MS2_vs_MS2 = res_MS2_MS2,
+  MS2_vs_MS3 = res_MS2_MS3,
+  MS3_vs_MS2 = res_MS3_MS2,
+  MS3_vs_MS3 = res_MS3_MS3,
+  MS4_vs_MS2 = res_MS4_MS2,
+  MS4_vs_MS3 = res_MS4_MS3
+)
+
+# Concatenate data.frames
+all_results <- bind_rows(
+  lapply(names(res_list), function(nm) {
+    df <- res_list[[nm]]
+    if (!is.null(df)) {
+      df$comparison <- nm   
+      return(df)
+    }
+    NULL
+  })
+)
+
+# Save to one CSV
+# Create a new workbook
+wb <- createWorkbook()
+
+# Add a sheet for the combined results
+addWorksheet(wb, "All_Results")
+
+# Write the data.frame to the sheet
+writeData(wb, "All_Results", all_results)
+
+# Save the workbook
+saveWorkbook(wb, here("data", "FTMSneg_multmatch.xlsx"), overwrite = TRUE)
+```
+
+
+
+```{r}
+cid <- spectraData(dy_sps, columns = "compound_id")$compound_id
+idx <- which(cid == "101280")
+nrow(peaksData(dy_sps[idx])[[1]])
+idx
+#peaksData(dy_sps[idx])[[1]][1:5, ]
+peaksData(dy_sps[idx])[[1]]
+spectraData(dy_sps[idx], columns = "precursorMz")
+```
+
+
+```{r}
+cid <- spectraData(dy_sps, columns = "compound_id")$compound_id
+idx <- which(cid == "1913")
+nrow(peaksData(dy_sps[idx])[[1]])
+idx
+peaksData(dy_sps[idx])[[1]][1:5, ]
+peaksData(dy_sps[idx])[[1]]
+spectraData(dy_sps[idx], columns = "precursorMz")
+```
+

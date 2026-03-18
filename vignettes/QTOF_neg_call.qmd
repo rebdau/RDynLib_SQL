@@ -44,7 +44,7 @@ Next we convert the "DyLib_QTOF_neg2.sqlite" database to a spectra object
 ```{r}
 library(DBI)
 library(RSQLite)
-dbf <- file.path("C:/Users/ament/Desktop/Github/RDynLib/Similarity/QTOF/data", "DyLib_QTOF_neg.sqlite")
+dbf <- here("data", "DyLib_QTOF_neg.sqlite")
 db <- dbConnect(SQLite(), dbf)
 dbExecute(db, "DROP TABLE IF EXISTS feature_matrix ")
 experiment_df <- dbGetQuery(db, "SELECT * FROM experiment")
@@ -66,23 +66,25 @@ qt_dy_sps <- Spectra(cdb)
 Here we load the QTOF of flax seed database (it's already a spectra object), you can load it from: [qtof_filtering.qmd](https://github.com/rebdau/RDynLib_qtof/blob/ahlam/qtof_filtering.qmd)
 
 ```{r}
-load("C:/Users/ament/Desktop/Github/RDynLib/Similarity/QTOF/data/qtof_flax_final.RData")
+load(here("data/database_QTOF_neg","qtof_flax_final.RData"))
 qtof_neg <- qtof_flax_final
 spectraData(qtof_neg)
 ```
 
-Next we calculate the similarity score between the dynlib and flax seed QTOF negative integuments.
+Next we calculate the similarity score between the dynlib and flax seed QTOF negative integuments.(intersect_single_energy)
 
 ```{r}
 qtof_matches <- similarity_RDynlib_match(
+  qtof_neg,
   qt_dy_sps,
-  dy_sps,
+  
   polarity_query = 0,
   polarity_target = 0,
   fragments_resolution = "high.resolution",
-  threshold = 0.5,
-  ppm = 20,
-  tolerance = 0.5
+  threshold = 0.8,
+  ppm = 10,
+  tolerance = 0,
+  requirePrecursor = FALSE
 )
 ```
 
@@ -98,5 +100,5 @@ nrow(qtof_matches)
 save the resulting object:
 
 ```{r}
-save(qtof_matches, file = "data/qtof_matches_11.RData")
+save(qtof_matches, file = here("data/database_QTOF_neg", "qtof_matches.RData"))
 ```
