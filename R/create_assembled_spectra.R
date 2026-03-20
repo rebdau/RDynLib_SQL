@@ -30,8 +30,8 @@ create_assembled_spectra <- function(ftms) {
     ms_levels <- meta$msLevel[idx]
     
     # Use already preprocessed peaks
-    spectra_list <- pd_list[idx]
-    
+    spectra_list <- lapply(idx, function(i) pd_list[[i]])
+
     # Combine all spectra by summing intensities for matching m/z
     merged_spec <- combine_spectra(spectra_list)
     
