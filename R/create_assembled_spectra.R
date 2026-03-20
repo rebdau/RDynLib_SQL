@@ -14,9 +14,9 @@
 #' @importFrom Spectra Spectra spectraData peaksData setBackend MsBackendMemory
 #' @export
 create_assembled_spectra <- function(ftms) {
-  #' ftms must be a Spectra object
-  #' Converting the backend to MsBackendMemory
-  #' so we could modify the peaksData
+  # ftms must be a Spectra object
+  # Converting the backend to MsBackendMemory
+  # so we could modify the peaksData
   ftms <- setBackend(ftms, MsBackendMemory())
   meta <- spectraData(ftms)
   pd_list <- peaksData(ftms)
@@ -29,7 +29,7 @@ create_assembled_spectra <- function(ftms) {
     idx <- which(meta$MSntreeID == tree_id)
     ms_levels <- meta$msLevel[idx]
     
-    #' Use already preprocessed peaks
+    # Use already preprocessed peaks
     spectra_list <- pd_list[idx]
     
     # Combine all spectra by summing intensities for matching m/z
@@ -41,7 +41,7 @@ create_assembled_spectra <- function(ftms) {
     
     # Create new assembled spectrum
     df <- ms2_meta
-    #' Mark it as assembled
+    # Mark it as assembled
     df$spectrum.type <- "assembled"
     df$MSntreeID <- tree_id
     # Copy the same mz and intensity (already cleaned)
@@ -50,8 +50,8 @@ create_assembled_spectra <- function(ftms) {
     # Remove rows where msLevel is NA
     df <- df[!is.na(df$msLevel), , drop = FALSE]
     k <- k + 1
-    #' Convert the modified metadata+peaks into a new
-    #' Spectra object and append it to assembled_list
+    # Convert the modified metadata+peaks into a new
+    # Spectra object and append it to assembled_list
     assembled_list[[k]] <- Spectra(df)
   }
   

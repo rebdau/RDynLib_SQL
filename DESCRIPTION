@@ -1,22 +1,24 @@
 Package: RDynLib
 Title: MS Spectral Data Analysis Using the DynLib Database
 Version: 2.0.0
-Authors@R: c(person("Kris", "Morreel",
-                    email = "krmor@psb.vib-ugent.be",
-                    role = c("aut", "cre")),
-			person("Sandrien", "Desmet",
-                   email = "sasme@psb.vib-ugent.be",
-                   role = "aut"),
-            person("Rebecca", "Dauwe",
+Authors@R: c(person("Rebecca", "Dauwe",
                    email = "rebdau@u-picardie.fr",
-                   role = "aut"),
-            person(given = "Ahlam", family = "Mentag",
+                   role = c("aut", "cre")),
+             person(given = "Ahlam", family = "Mentag",
                    email = "ahlammentag8@gmail.com",
                    comment = c(ORCID = "0009-0008-5438-7067"),
+                   role = "aut"),
+             person(given = "Johannes", family = "Rainer",
+                   email = "johannes.rainer@eurac.edu",
+                   role = "aut"),
+            person("Kris", "Morreel",
+                    email = "krmor@psb.vib-ugent.be",
+                    role = "aut"),
+            person("Sandrien", "Desmet",
+                   email = "sasme@psb.vib-ugent.be",
                    role = "aut"))
 Description:
-    Provides tools for aligning MS/MS and MSn, positive and negative ionization
-    mode spectral sub-databases and spectral metadata analysis.
+    Provides tools for creating and aligning MS/MS and MSn spectral sub-databases in positive and negative ionization modes, and for analyzing spectral metadata.
 Depends: R (>= 3.4.3)
 License: GPL-2
 Encoding: UTF-8

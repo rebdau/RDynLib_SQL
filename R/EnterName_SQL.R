@@ -51,8 +51,6 @@
 #'
 #' @importFrom RSQLite SQLite
 #'
-#' @importFrom utils readline
-#'
 #' @author Ahlam Mentag
 #'
 #' @export

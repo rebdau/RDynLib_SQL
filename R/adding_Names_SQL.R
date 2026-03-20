@@ -1,4 +1,4 @@
-#' @tiltle adding names from a similarity table to the 'name' column in a sql 
+#' @title adding names from a similarity table to the 'name' column in a sql 
 #'         database.
 #'         
 #' @param con_merged 'character(1)' connection to the sqlite database.

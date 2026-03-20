@@ -12,7 +12,7 @@
 #' @param tR `numeric(1)` minimum break-up retention time difference: determines
 #'  the minimum difference in retention time between two subsequent rows 
 #'  (i.e., features) prior to considering the row as a candidate for splitting 
-#'  the ‘featureDefinitions()’-derived spreadsheet [see BreakRowsXCMS()], 
+#'  the ‘featureDefinitions()’-derived spreadsheet (\link{BreakRowsXCMS_SQL}), 
 #'  1 sec by default.
 #'
 #' @param y10 maximum retention time deviation for feature alignment across 
@@ -35,9 +35,9 @@
 #'
 #' @importFrom DBI dbDisconnect
 #'
-#' @importFrom Spectra
+#' @import Spectra
 #'
-#' @importFrom dplyr
+#' @import dplyr
 #'
 #' @author Ahlam Mentag
 #'

@@ -12,7 +12,7 @@ XCMSgrouping_SQL(x, tR = 1, y10 = 1, y20 = 0.8, y11 = 46)
 \item{tR}{\code{numeric(1)} minimum break-up retention time difference: determines
 the minimum difference in retention time between two subsequent rows
 (i.e., features) prior to considering the row as a candidate for splitting
-the ‘featureDefinitions()’-derived spreadsheet \code{\link[=see BreakRowsXCMS]{see BreakRowsXCMS()}},
+the ‘featureDefinitions()’-derived spreadsheet (\link{BreakRowsXCMS_SQL}),
 1 sec by default.}
 
 \item{y10}{maximum retention time deviation for feature alignment across
