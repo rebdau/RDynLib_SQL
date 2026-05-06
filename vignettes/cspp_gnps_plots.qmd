@@ -1,0 +1,325 @@
+---
+title: "cspp and gnps-like networks of known molecules"
+format:
+  html:
+    toc: true
+    self-contained: true
+author: "Ahlam Mentag, Rebecca Dauwe, Johannes Rainer"
+---
+
+## Shiny Documents
+
+In this quarto document we plot the cspp and gnps-like networks of known 
+molecules from the aligned compounds of ftms and qtof flax data. 
+
+
+```{r}
+#| message: false
+
+#' Load required libraries
+library(devtools)
+library(DBI)
+library(RSQLite)
+library(here)
+library(data.table)
+#rm(list = c("convert_compid_assoc"))
+#` Uploading RDynLib: Load all functions of the RDynlib directory
+load_all()
+```
+
+#FTMS flax negative
+#cspp conversions
+```{r}
+con <- dbConnect(RSQLite::SQLite(), ft_path)
+ft_path <- here("data", "DYL_FLAX_FTMSneg.sqlite")
+cspp_ft <- here("data","cspp_flax.txt")
+charge_file <- here("data", "ftms_all_compounds_RD.xlsx")
+#cspp_ft_2ch <- here("data","cspp_flax_2ch.txt")
+cspp.tot_SQL(ft_path, 266, mzerr = 0.01,
+                         cspp = cspp_ft, peakwidth = 0.1, IntThres  = 0, mz_tol = 0.5,
+                         dot_thresh = 0, spectrum_type = "assembled",  
+                         min_common = 0, charge_file = charge_file)
+```
+
+
+```{r}
+dbGetQuery(con, "select * from compound_add where compound_id = 101280")
+```
+```{r}
+targMS2comp_SQL(101099, 101280, ms2_list)
+```
+
+
+
+```{r}
+dbGetQuery(con, "
+  SELECT compound_id, CSPP_HEX
+  FROM compound_add
+  WHERE CSPP_HEX IS NOT NULL
+    AND CSPP_HEX != 'NULL'
+  LIMIT 10
+")
+```
+
+
+Test if there is some new cspp conversions
+```{r}
+db_ft <- dbConnect(SQLite(), ft_path)
+DBI::dbGetQuery(db_ft, "
+  SELECT g.*
+  FROM compound_add g
+  INNER JOIN ms_compound c 
+      ON g.compound_id = c.compound_id
+  WHERE c.expid = 266 
+    AND (
+         g.GNPS IS NOT NULL OR
+         g.CSPP_RED IS NOT NULL OR
+         g.CSPP_ROX IS NOT NULL OR
+         g.CSPP_MET IS NOT NULL OR
+         g.CSPP_OXY IS NOT NULL OR
+         g.CSPP_HYD IS NOT NULL OR
+         g.CSPP_BOX IS NOT NULL OR
+         g.CSPP_MOX IS NOT NULL OR
+         g.CSPP_ACE IS NOT NULL OR
+         g.CSPP_CAR IS NOT NULL OR
+         g.CSPP_PRE IS NOT NULL OR
+         g.CSPP_GLY IS NOT NULL OR
+         g.CSPP_MON IS NOT NULL OR
+         g.CSPP_HdN IS NOT NULL OR
+         g.CSPP_HBA IS NOT NULL OR
+         g.CSPP_PEN IS NOT NULL OR
+         g.CSPP_COU IS NOT NULL OR
+         g.CSPP_RHA IS NOT NULL OR
+         g.CSPP_HuN_C IS NOT NULL OR
+         g.CSPP_VAN IS NOT NULL OR
+         g.CSPP_HaN_C IS NOT NULL OR
+         g.CSPP_HEX IS NOT NULL OR
+         g.CSPP_DCA IS NOT NULL OR
+         g.CSPP_HUN IS NOT NULL OR
+         g.CSPP_URO IS NOT NULL OR
+         g.CSPP_FER IS NOT NULL OR
+         g.CSPP_GuN_C IS NOT NULL OR
+         g.CSPP_SYR IS NOT NULL OR
+         g.CSPP_GaN_C IS NOT NULL OR
+         g.CSPP_GUN IS NOT NULL OR
+         g.CSPP_SIN IS NOT NULL OR
+         g.CSPP_SuN_C IS NOT NULL OR
+         g.CSPP_SaN_C IS NOT NULL OR
+         g.CSPP_SUN IS NOT NULL
+        )
+  ORDER BY g.compound_id
+")
+```
+
+#GNPS conversion
+```{r}
+conv.GNPS_SQL(sql_path= ft_path, expid = 266,
+                          peakwidth = 0.2,
+                          mzerr = 0.015,
+                          min = 5,
+                          adduct = 60.0211, #what should I put here?
+                          thr1 = 2,
+                          thr2 = 0.1,
+                          thr3 = 0.3,
+                          spectrum_type = "not_assembled", 
+                          IntThres = 0)
+```
+
+
+```{r}
+db_ft <- dbConnect(SQLite(), ft_path)
+DBI::dbGetQuery(db_ft, "
+  SELECT g.*
+  FROM gnps_add g
+  INNER JOIN ms_compound c 
+      ON g.compound_id = c.compound_id
+  WHERE c.expid = 266 
+    AND (
+         g.GNPS_1 IS NOT NULL OR
+         g.GNPS_2 IS NOT NULL OR
+         g.GNPS_3 IS NOT NULL OR
+         g.GNPS_4 IS NOT NULL OR
+         g.GNPS_5 IS NOT NULL 
+        )
+  ORDER BY g.compound_id
+")
+```
+
+
+Visualize the distribustion of the similarity scores
+```{r}
+quantile(edges.raw$ave.common, c(0.25, 0.5, 0.75))
+quantile(edges.raw$ave.dot, c(0.25, 0.5, 0.75))
+thr2 <- quantile(edges.raw$ave.common, 0.25)
+thr3 <- quantile(edges.raw$ave.dot, 0.25)
+```
+
+Plot the network of the HDG-succinate-HDG with a mass of 666,14:
+```{r}
+Overall.net_SQL(sql_path = ft_path, exp.id = 266, dbkey = 100988, min = 0,
+                            nr_of_seq = 2,
+                           thr1 = 1,
+                          thr2 = 0.3, 
+                          thr3 = 0.3)
+```
+
+
+Plot the network of the HDG-succinate-HDG with a mass of 666,14:
+```{r}
+Overall.net_SQL(sql_path = ft_path, exp.id = 266, dbkey = 101283, min = 0,
+                            nr_of_seq = 2,
+                           thr1 = 1,
+                          thr2 = 0.3, 
+                          thr3 = 0.3)
+```
+
+Plot the network of the HDG-succinate-HDG with a mass of 747,16:
+```{r}
+Overall.net_SQL(sql_path = ft_path, exp.id = 266, dbkey = 101294, min = 0,
+                            nr_of_seq = 2,
+                           thr1 = 1,
+                          thr2 = 0.3, 
+                          thr3 = 0.3)
+```
+
+Plot the network of the HDG-succinate-HDG with a mass of 747,16:
+```{r}
+Overall.net_SQL(sql_path = ft_path, exp.id = 266, dbkey = 101213, min = 0,
+                            nr_of_seq = 2,
+                           thr1 = 1,
+                          thr2 = 0.3, 
+                          thr3 = 0.3)
+```
+
+```{r}
+Overall.net_SQL(sql_path = ft_path, exp.id = 266, dbkey = 101280, min = 0,
+                            nr_of_seq = 3,
+                           thr1 = 1,
+                          thr2 = 0.3, 
+                          thr3 = 0.4)
+```
+
+```{r}
+Overall.net_SQL(sql_path = ft_path, exp.id = 266, dbkey = 101007, min = 0,
+                            nr_of_seq = 3,
+                           thr1 = 0.1,
+                          thr2 = 0.3, 
+                          thr3 = 0.3)
+```
+
+
+#Flax Qtof negtive
+
+First get the corresponding aligned compounds of qtof data based on ftms compounds.
+```{r}
+#loading the txt file that contains the alignment results
+alignment_file <- here("data", "assoc_flax_63.txt")
+
+getAlignedCompids <- getAlignedCompids_SQL(
+compound_id = c(
+  100926, 100998, 100974, 100934, 101238, 100946, 101211, 100988, 101242, 
+  101097, 101141, 101019, 101147, 100991, 101098, 101296, 101154
+),
+  database_name = "DYL_FLAX_FTMSneg.sqlite",
+  alignment_file = alignment_file
+)
+print(getAlignedCompids)
+```
+
+
+
+```{r}
+conv.GNPS_SQL(sql_path= qt_path, expid = 52,
+                          mzerr = 0.015,
+                          min = 5,
+                          adduct = 60.0211,
+                          thr1 = 3,
+                          thr2 = 0.1,
+                          thr3 = 0.4,
+                          spectrum_type = "intersect_single_energy", 
+                          IntThres = 0)
+```
+
+```{r}
+db_qt <- dbConnect(SQLite(), qt_path)
+DBI::dbGetQuery(db_qt, "
+  SELECT g.*
+  FROM gnps_add g
+  INNER JOIN ms_compound c 
+      ON g.compound_id = c.compound_id
+  WHERE c.expid = 52 
+    AND (
+         g.GNPS_1 IS NOT NULL OR
+         g.GNPS_2 IS NOT NULL OR
+         g.GNPS_3 IS NOT NULL OR
+         g.GNPS_4 IS NOT NULL OR
+         g.GNPS_5 IS NOT NULL 
+        )
+  ORDER BY g.compound_id
+")
+```
+
+#cspp conversion
+```{r}
+cspp.tot_SQL(qt_path, 52, mzerr = 0.01,
+                         cspp = cspp_ft, peakwidth = 0.2, IntThres  = 0, mz_tol = 0.5,
+                         dot_thresh = 0.7, spectrum_type = "intersect_single_energy",  
+                         min_common = 3, charge_file = charge_file)
+```
+
+
+
+plot ntworks
+```{r}
+Overall.net_SQL(sql_path = qt_path, exp.id = 52, dbkey = 45843, min = 0,
+                            nr_of_seq = 2,
+                            thr1 = 1,
+                            thr2 = 0.1,
+                            thr3 = 0.2)
+```
+
+
+```{r}
+Overall.net_SQL(sql_path = qt_path, exp.id = 52, dbkey = 45858, min = 0,
+                            nr_of_seq = 2,
+                            thr1 = 1,
+                            thr2 = 0.1,
+                            thr3 = 0.2)
+```
+
+
+```{r}
+Overall.net_SQL(sql_path = qt_path, exp.id = 52, dbkey = 45847, min = 0,
+                            nr_of_seq = 2,
+                            thr1 = 1,
+                            thr2 = 0.1,
+                            thr3 = 0.2)
+```
+
+```{r}
+Overall.net_SQL(sql_path = qt_path, exp.id = 52, dbkey = 45890, min = 0,
+                            nr_of_seq = 2,
+                            thr1 = 1,
+                            thr2 = 0.1,
+                            thr3 = 0.2)
+```
+
+```{r}
+Overall.net_SQL(sql_path = qt_path, exp.id = 52, dbkey = 45918, min = 0,
+                            nr_of_seq = 2,
+                            thr1 = 1,
+                            thr2 = 0.1,
+                            thr3 = 0.2)
+```
+
+
+```{r}
+Overall.net_SQL(sql_path = qt_path, exp.id = 52, dbkey = 45848, min = 0,
+                            nr_of_seq = 2,
+                            thr1 = 1,
+                            thr2 = 0.1,
+                            thr3 = 0.2)
+```
+
+
+
