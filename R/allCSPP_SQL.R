@@ -31,86 +31,92 @@
 #' @author Ahlam Mentag
 #' 
 #' @export
-
 allCSPP_SQL <- function(sql_path,
                         exp.id,
                         nr_col = NULL,
-                        thr1 = 1,
-                        thr2 = 0.9,
-                        thr3 = 0.4) {
+                        thr1 = 0,
+                        thr2 = 0,
+                        thr3 = 0) {
+  
+  library(data.table)
+  library(DBI)
+  library(RSQLite)
   
   con <- dbConnect(RSQLite::SQLite(), sql_path)
   on.exit(dbDisconnect(con), add = TRUE)
   
-  if (is.null(nr_col)) {
-    table_info <- dbGetQuery(con, "PRAGMA table_info(compound_add)")
-    nr_col <- nrow(table_info)
-  }
-  
+  # MS compounds filter
   compounds <- dbGetQuery(
     con,
     sprintf("SELECT compound_id FROM ms_compound WHERE expid = %d", exp.id)
   )
   
-  if (nrow(compounds) == 0) 
-    return(data.frame())
+  if (nrow(compounds) == 0) return(data.frame())
   
-  comp_ids <- compounds$compound_id
+  comp_ids <- as.character(compounds$compound_id)
   
-  compound_add <- dbGetQuery(con, "SELECT * FROM compound_add")
-  compound_add <- compound_add[compound_add[,1] %in% comp_ids, ]
+  compound_add <- as.data.table(dbGetQuery(con, "SELECT * FROM compound_add"))
+  compound_add <- compound_add[compound_id %in% comp_ids]
   
-  cspp.res <- data.frame(
-    compid.sub = integer(),
-    compid.prod = integer(),
-    conv.type = character(),
-    ions.prod = integer(),
-    ave.common = numeric(),
-    ave.dot = numeric(),
-    stringsAsFactors = FALSE
-  )
+  cols <- setdiff(names(compound_add), "compound_id")
   
+  res_list <- list()
   k <- 1
-  max_col <- min(nr_col, ncol(compound_add))
   
+
   for (i in seq_len(nrow(compound_add))) {
     
-    compid.sub <- as.integer(compound_add[i,1])
+    sub_id <- compound_add$compound_id[i]
     
-    for (j in 3:max_col) {
+    for (col in cols) {
       
-      cell_value <- compound_add[i,j]
-      if (is.na(cell_value) || cell_value == "") next
+      cell <- compound_add[[col]][i]
+      if (is.na(cell) || cell == "") next
       
-      parts <- strsplit(cell_value, "!!")[[1]]
-      if (length(parts) < 3) next
+      # IMPORTANT: multiple entries are separated by |
+      entries <- unlist(strsplit(cell, "\\|"))
       
-      compid.prod <- as.integer(trimws(parts[3]))
-      if (is.na(compid.prod)) next
-      
-      subparts <- strsplit(parts[2], "!")[[1]]
-      if (length(subparts) < 3) next
-      subparts <- trimws(subparts)
-      
-      cspp.res[k,] <- list(
-        compid.sub,
-        compid.prod,
-        colnames(compound_add)[j],
-        as.integer(subparts[1]),
-        as.numeric(subparts[2]),
-        as.numeric(subparts[3])
-      )
-      
-      k <- k + 1
+      for (entry in entries) {
+        
+        entry <- trimws(entry)
+        if (entry == "") next
+        
+        # expected format:
+        # !!COMMON!FORW_REV!DOT!!PRODID
+        parts <- unlist(strsplit(entry, "!!", fixed = TRUE))
+        if (length(parts) < 3) next
+        
+        metrics <- unlist(strsplit(parts[2], "!", fixed = TRUE))
+        if (length(metrics) < 3) next
+        
+        prod_id <- parts[3]
+        
+        res_list[[k]] <- data.table(
+          compid.sub  = as.integer(sub_id),
+          compid.prod = as.integer(prod_id),
+          conv.type   = col,
+          ions.prod   = as.numeric(metrics[1]),
+          ave.common  = as.numeric(metrics[2]),
+          ave.dot     = as.numeric(metrics[3])
+        )
+        
+        k <- k + 1
+      }
     }
   }
   
-  cspp.res <- cspp.res[
-    cspp.res$ions.prod >= thr1 &
-      cspp.res$ave.common >= thr2 &
-      cspp.res$ave.dot >= thr3, ]
+  if (length(res_list) == 0) return(data.frame())
   
-  cspp.res <- cspp.res[order(cspp.res$compid.sub), ]
+  res <- rbindlist(res_list, fill = TRUE)
   
-  return(cspp.res)
+
+  res <- res[
+    ions.prod >= thr1 &
+      ave.common >= thr2 &
+      ave.dot >= thr3
+  ]
+  
+  setorder(res, compid.sub)
+  
+  return(res)
 }

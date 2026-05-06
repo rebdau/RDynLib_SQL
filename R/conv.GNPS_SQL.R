@@ -61,6 +61,7 @@ conv.GNPS_SQL <- function(sql_path, expid,
                           thr1 = 3,
                           thr2 = 0.1,
                           thr3 = 0.4,
+                          spectrum_type = "assembled", 
                           IntThres = 5) {
   
   con <- DBI::dbConnect(RSQLite::SQLite(), sql_path)
@@ -95,16 +96,17 @@ conv.GNPS_SQL <- function(sql_path, expid,
     FROM msms_spectrum s
     INNER JOIN ms_compound c ON s.compound_id = c.compound_id
     WHERE s.ms_level = 2 
-      AND c.expid = %d
-", expid))
+      AND c.expid = %d AND spectrum_type = '%s'
+", expid, spectrum_type))
   
   peak_df <- DBI::dbGetQuery(con, sprintf("
       SELECT p.spectrum_id, p.mz, p.intensity
       FROM msms_spectrum_peak p
       INNER JOIN msms_spectrum s ON p.spectrum_id = s.spectrum_id
       INNER JOIN ms_compound c ON s.compound_id = c.compound_id
-      WHERE c.expid = %d
-  ", expid))
+      WHERE c.expid = %d AND s.spectrum_type = '%s'
+  ", expid, spectrum_type))
+  
   
   ms2_df <- merge(peak_df, spec_df, by = "spectrum_id")
   ms2_df$mz           <- as.numeric(ms2_df$mz)
@@ -172,12 +174,18 @@ conv.GNPS_SQL <- function(sql_path, expid,
         if (is.null(ms2_split[[as.character(prod_id)]]) ||
             is.null(ms2_split[[as.character(sub_id)]])) next
         
-        out <- targMS2comp_SQL(sub_id, prod_id, ms2_split, IntThres = min)
+        out <- targMS2comp_SQL(sub_id, prod_id, ms2_split, IntThres = IntThres)
         if (is.null(out) || nrow(out) == 0) next
         
         # thresholds
-        min_ions <- min(out$IONS.sub, out$IONS.prod)
-        if (is.na(min_ions) || min_ions == 0) next
+        if (!all(c("IONS.sub", "IONS.prod") %in% colnames(out))) next
+        
+        vals <- c(out$IONS.sub, out$IONS.prod)
+        vals <- vals[!is.na(vals)]
+        
+        if (length(vals) == 0) next
+        
+        min_ions <- min(vals)
         
         thresh1 <- (out$COMMON_IONS + out$COMMON_LOSS)/2
         thresh2 <- thresh1 / min_ions

@@ -40,77 +40,102 @@
 #'
 #' @author Ahlam Mentag
 #'
+#'
 #' @export
+
 conv.CSPP_SQL <- function(inp.x,
                           mzdiff,
                           direc,
                           peakwidth,
-                          mzerr = 0.015,
-                          ms2_split) {
+                          mzerr = 1,
+                          ms2_split,
+                          IntThres = 0,
+                          mz_tol = 0.3,
+                          dot_thresh = 0,
+                          min_common = 0) {
   
-  Prod.dat <- inp.x[order(inp.x$mass_measured), ]
-  Sub.dat  <- Prod.dat
+  library(data.table)
   
-  cspp.list <- list()
-  idx <- 1
+
+  # dt <- dt[!is.na(mass_measured)]
+  # dt[, compound_id := as.character(compound_id)]
+  # dt[, mass_measured := as.numeric(mass_measured)]
+  # dt[, retention_time := as.numeric(retention_time)]
   
-  i <- 1
-  repeat {
-    
-    if (i > nrow(Sub.dat)) break
-    
-    mz.sub  <- Sub.dat$mass_measured[i]
-    mz.prod <- mz.sub + mzdiff
-    
-    prd.low  <- mz.prod - mzerr
-    prd.high <- mz.prod + mzerr
-    
-    j <- 1
-    while (j <= nrow(Prod.dat)) {
-      
-      if (Prod.dat$mass_measured[j] < prd.low) {
-        Prod.dat <- Prod.dat[-j, ]
-        next
-      }
-      
-      if (Prod.dat$mass_measured[j] <= prd.high) {
-        
-        out <- targMS2comp_SQL(
-          Sub.dat$compound_id[i],
-          Prod.dat$compound_id[j],
-          ms2_split
-        )
-        
-        if (!is.null(out)) {
-          
-          rt.sub  <- Sub.dat$retention_time[i]
-          rt.prod <- Prod.dat$retention_time[j]
-          
-          if (
-            (direc == 1 && rt.prod < rt.sub - peakwidth) ||
-            (direc == 2 && rt.prod > rt.sub + peakwidth) ||
-            (direc == 3 && (rt.prod < rt.sub - peakwidth ||
-                            rt.prod > rt.sub + peakwidth))
-          ) {
-            cspp.list[[idx]] <- out
-            idx <- idx + 1
-          }
-        }
-        
-        j <- j + 1
-        next
-      }
-      
-      if (Prod.dat$mass_measured[j] > prd.high) break
-    }
-    
-    if (nrow(Prod.dat) == 0) break
-    i <- i + 1
+  # SELF JOIN
+  pairs <- CJ(sub = inp.x$compound_id, prod = inp.x$compound_id)
+  
+  pairs <- merge(pairs,
+                 inp.x[, .(sub = compound_id,
+                        mass_sub = mass_measured,
+                        rt_sub = retention_time)],
+                 by = "sub")
+  
+  pairs <- merge(pairs,
+                 inp.x[, .(prod = compound_id,
+                        mass_prod = mass_measured,
+                        rt_prod = retention_time)],
+                 by = "prod")
+  
+  # avoid self matches
+  pairs <- pairs[sub != prod]
+  
+  # MASS FILTER 
+  pairs[, diff := (mass_prod - mass_sub) - mzdiff]
+  pairs <- pairs[abs(diff) <= mzerr ]
+  
+  if (nrow(pairs) == 0) return(data.frame())
+  
+  # RT FILTER
+  if (direc == 1) {
+    pairs <- pairs[rt_prod < rt_sub - peakwidth]
+  } else if (direc == 2) {
+    pairs <- pairs[rt_prod > rt_sub + peakwidth]
+  } else {
+    pairs <- pairs[abs(rt_prod - rt_sub) > peakwidth]
   }
   
-  if (length(cspp.list) == 0)
-    return(data.frame())
+  if (nrow(pairs) == 0) return(data.frame())
   
-  do.call(rbind, cspp.list)
+  # MS2 SCORING
+  out_list <- vector("list", nrow(pairs))
+  
+  for (i in seq_len(nrow(pairs))) {
+    
+    res <- targMS2comp_SQL(
+      pairs$sub[i],
+      pairs$prod[i],
+      ms2_split,
+      IntThres = IntThres,
+      mz_tol = mz_tol
+    )
+    
+    if (is.null(res) || !is.data.frame(res)) {
+      res <- data.frame(
+        COMPID.sub = pairs$sub[i],
+        COMPID.prod = pairs$prod[i],
+        DOT_IONS = NA,
+        DOT_LOSS = NA,
+        COMMON_IONS = NA,
+        COMMON_LOSS = NA,
+        FORW_IONS = NA,
+        REV_IONS = NA,
+        FORW_LOSS = NA,
+        REV_LOSS = NA
+      )
+    }
+    
+    out_list[[i]] <- res
+  }
+  
+  out <- rbindlist(out_list, fill = TRUE)
+  
+  if (nrow(out) == 0) return(out)
+  
+  out <- out[
+    DOT_IONS >= dot_thresh &
+      COMMON_IONS >= min_common
+  ]
+  
+  return(out)
 }
-

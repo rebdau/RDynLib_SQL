@@ -41,9 +41,10 @@
 #'         
 #' @author Ahlam Mentag
 #' 
+#' @import igraph
 #' @export
-Overall.net_SQL <- function(sql_path, exp.id, dbkey, min , nr_of_seq = 2, thr1 = 1,
-                            thr2 = 0.9, thr3 = 0.4) {
+Overall.net_SQL <- function(sql_path, exp.id, dbkey, min , nr_of_seq = 2, thr1 = 0,
+                            thr2 = 0, thr3 = 0) {
   
   oldpar <- par(no.readonly = TRUE)
   on.exit({
