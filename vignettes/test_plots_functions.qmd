@@ -59,8 +59,62 @@ MSnplot_SQL("C:/Users/ament/Desktop/sql_data/DYL_FLAX_QTOFneg.sqlite", 45816)
 
 Plot just the spectra of the 101171 compound from FTMS database:
 ```{r}
-MSnplot_SQL("C:/Users/ament/Desktop/sql_data/DYL_FLAX_FTMSneg.sqlite", 101171)
+MSnplot_SQL("C:/Users/ament/Desktop/Github/RDynLib_SQL/data/DYL_FLAX_FTMSneg.sqlite", 100988, thr_int = 500)
 ```
+
+
+```{r}
+pdf("C:/Users/ament/Desktop/101141_ftms.pdf", width = 8, height = 6)
+
+MSnplot_SQL(
+  "C:/Users/ament/Desktop/Github/RDynLib_SQL/data/DYL_FLAX_FTMSneg.sqlite",
+  101141,
+  thr_int = 500
+)
+
+dev.off()
+```
+
+
+
+```{r}
+MSnplot_SQL("C:/Users/ament/Desktop/Github/RDynLib_SQL/data/DYL_FLAX_FTMSneg.sqlite", 101141, thr_int = 500)
+```
+
+
+```{r}
+pdf("C:/Users/ament/Desktop/45848_qtof.pdf", width = 8, height = 6)
+
+MSnplot_SQL(
+  "C:/Users/ament/Desktop/Github/RDynLib_SQL/data/DYL_FLAX_QTOFneg.sqlite",
+  45848,
+  thr_int = 500
+)
+
+dev.off()
+
+#MSnplot_SQL("C:/Users/ament/Desktop/Github/RDynLib_SQL/data/DYL_FLAX_QTOFneg.sqlite", 45848, thr_int = 500)
+```
+
+
+
+```{r}
+alignment_file <- here("data", "assoc_flax_63.txt")
+getAlignedCompids <- getAlignedCompids_SQL(
+compound_id = 100988,
+  database_name = "DYL_FLAX_FTMSneg.sqlite",
+  alignment_file = alignment_file
+)
+getAlignedCompids
+```
+
+
+
+
+
+
+
+
 
 Test the MS2plot to plot just the MS2 spectrum
 ```{r} 

@@ -28,12 +28,42 @@ load_all()
 ```
 
 #FTMS flax negative
-#cspp conversions
+
 ```{r}
-con <- dbConnect(RSQLite::SQLite(), ft_path)
 ft_path <- here("data", "DYL_FLAX_FTMSneg.sqlite")
+con <- dbConnect(RSQLite::SQLite(), ft_path)
 cspp_ft <- here("data","cspp_flax.txt")
 charge_file <- here("data", "ftms_all_compounds_RD.xlsx")
+```
+
+Add additional columns to compound_add table:
+```{r}
+library(DBI)
+library(RSQLite)
+library(here)
+
+ft_path <- here("data", "DYL_FLAX_FTMSneg.sqlite")
+con <- dbConnect(RSQLite::SQLite(), ft_path)
+
+# Add columns
+dbExecute(con, "ALTER TABLE compound_add ADD COLUMN Suc TEXT")
+dbExecute(con, "ALTER TABLE compound_add ADD COLUMN HMG TEXT")
+dbExecute(con, "ALTER TABLE compound_add ADD COLUMN Her TEXT")
+dbExecute(con, "ALTER TABLE compound_add ADD COLUMN Hdg TEXT")
+dbExecute(con, "ALTER TABLE compound_add ADD COLUMN NiA TEXT")
+dbExecute(con, "ALTER TABLE compound_add ADD COLUMN Hmg_C TEXT")
+
+# Optional renamed version instead of Hmg
+dbExecute(con, "ALTER TABLE compound_add DROP COLUMN V36")
+dbExecute(con, "ALTER TABLE compound_add DROP COLUMN V37")
+dbExecute(con, "ALTER TABLE compound_add DROP COLUMN V38")
+dbExecute(con, "ALTER TABLE compound_add DROP COLUMN V39")
+dbExecute(con, "ALTER TABLE compound_add DROP COLUMN V40")
+
+```
+
+cspp conversions
+```{r}
 #cspp_ft_2ch <- here("data","cspp_flax_2ch.txt")
 cspp.tot_SQL(ft_path, 266, mzerr = 0.01,
                          cspp = cspp_ft, peakwidth = 0.1, IntThres  = 0, mz_tol = 0.5,
@@ -53,10 +83,10 @@ targMS2comp_SQL(101099, 101280, ms2_list)
 
 ```{r}
 dbGetQuery(con, "
-  SELECT compound_id, CSPP_HEX
+  SELECT compound_id, HEX
   FROM compound_add
-  WHERE CSPP_HEX IS NOT NULL
-    AND CSPP_HEX != 'NULL'
+  WHERE HEX IS NOT NULL
+    AND HEX != 'NULL'
   LIMIT 10
 ")
 ```
@@ -73,12 +103,12 @@ DBI::dbGetQuery(db_ft, "
   WHERE c.expid = 266 
     AND (
          g.GNPS IS NOT NULL OR
-         g.CSPP_RED IS NOT NULL OR
-         g.CSPP_ROX IS NOT NULL OR
-         g.CSPP_MET IS NOT NULL OR
-         g.CSPP_OXY IS NOT NULL OR
-         g.CSPP_HYD IS NOT NULL OR
-         g.CSPP_BOX IS NOT NULL OR
+         g.RED IS NOT NULL OR
+         g.ROX IS NOT NULL OR
+         g.MET IS NOT NULL OR
+         g.OXY IS NOT NULL OR
+         g.HYD IS NOT NULL OR
+         g.BOX IS NOT NULL OR
          g.CSPP_MOX IS NOT NULL OR
          g.CSPP_ACE IS NOT NULL OR
          g.CSPP_CAR IS NOT NULL OR
@@ -192,16 +222,40 @@ Overall.net_SQL(sql_path = ft_path, exp.id = 266, dbkey = 101213, min = 0,
 ```
 
 ```{r}
+load_all()
 Overall.net_SQL(sql_path = ft_path, exp.id = 266, dbkey = 101280, min = 0,
                             nr_of_seq = 3,
-                           thr1 = 1,
-                          thr2 = 0.3, 
-                          thr3 = 0.4)
+                           thr1 = 0.1,
+                          thr2 = 0.2, 
+                          thr3 = 0.3)
 ```
 
 ```{r}
+load_all()
+addit <- net.addit_SQL(sql_path = ft_path, exp.id = 266, nettype = "CSPP",
+                          nr_col = NULL,
+                          min = 100,
+                          thr1 = 2,
+                          thr2 = 0.3,
+                          thr3 = 0.3)
+
+Local.net_SQL(
+  net.lst = addit,
+  dbkey      = "101280",
+  nettype    = "CSPP",
+  output_png = "network_CSPP2.png",   # omit to just display in RStudio
+  png_width  = 3000,
+  png_height = 3000,
+  png_res    = 150
+)
+```
+
+
+
+
+```{r}
 Overall.net_SQL(sql_path = ft_path, exp.id = 266, dbkey = 101007, min = 0,
-                            nr_of_seq = 3,
+                            nr_of_seq = 2,
                            thr1 = 0.1,
                           thr2 = 0.3, 
                           thr3 = 0.3)
