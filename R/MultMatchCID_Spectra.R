@@ -371,7 +371,7 @@ MultMatchCID_Spectra <- function(
     
   }
   
-  if (!(ms_level_query %in% available_ms))
+  if (!all(ms_level_query %in% available_ms))
     stop("Invalid query MS level selected.")
   
   query_sps <- query_sps[msLevel(query_sps) == ms_level_query]
@@ -462,7 +462,7 @@ MultMatchCID_Spectra <- function(
     
   }
   
-  if (!(ms_level_target %in% available_target_ms))
+  if (!all(ms_level_target %in% available_target_ms))
     stop("Invalid target MS level selected.")
   
   target_sps <- target_sps[msLevel(target_sps) == ms_level_target]

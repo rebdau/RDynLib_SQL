@@ -38,10 +38,12 @@
 #' corresponds to one candidate conversion and includes fragment ion and
 #' neutral loss similarity scores.
 #'
+#'@import data.table
 #' @author Ahlam Mentag
 #'
 #'
 #' @export
+NULL
 
 conv.CSPP_SQL <- function(inp.x,
                           mzdiff,
@@ -54,39 +56,46 @@ conv.CSPP_SQL <- function(inp.x,
                           dot_thresh = 0,
                           min_common = 0) {
   
-  library(data.table)
+  inp.x <- as.data.table(inp.x)
+  inp.x$compound_id <- as.character(inp.x$compound_id)
   
-
-  # dt <- dt[!is.na(mass_measured)]
-  # dt[, compound_id := as.character(compound_id)]
-  # dt[, mass_measured := as.numeric(mass_measured)]
-  # dt[, retention_time := as.numeric(retention_time)]
+  # ---- SELF JOIN BASE ----
+  pairs <- CJ(sub  = inp.x$compound_id,
+              prod = inp.x$compound_id)
   
-  # SELF JOIN
-  pairs <- CJ(sub = inp.x$compound_id, prod = inp.x$compound_id)
+  # ---- JOIN metadata ----
+  pairs <- merge(
+    pairs,
+    data.table(sub      = inp.x$compound_id,
+               mass_sub = inp.x$mass_measured,
+               rt_sub   = inp.x$retention_time),
+    by    = "sub",
+    all.x = TRUE
+  )
   
-  pairs <- merge(pairs,
-                 inp.x[, .(sub = compound_id,
-                        mass_sub = mass_measured,
-                        rt_sub = retention_time)],
-                 by = "sub")
+  pairs <- merge(
+    pairs,
+    data.table(prod      = inp.x$compound_id,
+               mass_prod = inp.x$mass_measured,
+               rt_prod   = inp.x$retention_time),
+    by    = "prod",
+    all.x = TRUE
+  )
   
-  pairs <- merge(pairs,
-                 inp.x[, .(prod = compound_id,
-                        mass_prod = mass_measured,
-                        rt_prod = retention_time)],
-                 by = "prod")
+  # Coerce to atomic before comparison
+  pairs[, sub  := as.character(sub)]
+  pairs[, prod := as.character(prod)]
   
   # avoid self matches
   pairs <- pairs[sub != prod]
   
-  # MASS FILTER 
+  # ---- MASS FILTER ----
   pairs[, diff := (mass_prod - mass_sub) - mzdiff]
-  pairs <- pairs[abs(diff) <= mzerr ]
+  pairs <- pairs[abs(diff) <= mzerr]
   
   if (nrow(pairs) == 0) return(data.frame())
   
-  # RT FILTER
+  # ---- RT FILTER ----
   if (direc == 1) {
     pairs <- pairs[rt_prod < rt_sub - peakwidth]
   } else if (direc == 2) {
@@ -97,7 +106,7 @@ conv.CSPP_SQL <- function(inp.x,
   
   if (nrow(pairs) == 0) return(data.frame())
   
-  # MS2 SCORING
+  # ---- MS2 SCORING ----
   out_list <- vector("list", nrow(pairs))
   
   for (i in seq_len(nrow(pairs))) {

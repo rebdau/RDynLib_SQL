@@ -73,7 +73,7 @@ cspp.tot_SQL <- function(sql_path, expid,
   con <- dbConnect(SQLite(), sql_path)
   on.exit(dbDisconnect(con), add = TRUE)
   
-
+  
   inp.x <- as.data.table(dbGetQuery(con, sprintf("
     SELECT compound_id, mass_measured, retention_time
     FROM ms_compound
@@ -85,7 +85,34 @@ cspp.tot_SQL <- function(sql_path, expid,
   
   log("Loaded MS1 compounds: %d", nrow(inp.x))
   
+  
 
+  if (!is.null(charge_file)) {
+    
+    charge_dt <- as.data.table(readxl::read_excel(charge_file))
+    charge_dt[, compound_id := as.character(compound_id)]
+    charge_dt[, doublecharged := tolower(trimws(as.character(doublecharged)))]
+    
+    inp.x <- merge(
+      inp.x,
+      charge_dt[, .(compound_id, doublecharged)],
+      by = "compound_id",
+      all.x = TRUE
+    )
+    
+    inp.x[, mass_measured := fifelse(
+      doublecharged %in% c("true", "t", "1"),
+      (mass_measured * 2) + 1.007276,
+      mass_measured
+    )]
+    
+    inp.x[, doublecharged := NULL]
+    
+    log("Charge correction applied from Excel file.")
+  }
+
+  
+  
   conv_raw <- fread(cspp)
   
   conv <- data.table(
@@ -94,9 +121,10 @@ cspp.tot_SQL <- function(sql_path, expid,
     direc = as.integer(conv_raw[[5]])
   )
   
-  conv[, col_name := paste0("CSPP_", type)]
-  
 
+  conv[, col_name := type]
+  
+  
   spec_df <- as.data.table(dbGetQuery(con, sprintf("
     SELECT spectrum_id, compound_id, precursor_mz
     FROM msms_spectrum
@@ -116,11 +144,41 @@ cspp.tot_SQL <- function(sql_path, expid,
   
   log("Loaded MS2 compounds: %d", length(ms2_list))
   
-
+  
   comp_add <- as.data.table(dbReadTable(con, "compound_add"))
   comp_add[, compound_id := as.character(compound_id)]
   
 
+  missing_ids <- setdiff(inp.x$compound_id, comp_add$compound_id)
+  
+  if (length(missing_ids) > 0) {
+    
+    log("Adding %d missing compound_ids to compound_add",
+        length(missing_ids))
+    
+    new_rows <- data.table(compound_id = missing_ids)
+    
+    comp_add <- rbind(
+      comp_add,
+      new_rows,
+      fill = TRUE
+    )
+  }
+
+  
+ 
+  cspp_cols <- unique(conv$col_name)
+  missing_cols <- setdiff(cspp_cols, names(comp_add))
+  
+  if (length(missing_cols) > 0) {
+    log("Adding missing columns to compound_add: %s",
+        paste(missing_cols, collapse = ", "))
+    
+    comp_add[, (missing_cols) := NA_character_]
+  }
+
+  
+  
   if (reset) {
     for (col in conv$col_name) {
       if (col %in% names(comp_add)) {
@@ -131,7 +189,7 @@ cspp.tot_SQL <- function(sql_path, expid,
   
   success <- character()
   
-
+  
   for (k in seq_len(nrow(conv))) {
     
     log("Conversion %d/%d (%s)", k, nrow(conv), conv$type[k])
@@ -153,19 +211,8 @@ cspp.tot_SQL <- function(sql_path, expid,
     
     res <- as.data.table(res)
     
-
-    # res_rev <- copy(res)
-    # res_rev[, `:=`(
-    #   COMPID.sub = COMPID.prod,
-    #   COMPID.prod = COMPID.sub
-    # )]
-    # 
-    # res <- rbind(res, res_rev)
-    
-
     res <- unique(res, by = c("COMPID.sub", "COMPID.prod"))
     
-
     res[, val := paste0(
       "!!", COMMON_IONS,
       "!", round((FORW_IONS + REV_IONS)/2, 3),
@@ -173,14 +220,12 @@ cspp.tot_SQL <- function(sql_path, expid,
       "!!", COMPID.prod
     )]
     
-
     res_agg <- res[, .(val = paste(unique(val), collapse = "|")), by = COMPID.sub]
     res_agg[, sub_id := as.character(COMPID.sub)]
     
     col <- conv$col_name[k]
     if (!(col %in% names(comp_add))) next
     
- 
     comp_add[res_agg,
              on = .(compound_id = sub_id),
              (col) := {
@@ -200,10 +245,10 @@ cspp.tot_SQL <- function(sql_path, expid,
              }
     ]
     
+    
     success <- c(success, col)
   }
   
- 
   dbWriteTable(con, "compound_add", comp_add, overwrite = TRUE)
   
   log("Successful conversions: %s",
