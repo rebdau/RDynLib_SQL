@@ -10,33 +10,28 @@ MSMSplot_SQL <- function(sql_path,
                          dbkey,
                          prdion,
                          neutloss,
-                         err = NULL,
-                         minum = NULL,
-                         oldpar = NULL,
-                         nl = NULL) {
-  
-  if (is.null(err)) err <- 0.015
-  if (is.null(minum)) minum <- 2
+                         err = 0.015,
+                         minum = 2,
+                         oldpar = NULL) {
   
   con <- dbConnect(SQLite(), sql_path)
   on.exit(dbDisconnect(con), add = TRUE)
   
-  # Get precursor m/z 
+  # precursor
   compound <- dbGetQuery(con, sprintf(
     "SELECT precursor_mz
-   FROM msms_spectrum
-   WHERE compound_id = %d
-   AND ms_level = 2",
+     FROM msms_spectrum
+     WHERE compound_id = %d
+     AND ms_level = 2",
     dbkey
   ))
-  
   
   if (nrow(compound) == 0)
     stop("Compound not found")
   
   precursor_mz <- compound$precursor_mz
   
-  #Get product ions and intensities 
+  # peaks
   peaks <- dbGetQuery(con, sprintf(
     "SELECT p.mz, p.intensity
      FROM msms_spectrum s
@@ -47,93 +42,64 @@ MSMSplot_SQL <- function(sql_path,
   ))
   
   if (nrow(peaks) == 0)
-    stop("No MS/MS peaks found for this compound")
+    stop("No MS/MS peaks found")
   
-  prod_ion.num <- round(peaks$mz, 2)
-  intens_ion.num <- peaks$intensity
+  prod_ion <- round(peaks$mz, 2)
+  intensity <- peaks$intensity
   
-  # Candidate product ions 
+  sel <- which(intensity >= minum)
+  
+  # =========================
+  # PRODUCT ION ANNOTATION
+  # =========================
   cat("\nCandidate product ions:\n")
+  prod_ann <- ProdIonMatch(prod_ion, prdion, err = err)
   
-  
-  ProdIonMatch(prod_ion.num, prdion,  err = err)
-  
-  minum_sel <- which(intens_ion.num >= minum)
-  
-  # Neutral losses 
-  neutprod.num <- round(precursor_mz - prod_ion.num, 2)
+  # =========================
+  # NEUTRAL LOSS (AUTO)
+  # =========================
+  neut_loss <- round(precursor_mz - prod_ion, 2)
   
   cat("\nCandidate neutral losses:\n")
-  NeutLossMatch(neutprod.num, neutloss, err = err)
+  neut_ann <- NeutLossMatch(neut_loss, neutloss, err = err)
   
-  # Complementary ions
+  # =========================
+  # COMPLEMENTARY IONS
+  # =========================
   cat("\nComplementary product ions:\n")
-  ComplemIons_SQL(prod_ion.num,
-                  intens_ion.num,
-                  neutprod.num,
-                  err)
+  ComplemIons_SQL(prod_ion, intensity, neut_loss, err)
   
-  #  Plot 
-  if (is.null(oldpar)) oldpar <- par(no.readonly = TRUE)
+  # =========================
+  # PLOT
+  # =========================
+  par(mfrow = c(1,1))
+  par(cex = 0.7)
   
-  par(mfrow = c(1, 1))
-  par(cex = 0.6)
-  
-  adj_intens <- max(intens_ion.num) * 1.1
-  adj_prod_min <- min(prod_ion.num) * 0.9
-  adj_prod_max <- max(prod_ion.num) * 1.1
-  
-  plot(prod_ion.num,
-       intens_ion.num,
+  plot(prod_ion,
+       intensity,
        type = "h",
        xlab = "m/z",
-       ylab = "ion intensity",
-       main = round(precursor_mz, 2),
-       xlim = c(adj_prod_min, adj_prod_max),
-       ylim = c(0, adj_intens))
+       ylab = "intensity",
+       main = round(precursor_mz, 2))
   
-  text(prod_ion.num[minum_sel],
-       intens_ion.num[minum_sel],
-       prod_ion.num[minum_sel],
+  # labels: product ions
+  text(prod_ion[sel],
+       intensity[sel],
+       labels = prod_ion[sel],
        pos = 3)
   
-  #Interactive neutral loss mode 
-  if (!is.null(nl)) {
-    
-    text(prod_ion.num[minum_sel],
-         intens_ion.num[minum_sel],
-         neutprod.num[minum_sel],
-         pos = 3,
-         offset = 1.5,
-         col = 2)
-    
-    cat("\nEnter 0 to exit.\n")
-    i <- 2.5
-    
-    repeat {
-      chosen_ion <- as.numeric(
-        readline("From which product ion do you want to see the neutral losses? ")
-      )
-      
-      if (chosen_ion == 0) break
-      
-      sl <- which(prod_ion.num %in% chosen_ion)
-      if (length(sl) == 0) next
-      
-      neutprod.num <- round(prod_ion.num[sl] - prod_ion.num, 2)
-      
-      NeutLossMatch(neutprod.num, err = err)
-      
-      text(prod_ion.num[minum_sel],
-           intens_ion.num[minum_sel],
-           neutprod.num[minum_sel],
-           pos = 3,
-           offset = i,
-           col = 3)
-      
-      i <- i + 1
-    }
-  }
+  # labels: neutral losses (automatic overlay)
+  text(prod_ion[sel],
+       intensity[sel],
+       labels = neut_loss[sel],
+       pos = 1,
+       col = "red")
   
   if (!is.null(oldpar)) par(oldpar)
+  
+  return(list(
+    product_ions = prod_ion,
+    intensities = intensity,
+    neutral_losses = neut_loss
+  ))
 }

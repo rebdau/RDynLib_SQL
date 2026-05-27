@@ -59,6 +59,7 @@ MSMSspecplot_SQL <- function(sql_path,
   
   #Plot MS/MS spectrum 
   oldpar <- par(no.readonly = TRUE)
+
   
   MSMSplot_SQL(sql_path = sql_path,
                dbkey = dbkey,
@@ -66,8 +67,7 @@ MSMSspecplot_SQL <- function(sql_path,
                neutloss = neutloss,
                err = err,
                minum = minum,
-               oldpar = oldpar,
-               nl = "nl")
+               oldpar = oldpar)
   
   par(oldpar)
   
