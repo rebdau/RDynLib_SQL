@@ -159,6 +159,7 @@ MSMSplot_SQL("C:/Users/ament/Desktop/sql_data/DYL_FLAX_QTOFneg.sqlite", 26,
 
 
 ```{r}
+load_all()
 MSMSspecplot_SQL("C:/Users/ament/Desktop/sql_data/DYL_FLAX_QTOFneg.sqlite", 26, 
                  prdion = prdion, neutloss = neutloss, err = NULL, 
                  minum = NULL, nr_col = NULL,   nr_col2 = NULL)
