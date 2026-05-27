@@ -255,7 +255,7 @@ Test gnps conversion
 #qtof flax
 qtof_path <- "C:/Users/ament/Desktop/sql_data/DYL_FLAX_QTOFneg.sqlite"
 conv.GNPS_SQL(sql_path = qtof_path, expid= 52, mzerr = 0.015,
-              min = 5, adduct = 46.0055, thr1 = 3, thr2 = 0.1, thr3 = 0.4,
+              min = 5, adduct = 60.0211, thr1 = 3, thr2 = 0.1, thr3 = 0.4,
               IntThres = 5)
                           
 ```
@@ -298,12 +298,14 @@ DBI::dbGetQuery(con_qtof, "
 #ftms flax
 ft_path <- "C:/Users/ament/Desktop/sql_data/DYL_FLAX_FTMSneg.sqlite"
 conv.GNPS_SQL(sql_path = ft_path, expid= 266, mzerr = 0.015,
-              min = 5, adduct = 46.0055, thr1 = 3, thr2 = 0.1, thr3 = 0.4,
+              min = 5, adduct = 60.0211, thr1 = 3, thr2 = 0.1, thr3 = 0.4,
               IntThres = 5)
                           
 ```
 
 ```{r}
+ft_con <- DBI::dbConnect(RSQLite::SQLite(), ft_path)
+
 DBI::dbGetQuery(ft_con, "
   SELECT g.*
   FROM gnps_add g

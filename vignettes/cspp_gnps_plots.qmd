@@ -232,22 +232,13 @@ Overall.net_SQL(sql_path = ft_path, exp.id = 266, dbkey = 101280, min = 0,
 
 ```{r}
 load_all()
-addit <- net.addit_SQL(sql_path = ft_path, exp.id = 266, nettype = "CSPP",
-                          nr_col = NULL,
-                          min = 100,
-                          thr1 = 2,
-                          thr2 = 0.3,
-                          thr3 = 0.3)
-
-Local.net_SQL(
-  net.lst = addit,
-  dbkey      = "101280",
-  nettype    = "CSPP",
-  output_png = "network_CSPP2.png",   # omit to just display in RStudio
-  png_width  = 3000,
-  png_height = 3000,
-  png_res    = 150
-)
+output_path <- here("data", "101280.png")
+Overall.net_SQL(sql_path = ft_path, exp.id = 266, dbkey = 101280, min = 100, 
+                output_png = output_path,
+                            nr_of_seq = 2,
+                            thr1 = 1,
+                            thr2 = 0.1,
+                            thr3 = 0.2)
 ```
 
 
@@ -280,21 +271,24 @@ compound_id = c(
 print(getAlignedCompids)
 ```
 
+```{r}
+qt_path <- here("data", "DYL_FLAX_QTOFneg.sqlite")
+db_qt <- dbConnect(RSQLite::SQLite(), qt_path)
+DBI::dbGetQuery(db_qt, "
+  SELECT DISTINCT spectrum_type
+  FROM msms_spectrum
+")
+```
 
 
 ```{r}
-conv.GNPS_SQL(sql_path= qt_path, expid = 52,
-                          mzerr = 0.015,
-                          min = 5,
-                          adduct = 60.0211,
-                          thr1 = 3,
-                          thr2 = 0.1,
-                          thr3 = 0.4,
-                          spectrum_type = "intersect_single_energy", 
-                          IntThres = 0)
+conv.GNPS_SQL(sql_path = qt_path, expid= 52, mzerr = 0.015,
+              min = 5, adduct = 60.0211, thr1 = 3, thr2 = 0.1, thr3 = 0.4,
+              spectrum_type = "merged_MSMS_all_energies", IntThres = 5)
 ```
 
 ```{r}
+qt_path <- here("data", "DYL_FLAX_QTOFneg.sqlite")
 db_qt <- dbConnect(SQLite(), qt_path)
 DBI::dbGetQuery(db_qt, "
   SELECT g.*
@@ -325,7 +319,7 @@ cspp.tot_SQL(qt_path, 52, mzerr = 0.01,
 
 plot ntworks
 ```{r}
-Overall.net_SQL(sql_path = qt_path, exp.id = 52, dbkey = 45843, min = 0,
+Overall.net_SQL(sql_path = qt_path, exp.id = 52, dbkey = 45818, min = 0,
                             nr_of_seq = 2,
                             thr1 = 1,
                             thr2 = 0.1,
@@ -359,7 +353,8 @@ Overall.net_SQL(sql_path = qt_path, exp.id = 52, dbkey = 45890, min = 0,
 ```
 
 ```{r}
-Overall.net_SQL(sql_path = qt_path, exp.id = 52, dbkey = 45918, min = 0,
+Overall.net_SQL(sql_path = qt_path, exp.id = 52, dbkey = 45918, min = 0, 
+                output_png = "test2.png",
                             nr_of_seq = 2,
                             thr1 = 1,
                             thr2 = 0.1,
