@@ -64,9 +64,7 @@ cspp.tot_SQL <- function(sql_path, expid,
                          reset = TRUE,        
                          verbose = TRUE) {
   
-  library(DBI)
-  library(RSQLite)
-  library(data.table)
+
   
   log <- function(...) if (verbose) message(sprintf(...))
   

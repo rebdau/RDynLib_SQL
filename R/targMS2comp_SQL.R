@@ -69,28 +69,38 @@ targMS2comp_SQL <- function(compid1,
   
   if (is.na(precursor1) || is.na(precursor2)) return(NULL)
   
+  # Keep only relevant columns
   ac <- ms2_sub[, c("mz", "intensity")]
   bd <- ms2_prod[, c("mz", "intensity")]
   
-  ac <- ac[!is.na(intensity) & intensity >= IntThres, ]
-  bd <- bd[!is.na(intensity) & intensity >= IntThres, ]
+  # FIX: explicit column reference (avoids "closure" bug)
+  ac <- ac[!is.na(ac$intensity) & ac$intensity >= IntThres, , drop = FALSE]
+  bd <- bd[!is.na(bd$intensity) & bd$intensity >= IntThres, , drop = FALSE]
   
   if (nrow(ac) == 0 || nrow(bd) == 0) return(NULL)
   
+  # Normalize intensities
   ac$rint <- ac$intensity / max(ac$intensity) * 100
   bd$rint <- bd$intensity / max(bd$intensity) * 100
   
-  DotIons <- CommonDotProd(ac[, .(mz, rint)],
-                           bd[, .(mz, rint)],
-                           tol = mz_tol)
+  # Dot product on ions
+  DotIons <- CommonDotProd(
+    ac[, c("mz", "rint")],
+    bd[, c("mz", "rint")],
+    tol = mz_tol
+  )
   
+  # Loss calculation
   ac$nloss <- precursor1 - ac$mz
   bd$nloss <- precursor2 - bd$mz
   
-  DotLoss <- CommonDotProd(ac[, .(nloss, rint)],
-                           bd[, .(nloss, rint)],
-                           tol = mz_tol)
+  DotLoss <- CommonDotProd(
+    ac[, c("nloss", "rint")],
+    bd[, c("nloss", "rint")],
+    tol = mz_tol
+  )
   
+  # Output
   data.frame(
     COMPID.sub  = compid1,
     COMPID.prod = compid2,
