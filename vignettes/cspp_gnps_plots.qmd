@@ -245,12 +245,13 @@ Overall.net_SQL(sql_path = ft_path, exp.id = 266, dbkey = 101280, min = 100,
 
 
 ```{r}
-Overall.net_SQL(sql_path = ft_path, exp.id = 266, dbkey = 101007, min = 0,
+Overall.net_SQL(sql_path = ft_path, exp.id = 266, dbkey = 101283, min = 0,
                             nr_of_seq = 2,
                            thr1 = 0.1,
                           thr2 = 0.3, 
                           thr3 = 0.3)
 ```
+
 
 
 #Flax Qtof negtive
@@ -263,7 +264,7 @@ alignment_file <- here("data", "assoc_flax_63.txt")
 getAlignedCompids <- getAlignedCompids_SQL(
 compound_id = c(
   100926, 100998, 100974, 100934, 101238, 100946, 101211, 100988, 101242, 
-  101097, 101141, 101019, 101147, 100991, 101098, 101296, 101154
+  101097, 101141, 101019, 101147, 100991, 101098, 101296, 101154,101280
 ),
   database_name = "DYL_FLAX_FTMSneg.sqlite",
   alignment_file = alignment_file
@@ -329,6 +330,7 @@ Overall.net_SQL(sql_path = qt_path, exp.id = 52, dbkey = 45818, min = 0,
 
 ```{r}
 Overall.net_SQL(sql_path = qt_path, exp.id = 52, dbkey = 45858, min = 0,
+               # output_png = "qtof_45858.png",
                             nr_of_seq = 2,
                             thr1 = 1,
                             thr2 = 0.1,
@@ -337,7 +339,7 @@ Overall.net_SQL(sql_path = qt_path, exp.id = 52, dbkey = 45858, min = 0,
 
 
 ```{r}
-Overall.net_SQL(sql_path = qt_path, exp.id = 52, dbkey = 45847, min = 0,
+Overall.net_SQL(sql_path = qt_path, exp.id = 52, dbkey = 45890, min = 0,
                             nr_of_seq = 2,
                             thr1 = 1,
                             thr2 = 0.1,
@@ -354,7 +356,7 @@ Overall.net_SQL(sql_path = qt_path, exp.id = 52, dbkey = 45890, min = 0,
 
 ```{r}
 Overall.net_SQL(sql_path = qt_path, exp.id = 52, dbkey = 45918, min = 0, 
-                output_png = "test2.png",
+                output_png = "qtof_45918.png",
                             nr_of_seq = 2,
                             thr1 = 1,
                             thr2 = 0.1,
