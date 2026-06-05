@@ -8,6 +8,7 @@
 #' @export
 MSMSplot_SQL <- function(sql_path,
                          dbkey,
+                         spectrum_id,
                          prdion,
                          neutloss,
                          err = 0.015,
@@ -21,9 +22,9 @@ MSMSplot_SQL <- function(sql_path,
   compound <- dbGetQuery(con, sprintf(
     "SELECT precursor_mz
      FROM msms_spectrum
-     WHERE compound_id = %d
+     WHERE spectrum_id = %d
      AND ms_level = 2",
-    dbkey
+    spectrum_id
   ))
   
   if (nrow(compound) == 0)
@@ -36,9 +37,9 @@ MSMSplot_SQL <- function(sql_path,
     "SELECT p.mz, p.intensity
      FROM msms_spectrum s
      JOIN msms_spectrum_peak p ON s.spectrum_id = p.spectrum_id
-     WHERE s.compound_id = %d
+     WHERE s.spectrum_id = %d
      ORDER BY p.mz",
-    dbkey
+    spectrum_id
   ))
   
   if (nrow(peaks) == 0)

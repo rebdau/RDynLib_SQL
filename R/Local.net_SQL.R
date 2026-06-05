@@ -188,25 +188,24 @@ Local.net_SQL <- function(net.lst,
     
     lay <- layout_with_graphopt(
       net,
-      niter = 10000,
-      charge = 0.06,
-      mass = 30,
-      spring.length = 150,
-      spring.constant = 0.005
+      niter = 20000,
+      charge = 0.2,
+      mass = 50,
+      spring.length = 300,
+      spring.constant = 0.002
     )
-    
     lay <- norm_coords(
       lay,
-      xmin = -3, xmax = 3,
-      ymin = -3, ymax = 3
+      xmin = -8, xmax = 8,
+      ymin = -8, ymax = 8
     )
     
     ## NODE STYLE
     
     vertex_size <- if ("X2" %in% names(nodes.netloc)) {
-      rescale(nodes.netloc$X2, to = c(55, 80))
+      rescale(nodes.netloc$X2, to = c(77, 100))
     } else {
-      rep(60, vcount(net))
+      rep(150, vcount(net))
     }
     
     v_colors <- ifelse(
@@ -268,8 +267,8 @@ Local.net_SQL <- function(net.lst,
       net,
       layout = lay,
       rescale = FALSE,
-      xlim = c(-6, 6),
-      ylim = c(-6, 6),
+      xlim = c(-10, 10),
+      ylim = c(-10, 10),
       
       vertex.color = v_colors,
       vertex.frame.color = "deeppink4",
@@ -280,18 +279,19 @@ Local.net_SQL <- function(net.lst,
       vertex.label.cex = 1.1,
       vertex.label.color = "black",
       vertex.label.font = 2,
+      edge.label.dist = 1.5,
       
       edge.color = edge_colors,
       edge.width = edge_width,
-      edge.arrow.size = 0.7,
-      edge.arrow.width = 2.5,
+      edge.arrow.size = 1.2,
+      edge.arrow.width = 3,
       edge.curved = edge_curve,
       
       edge.label = edge_labels,
-      edge.label.cex = 1,
+      edge.label.cex = 0.9,
       edge.label.color = "black",
       edge.label.font = 2,
-      
+
       main = plot_title
     )
     
