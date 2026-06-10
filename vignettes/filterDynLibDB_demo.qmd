@@ -1,0 +1,61 @@
+---
+title: "Create an sql subdatabase of a given experiment id"
+format:
+  html:
+    toc: true
+    self-contained: true
+author: "Ahlam Mentag, Rebecca Dauwe, Johannes Rainer"
+---
+
+## Shiny Documents
+
+Quarto document to demonstrate how to use filterDynLibDB() function from RDynlib 
+package to create an sql subdatabase of a given experiment
+
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+#' Load required libraries
+library(devtools)
+library(DBI)
+library(RSQLite)
+library(here)
+#rm(list = c("convert_compid_assoc"))
+#` Uploading RDynLib: Load all functions of the RDynlib directory
+load_all()
+```
+
+#File paths to the input and output sql databases
+```{r}
+input_db <- here("data", "DYL_FLAX_FTMSneg.sqlite")
+output_db <- here("data", "filter_flax.sqlite")
+```
+
+#Call the function to filter the database based on expid
+```{r}
+filterDynLibDB(
+  expid = 266,
+  input_db = input_db,
+  output_db = output_db
+)
+```
+
+#Connection to the output database
+```{r}
+con_filter <- dbConnect(RSQLite::SQLite(), output_db)
+#Verify the experiment table
+dbGetQuery(con_filter , "
+SELECT *
+FROM experiment
+")
+```
+
+#Print ms_compound table of the filtered database
+```{r}
+dbGetQuery(con_filter , "
+SELECT *
+FROM ms_compound
+")
+```
+
