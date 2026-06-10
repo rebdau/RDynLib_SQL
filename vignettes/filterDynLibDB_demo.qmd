@@ -30,9 +30,11 @@ load_all()
 ```{r}
 input_db <- here("data", "DYL_FLAX_FTMSneg.sqlite")
 output_db <- here("data", "filter_flax.sqlite")
+output_db2 <- here("data", "filter_5_7_12.sqlite")
+
 ```
 
-#Call the function to filter the database based on expid
+#Call the function to filter the database based on a single expid
 ```{r}
 filterDynLibDB(
   expid = 266,
@@ -44,6 +46,7 @@ filterDynLibDB(
 #Connection to the output database
 ```{r}
 con_filter <- dbConnect(RSQLite::SQLite(), output_db)
+
 #Verify the experiment table
 dbGetQuery(con_filter , "
 SELECT *
@@ -59,3 +62,25 @@ FROM ms_compound
 ")
 ```
 
+
+#Call the function to filter the database based on a set of expids
+```{r}
+filterDynLibDB(
+    expid = c(5, 7, 12),
+    input_db = input_db,
+    output_db = output_db2
+)
+```
+
+
+
+#Connection to the output2 database
+```{r}
+con_filter2 <- dbConnect(RSQLite::SQLite(), output_db2)
+
+#Verify the experiment table
+dbGetQuery(con_filter2 , "
+SELECT *
+FROM experiment
+")
+```

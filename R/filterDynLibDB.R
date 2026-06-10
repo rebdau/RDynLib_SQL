@@ -1,16 +1,21 @@
-#' @title Filter and Create an sql subdatabase of a given experiment id  
+#' @title Filter and create a SQL subdatabase from one or more experiment IDs
 #'
-#' 
-#' @return a new sql database containing just the given experiment id
-#' 
+#' @description
+#' Creates a new SQLite database containing only records associated with the
+#' specified experiment IDs.
+#'
+#' @param expid Numeric vector of experiment IDs to keep.
+#' @param input_db Character. Path to the input SQLite database.
+#' @param output_db Character. Path to the output SQLite database.
+#' @param overwrite Logical. Whether to overwrite an existing output database.
+#'
+#' @return Invisibly returns the path to the output database.
+#'
+#' @author Ahlam Mentag
+#'
 #' @import DBI
 #' @import RSQLite
-#' 
-#' @param expid 'numeric(0) experiment id to keep. 
-#' @param input_db 'character' file path to the global sql database to filter
-#' @param output_db 'character' output file path to the filtered sql database
-#' @author Ahlam Mentag
-#' 
+#'
 #' @export
 filterDynLibDB <- function(expid,
                            input_db,
@@ -20,6 +25,11 @@ filterDynLibDB <- function(expid,
   if (!file.exists(input_db))
     stop("Input database does not exist.")
   
+  if (!length(expid))
+    stop("'expid' must contain at least one experiment ID.")
+  
+  expid <- unique(as.integer(expid))
+  
   if (file.exists(output_db)) {
     if (overwrite) {
       file.remove(output_db)
@@ -28,65 +38,89 @@ filterDynLibDB <- function(expid,
     }
   }
   
-  con_in <- dbConnect(SQLite(), input_db)
-  con_out <- dbConnect(SQLite(), output_db)
+  con_in <- DBI::dbConnect(RSQLite::SQLite(), input_db)
+  con_out <- DBI::dbConnect(RSQLite::SQLite(), output_db)
   
   on.exit({
-    dbDisconnect(con_in)
-    dbDisconnect(con_out)
+    DBI::dbDisconnect(con_in)
+    DBI::dbDisconnect(con_out)
   })
   
-
+  expid_sql <- paste(expid, collapse = ",")
+  
   ## experiment
-  experiment <- dbGetQuery(
+  experiment <- DBI::dbGetQuery(
     con_in,
     sprintf(
-      "SELECT * FROM experiment WHERE expid = '%s'",
-      expid
+      "SELECT * FROM experiment WHERE expid IN (%s)",
+      expid_sql
     )
   )
   
-  if (nrow(experiment) == 0)
-    stop("expid not found.")
+  if (!nrow(experiment))
+    stop("None of the provided expid values were found.")
   
-  dbWriteTable(con_out, "experiment", experiment)
-  
+  DBI::dbWriteTable(
+    con_out,
+    "experiment",
+    experiment,
+    row.names = FALSE
+  )
   
   ## ms_compound
-  compounds <- dbGetQuery(
+  compounds <- DBI::dbGetQuery(
     con_in,
     sprintf(
-      "SELECT * FROM ms_compound WHERE expid = '%s'",
-      expid
+      "SELECT * FROM ms_compound WHERE expid IN (%s)",
+      expid_sql
     )
   )
   
-  dbWriteTable(con_out, "ms_compound", compounds)
+  if (!nrow(compounds)) {
+    compounds <- DBI::dbGetQuery(
+      con_in,
+      "SELECT * FROM ms_compound WHERE 1 = 0"
+    )
+  }
   
-  compound_ids <- compounds$compound_id
+  DBI::dbWriteTable(
+    con_out,
+    "ms_compound",
+    compounds,
+    row.names = FALSE
+  )
   
-
+  compound_ids <- unique(compounds$compound_id)
+  
   ## Feature_matrix
-  feature_matrix <- dbGetQuery(
+  feature_matrix <- DBI::dbGetQuery(
     con_in,
     sprintf(
-      "SELECT * FROM Feature_matrix WHERE expid = '%s'",
-      expid
+      "SELECT * FROM Feature_matrix WHERE expid IN (%s)",
+      expid_sql
     )
   )
   
-  dbWriteTable(con_out, "Feature_matrix", feature_matrix)
-  
-
-  ## msms_spectrum
-  if (length(compound_ids) > 0) {
-    
-    compound_ids_sql <- paste(
-      sprintf("'%s'", compound_ids),
-      collapse = ","
+  if (!nrow(feature_matrix)) {
+    feature_matrix <- DBI::dbGetQuery(
+      con_in,
+      "SELECT * FROM Feature_matrix WHERE 1 = 0"
     )
+  }
+  
+  DBI::dbWriteTable(
+    con_out,
+    "Feature_matrix",
+    feature_matrix,
+    row.names = FALSE
+  )
+  
+  ## msms_spectrum
+  if (length(compound_ids)) {
     
-    spectra <- dbGetQuery(
+    compound_ids_sql <- paste(compound_ids, collapse = ",")
+    
+    spectra <- DBI::dbGetQuery(
       con_in,
       sprintf(
         paste0(
@@ -98,21 +132,29 @@ filterDynLibDB <- function(expid,
     )
     
   } else {
-    spectra <- data.frame()
+    
+    spectra <- DBI::dbGetQuery(
+      con_in,
+      "SELECT * FROM msms_spectrum WHERE 1 = 0"
+    )
   }
   
-  dbWriteTable(con_out, "msms_spectrum", spectra)
+  DBI::dbWriteTable(
+    con_out,
+    "msms_spectrum",
+    spectra,
+    row.names = FALSE
+  )
   
-
   ## msms_spectrum_peak
-  if (nrow(spectra) > 0) {
+  if (nrow(spectra)) {
     
     spectrum_ids_sql <- paste(
-      spectra$spectrum_id,
+      unique(spectra$spectrum_id),
       collapse = ","
     )
     
-    peaks <- dbGetQuery(
+    peaks <- DBI::dbGetQuery(
       con_in,
       sprintf(
         paste0(
@@ -124,13 +166,19 @@ filterDynLibDB <- function(expid,
     )
     
   } else {
-    peaks <- data.frame()
+    
+    peaks <- DBI::dbGetQuery(
+      con_in,
+      "SELECT * FROM msms_spectrum_peak WHERE 1 = 0"
+    )
   }
   
-  dbWriteTable(con_out, "msms_spectrum_peak", peaks)
+  DBI::dbWriteTable(
+    con_out,
+    "msms_spectrum_peak",
+    peaks,
+    row.names = FALSE
+  )
   
   invisible(output_db)
 }
-
-
-
