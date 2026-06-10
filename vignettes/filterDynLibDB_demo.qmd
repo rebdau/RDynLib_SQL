@@ -21,6 +21,7 @@ library(devtools)
 library(DBI)
 library(RSQLite)
 library(here)
+library(RDynLib)
 #rm(list = c("convert_compid_assoc"))
 #` Uploading RDynLib: Load all functions of the RDynlib directory
 load_all()
