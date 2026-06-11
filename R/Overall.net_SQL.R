@@ -41,45 +41,53 @@
 #'         
 #' @author Ahlam Mentag
 #' 
+#' @import igraph
 #' @export
-Overall.net_SQL <- function(sql_path, exp.id, dbkey, min , nr_of_seq = 2, thr1 = 1,
-                            thr2 = 0.9, thr3 = 0.4) {
+Overall.net_SQL <- function(sql_path,
+                            exp.id,
+                            dbkey,
+                            output_png = NULL,
+                            min,
+                            nr_of_seq = 2,
+                            thr1 = 0,
+                            thr2 = 0,
+                            thr3 = 0) {
   
-  oldpar <- par(no.readonly = TRUE)
-  on.exit({
-    try(par(oldpar), silent = TRUE)
-  }, add = TRUE)
+  ## CSPP
+  net.lst1 <- net.addit_SQL(
+    sql_path = sql_path,
+    exp.id = exp.id,
+    nettype = "CSPP",
+    min = min,
+    thr1 = thr1,
+    thr2 = thr2,
+    thr3 = thr3
+  )
   
-  par(mfrow = c(1,2), mar = c(1,1,1,1))
+  ## GNPS
+  net.lst2 <- net.addit_SQL(
+    sql_path = sql_path,
+    exp.id = exp.id,
+    nettype = "GNPS",
+    min = min,
+    thr1 = thr1,
+    thr2 = thr2,
+    thr3 = thr3
+  )
   
-  ##CSPP
-  net.lst1 <- net.addit_SQL(sql_path = sql_path,
-                            exp.id = exp.id,
-                            nettype = "CSPP",
-                            min = min,
-                            thr1 = thr1,
-                            thr2 = thr2,
-                            thr3 = thr3)
+  ## COMBINE BOTH NETWORKS
+  combined_net <- list(
+    CSPP = net.lst1,
+    GNPS = net.lst2
+  )
   
-  locNET1.list <- Local.net_SQL(net.lst1,
-                                dbkey = dbkey,
-                                nettype = "CSPP",
-                                nr_of_seq = nr_of_seq)
+  ## SINGLE PLOT
+  locNET <- Local.net_SQL(
+    net.lst = combined_net,
+    dbkey = dbkey,
+    nr_of_seq = nr_of_seq,
+    output_png = output_png
+  )
   
-  
-  ##GNPS 
-  net.lst2 <- net.addit_SQL(sql_path = sql_path,
-                            exp.id = exp.id,
-                            nettype = "GNPS",
-                            min = min,
-                            thr1 = thr1,
-                            thr2 = thr2,
-                            thr3 = thr3)
-  
-  locNET2.list <- Local.net_SQL(net.lst2,
-                                dbkey = dbkey,
-                                nettype = "GNPS",
-                                nr_of_seq = nr_of_seq)
-  
-  return(list(locNET1.list, locNET2.list))
+  return(locNET)
 }

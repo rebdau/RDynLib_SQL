@@ -34,10 +34,14 @@ net.addit_SQL <- function(sql_path,
                           thr2 = 0.1,
                           thr3 = 0.2) {
   
-  con <- dbConnect(RSQLite::SQLite(), sql_path)
-  on.exit(dbDisconnect(con), add = TRUE)
+  con <- DBI::dbConnect(RSQLite::SQLite(), sql_path)
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
   
-  compounds <- dbGetQuery(
+
+  ## CHECK COMPOUNDS
+
+  
+  compounds <- DBI::dbGetQuery(
     con,
     sprintf(
       "SELECT compound_id
@@ -48,32 +52,52 @@ net.addit_SQL <- function(sql_path,
     )
   )
   
-  if (nrow(compounds) == 0)
+  if (nrow(compounds) == 0) {
     stop("No compounds found for expid = ", exp.id)
+  }
   
+
+  ## NODES
+
   
-  ## Nodes
   nodes.net <- net.nodes_SQL(
     sql_path = sql_path,
     exp.id = exp.id,
     min = min
   )
   
-  ## If nr_col is NULL, detect automatically from database
+
+  ## DETECT NUMBER OF COLUMNS
+
+  
   if (is.null(nr_col)) {
     
     if (nettype == "CSPP") {
-      table_info <- dbGetQuery(con, "PRAGMA table_info(compound_add)")
+      
+      table_info <- DBI::dbGetQuery(
+        con,
+        "PRAGMA table_info(compound_add)"
+      )
+      
     } else if (nettype == "GNPS") {
-      table_info <- dbGetQuery(con, "PRAGMA table_info(gnps_add)")
+      
+      table_info <- DBI::dbGetQuery(
+        con,
+        "PRAGMA table_info(gnps_add)"
+      )
+      
     } else {
+      
       stop("Type of net should be CSPP or GNPS.")
     }
     
     nr_col <- nrow(table_info)
   }
   
-  ## Edges
+
+  ## BUILD EDGES
+
+  
   if (nettype == "CSPP") {
     
     edges.net <- allCSPP_SQL(
@@ -85,7 +109,7 @@ net.addit_SQL <- function(sql_path,
       thr3 = thr3
     )
     
-  } else if (nettype == "GNPS") {
+  } else {
     
     edges.net <- allGNPS_SQL(
       sql_path = sql_path,
@@ -97,15 +121,89 @@ net.addit_SQL <- function(sql_path,
     )
   }
   
-  ## Additional metrics
-  common.nr <- edges.net[,4] * edges.net[,5]
-  edges.net <- data.frame(edges.net, common.nr)
+  edges.net <- as.data.frame(edges.net)
   
-  common.nr.rel <- edges.net[,7] / max(edges.net[,7])
-  edges.net <- data.frame(edges.net, common.nr.rel)
+
+  ## HANDLE EMPTY NETWORKS
+
   
-  dot.rel <- round(edges.net[,6] * 8, digits = 0)
-  edges.net <- data.frame(edges.net, dot.rel)
+  if (nrow(edges.net) == 0 || ncol(edges.net) < 6) {
+    
+    message(nettype, " network is empty.")
+    
+    empty.df <- data.frame(
+      compid.sub = character(),
+      compid.prod = character(),
+      common.nr = numeric(),
+      common.nr.rel = numeric(),
+      dot.rel = numeric(),
+      ave.dot = numeric(),
+      conv.type = character(),
+      stringsAsFactors = FALSE
+    )
+    
+    return(list(nodes.net, empty.df))
+  }
+  
+
+  ## ADD METRICS
+
+  
+  common.nr <- edges.net[[4]] * edges.net[[5]]
+  
+  edges.net$common.nr <- common.nr
+  
+  max_common <- max(common.nr, na.rm = TRUE)
+  
+  if (is.na(max_common) || max_common == 0) {
+    max_common <- 1
+  }
+  
+  edges.net$common.nr.rel <- common.nr / max_common
+  
+  edges.net$dot.rel <- round(
+    as.numeric(edges.net[[6]]) * 8,
+    digits = 0
+  )
+  
+
+  ## GNPS MASS DIFFERENCE LABELS
+
+  
+  if (nettype == "GNPS") {
+    
+    masses <- DBI::dbGetQuery(
+      con,
+      sprintf(
+        "SELECT compound_id, mass_measured
+         FROM ms_compound
+         WHERE expid = %d",
+        exp.id
+      )
+    )
+    
+    masses$compound_id <- as.character(masses$compound_id)
+    
+    mass_map <- setNames(
+      masses$mass_measured,
+      masses$compound_id
+    )
+    
+    sub_mass <- mass_map[as.character(edges.net$compid.sub)]
+    prod_mass <- mass_map[as.character(edges.net$compid.prod)]
+    
+    mass_diff <- round(abs(prod_mass - sub_mass), 2)
+    
+    edges.net$conv.type <- as.character(mass_diff)
+    
+  } else {
+    
+    ## KEEP ORIGINAL CSPP LABELS
+    
+    if (!("conv.type" %in% names(edges.net))) {
+      edges.net$conv.type <- "CSPP"
+    }
+  }
   
   return(list(nodes.net, edges.net))
 }

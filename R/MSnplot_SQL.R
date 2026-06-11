@@ -6,7 +6,7 @@
 #' @author Ahlam Mentag
 #' 
 #' @export
-MSnplot_SQL <- function(sql_path, dbkey, prcx = 0.6) {
+MSnplot_SQL <- function(sql_path, dbkey, prcx = 0.6, thr_int = 0) {
 
   con <- dbConnect(SQLite(), sql_path)
   on.exit(dbDisconnect(con), add = TRUE)
@@ -29,11 +29,11 @@ MSnplot_SQL <- function(sql_path, dbkey, prcx = 0.6) {
   
   par(mfrow = c(row.nr, col.nr))
   
-  MS2plot_SQL(sql_path, dbkey, prcx)
+  MS2plot_SQL(sql_path, dbkey, prcx, thr_int)
   
   if (ms3count > 0) {
     for (i in 1:ms3count) {
-      MS3plot_SQL(sql_path, dbkey, prcx, wh = i)
+      MS3plot_SQL(sql_path, dbkey, prcx, wh = i, thr_int)
     }
   }
 }

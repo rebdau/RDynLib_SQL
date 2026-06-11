@@ -38,79 +38,113 @@
 #' corresponds to one candidate conversion and includes fragment ion and
 #' neutral loss similarity scores.
 #'
+#'@import data.table
 #' @author Ahlam Mentag
 #'
+#'
 #' @export
+NULL
+
 conv.CSPP_SQL <- function(inp.x,
                           mzdiff,
                           direc,
                           peakwidth,
-                          mzerr = 0.015,
-                          ms2_split) {
+                          mzerr = 1,
+                          ms2_split,
+                          IntThres = 0,
+                          mz_tol = 0.3,
+                          dot_thresh = 0,
+                          min_common = 0) {
   
-  Prod.dat <- inp.x[order(inp.x$mass_measured), ]
-  Sub.dat  <- Prod.dat
+  inp.x <- as.data.table(inp.x)
+  inp.x$compound_id <- as.character(inp.x$compound_id)
   
-  cspp.list <- list()
-  idx <- 1
+  # ---- SELF JOIN BASE ----
+  pairs <- CJ(sub  = inp.x$compound_id,
+              prod = inp.x$compound_id)
   
-  i <- 1
-  repeat {
-    
-    if (i > nrow(Sub.dat)) break
-    
-    mz.sub  <- Sub.dat$mass_measured[i]
-    mz.prod <- mz.sub + mzdiff
-    
-    prd.low  <- mz.prod - mzerr
-    prd.high <- mz.prod + mzerr
-    
-    j <- 1
-    while (j <= nrow(Prod.dat)) {
-      
-      if (Prod.dat$mass_measured[j] < prd.low) {
-        Prod.dat <- Prod.dat[-j, ]
-        next
-      }
-      
-      if (Prod.dat$mass_measured[j] <= prd.high) {
-        
-        out <- targMS2comp_SQL(
-          Sub.dat$compound_id[i],
-          Prod.dat$compound_id[j],
-          ms2_split
-        )
-        
-        if (!is.null(out)) {
-          
-          rt.sub  <- Sub.dat$retention_time[i]
-          rt.prod <- Prod.dat$retention_time[j]
-          
-          if (
-            (direc == 1 && rt.prod < rt.sub - peakwidth) ||
-            (direc == 2 && rt.prod > rt.sub + peakwidth) ||
-            (direc == 3 && (rt.prod < rt.sub - peakwidth ||
-                            rt.prod > rt.sub + peakwidth))
-          ) {
-            cspp.list[[idx]] <- out
-            idx <- idx + 1
-          }
-        }
-        
-        j <- j + 1
-        next
-      }
-      
-      if (Prod.dat$mass_measured[j] > prd.high) break
-    }
-    
-    if (nrow(Prod.dat) == 0) break
-    i <- i + 1
+  # ---- JOIN metadata ----
+  pairs <- merge(
+    pairs,
+    data.table(sub      = inp.x$compound_id,
+               mass_sub = inp.x$mass_measured,
+               rt_sub   = inp.x$retention_time),
+    by    = "sub",
+    all.x = TRUE
+  )
+  
+  pairs <- merge(
+    pairs,
+    data.table(prod      = inp.x$compound_id,
+               mass_prod = inp.x$mass_measured,
+               rt_prod   = inp.x$retention_time),
+    by    = "prod",
+    all.x = TRUE
+  )
+  
+  # Coerce to atomic before comparison
+  pairs[, sub  := as.character(sub)]
+  pairs[, prod := as.character(prod)]
+  
+  # avoid self matches
+  pairs <- pairs[sub != prod]
+  
+  # ---- MASS FILTER ----
+  pairs[, diff := (mass_prod - mass_sub) - mzdiff]
+  pairs <- pairs[abs(diff) <= mzerr]
+  
+  if (nrow(pairs) == 0) return(data.frame())
+  
+  # ---- RT FILTER ----
+  if (direc == 1) {
+    pairs <- pairs[rt_prod < rt_sub - peakwidth]
+  } else if (direc == 2) {
+    pairs <- pairs[rt_prod > rt_sub + peakwidth]
+  } else {
+    pairs <- pairs[abs(rt_prod - rt_sub) > peakwidth]
   }
   
-  if (length(cspp.list) == 0)
-    return(data.frame())
+  if (nrow(pairs) == 0) return(data.frame())
   
-  do.call(rbind, cspp.list)
+  # ---- MS2 SCORING ----
+  out_list <- vector("list", nrow(pairs))
+  
+  for (i in seq_len(nrow(pairs))) {
+    
+    res <- targMS2comp_SQL(
+      pairs$sub[i],
+      pairs$prod[i],
+      ms2_split,
+      IntThres = IntThres,
+      mz_tol = mz_tol
+    )
+    
+    if (is.null(res) || !is.data.frame(res)) {
+      res <- data.frame(
+        COMPID.sub = pairs$sub[i],
+        COMPID.prod = pairs$prod[i],
+        DOT_IONS = NA,
+        DOT_LOSS = NA,
+        COMMON_IONS = NA,
+        COMMON_LOSS = NA,
+        FORW_IONS = NA,
+        REV_IONS = NA,
+        FORW_LOSS = NA,
+        REV_LOSS = NA
+      )
+    }
+    
+    out_list[[i]] <- res
+  }
+  
+  out <- rbindlist(out_list, fill = TRUE)
+  
+  if (nrow(out) == 0) return(out)
+  
+  out <- out[
+    DOT_IONS >= dot_thresh &
+      COMMON_IONS >= min_common
+  ]
+  
+  return(out)
 }
-

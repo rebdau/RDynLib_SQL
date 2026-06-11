@@ -1,0 +1,473 @@
+---
+title: "cspp and gnps-like networks of known molecules"
+format:
+  html:
+    toc: true
+    self-contained: true
+author: "Ahlam Mentag, Rebecca Dauwe, Johannes Rainer"
+---
+
+## Shiny Documents
+
+In this quarto document we plot the cspp and gnps-like networks of known 
+molecules from the aligned compounds of ftms and qtof flax data. 
+
+
+```{r}
+#| message: false
+
+#' Load required libraries
+library(devtools)
+library(DBI)
+library(RSQLite)
+library(here)
+library(data.table)
+#rm(list = c("convert_compid_assoc"))
+#` Uploading RDynLib: Load all functions of the RDynlib directory
+load_all()
+```
+
+#test each subfunction
+```{r}
+library(DBI)
+library(RSQLite)
+
+con <- dbConnect(RSQLite::SQLite(), ft_path)
+
+inp.x <- dbGetQuery(
+  con,
+  "SELECT compound_id, mass_measured, retention_time
+   FROM ms_compound
+   WHERE expid = 266"
+)
+
+inp.x <- inp.x[order(inp.x$mass_measured), ]
+
+head(inp.x)
+```
+
+```{r}
+# Get assembled MS2 spectra (one per compound)
+spec_df <- dbGetQuery(
+  con,
+  "
+  SELECT s.spectrum_id,
+         s.compound_id,
+         s.precursor_mz
+  FROM msms_spectrum s
+  WHERE s.ms_level = 2
+    AND s.spectrum_type = 'assembled'
+    AND s.spectrum_id IN (
+      SELECT MIN(spectrum_id)
+      FROM msms_spectrum
+      WHERE ms_level = 2
+        AND spectrum_type = 'assembled'
+      GROUP BY compound_id
+    )
+  "
+)
+
+# Get peaks
+peak_df <- dbGetQuery(
+  con,
+  "
+  SELECT spectrum_id, mz, intensity
+  FROM msms_spectrum_peak
+  "
+)
+
+# Merge
+ms2_df <- merge(peak_df, spec_df, by = "spectrum_id")
+
+# DO NOT filter here (let your function handle it)
+
+# Split by compound
+ms2_split <- split(ms2_df, ms2_df$compound_id)
+
+length(ms2_split)
+```
+
+```{r}
+ids <- names(ms2_split)
+
+targMS2comp_SQL(
+  compid1 = ids[1],
+  compid2 = ids[2],
+  ms2_split = ms2_split,
+  IntThres = 100
+)
+```
+
+```{r}
+inp.x_df <- as.data.frame(inp.x)
+conv.CSPP_SQL(
+  inp.x = inp.x_df,
+  mzdiff = 162.05283/2,
+  direc = 1,
+  peakwidth = 0.2,
+  ms2_split = ms2_split,
+  IntThres = 100,
+  mz_tol = 0.5,
+  dot_thresh = 0.7,
+  min_common = 3
+)
+```
+
+```{r}
+class(inp.x)
+class(ms2_split)
+class(ms2_split[[1]])
+```
+
+
+#ftms Dynlib
+```{r}
+ft_path <- here("data", "DYL_FLAX_FTMSneg.sqlite")
+cspp_ft <- here("data","cspp_flax.txt")
+cspp_ft_2ch <- here("data","cspp_flax_2ch.txt")
+cspp.tot_SQL(ft_path, 266, mzerr = 0.01,
+                         cspp = cspp_ft, peakwidth = NULL, IntThres  = 0, mz_tol = 0.5,
+                         dot_thresh = 0.7, spectrum_type = "assembled",  
+                         min_common = 3)
+```
+test
+```{r}
+library(DBI)
+library(RSQLite)
+library(data.table)
+
+con <- dbConnect(RSQLite::SQLite(), ft_path)
+
+
+spec_df <- setDT(dbGetQuery(con, "
+  SELECT s.spectrum_id, s.compound_id, s.precursor_mz
+  FROM msms_spectrum s
+  WHERE s.ms_level = 2
+  AND s.spectrum_id IN (
+      SELECT MIN(spectrum_id)
+      FROM msms_spectrum
+      WHERE ms_level = 2
+      GROUP BY compound_id
+  )
+"))
+
+peak_df <- setDT(dbGetQuery(con, sprintf("
+  SELECT p.spectrum_id, p.mz, p.intensity, s.compound_id
+  FROM msms_spectrum_peak p
+  JOIN msms_spectrum s ON p.spectrum_id = s.spectrum_id
+  JOIN ms_compound c ON s.compound_id = c.compound_id
+  WHERE c.expid = %d
+", 266)))
+
+# join
+setkey(spec_df, spectrum_id)
+setkey(peak_df, spectrum_id)
+
+ms2_df <- peak_df[spec_df, nomatch = 0]
+
+# split
+ms2_list <- split(ms2_df, by = "compound_id", keep.by = FALSE)
+
+dbDisconnect(con)
+```
+
+
+```{r}
+length(ms2_list)
+names(ms2_list)[1:5]
+str(ms2_list[[1]])
+colnames(ms2_list[[1]])
+```
+```{r}
+ids <- names(ms2_list)
+
+targMS2comp_SQL(ids[1], ids[2], ms2_list,
+                IntThres = 10,
+                mz_tol = 0.05)
+```
+#works:
+
+```{r}
+ids <- DBI::dbGetQuery(db_ft, "
+  SELECT compound_id
+  FROM ms_compound
+  WHERE expid = 266
+")$compound_id
+
+# get column names
+cols <- DBI::dbGetQuery(db_ft, "PRAGMA table_info(compound_add)")$name
+
+# keep only CSPP columns
+cspp_cols <- cols[grepl("^CSPP_", cols)]
+
+# build SET clause
+set_clause <- paste(paste0(cspp_cols, " = NULL"), collapse = ", ")
+
+# build ID list
+id_list <- paste0("'", ids, "'", collapse = ", ")
+```
+
+```{r}
+query <- sprintf("
+  UPDATE compound_add
+  SET %s
+  WHERE compound_id IN (%s)
+", set_clause, id_list)
+
+DBI::dbExecute(db_ft, query)
+```
+```{r}
+DBI::dbGetQuery(db_ft, "
+  SELECT * FROM compound_add
+  WHERE compound_id IN (
+    SELECT compound_id FROM ms_compound WHERE expid = 266
+  )
+  LIMIT 5
+")
+```
+
+
+```{r}
+cspp.tot_SQL(
+  ft_path, 266,
+  mzerr = 0.01,
+  cspp = cspp_ft_2ch,
+  peakwidth = 0.2,
+  IntThres = 0,
+  mz_tol = 0.5,  #mz tolerance is high?  
+  dot_thresh = 0.7, 
+  spectrum_type = "assembled", 
+  min_common = 3
+)
+```
+
+
+```{r}
+db_ft <- dbConnect(SQLite(), ft_path)
+DBI::dbGetQuery(db_ft, "
+  SELECT g.*
+  FROM compound_add g
+  INNER JOIN ms_compound c 
+      ON g.compound_id = c.compound_id
+  WHERE c.expid = 266 
+    AND (
+         g.GNPS IS NOT NULL OR
+         g.CSPP_RED IS NOT NULL OR
+         g.CSPP_ROX IS NOT NULL OR
+         g.CSPP_MET IS NOT NULL OR
+         g.CSPP_OXY IS NOT NULL OR
+         g.CSPP_HYD IS NOT NULL OR
+         g.CSPP_BOX IS NOT NULL OR
+         g.CSPP_MOX IS NOT NULL OR
+         g.CSPP_ACE IS NOT NULL OR
+         g.CSPP_CAR IS NOT NULL OR
+         g.CSPP_PRE IS NOT NULL OR
+         g.CSPP_GLY IS NOT NULL OR
+         g.CSPP_MON IS NOT NULL OR
+         g.CSPP_HdN IS NOT NULL OR
+         g.CSPP_HBA IS NOT NULL OR
+         g.CSPP_PEN IS NOT NULL OR
+         g.CSPP_COU IS NOT NULL OR
+         g.CSPP_RHA IS NOT NULL OR
+         g.CSPP_HuN_C IS NOT NULL OR
+         g.CSPP_VAN IS NOT NULL OR
+         g.CSPP_HaN_C IS NOT NULL OR
+         g.CSPP_HEX IS NOT NULL OR
+         g.CSPP_DCA IS NOT NULL OR
+         g.CSPP_HUN IS NOT NULL OR
+         g.CSPP_URO IS NOT NULL OR
+         g.CSPP_FER IS NOT NULL OR
+         g.CSPP_GuN_C IS NOT NULL OR
+         g.CSPP_SYR IS NOT NULL OR
+         g.CSPP_GaN_C IS NOT NULL OR
+         g.CSPP_GUN IS NOT NULL OR
+         g.CSPP_SIN IS NOT NULL OR
+         g.CSPP_SuN_C IS NOT NULL OR
+         g.CSPP_SaN_C IS NOT NULL OR
+         g.CSPP_SUN IS NOT NULL
+        )
+  ORDER BY g.compound_id
+")
+```
+
+```{r}
+DBI::dbGetQuery(db_ft, "
+  SELECT g.*
+  FROM compound_add g
+  INNER JOIN ms_compound c 
+      ON g.compound_id = c.compound_id
+  WHERE c.expid = 266
+    AND (
+         g.GNPS IS NOT NULL 
+
+        )
+  ORDER BY g.compound_id
+")
+```
+
+
+```{r}
+MultExp_CSPP_SQL(ft_path, 
+                 startexp = 1, stopexp = 266, peakwidth = NULL, mzerr = 0.015,
+                             IntThres  = 100, cspp = cspp_ft)
+```
+
+
+
+
+```{r}
+ft_path <- here("data", "DYL_FLAX_FTMSneg.sqlite")
+db <- dbConnect(SQLite(), ft_path)
+dbGetQuery(db, "Select expid, compound_id from ms_compound 
+           where compound_id = 101290")
+```
+
+```{r}
+addit <- net.addit_SQL(sql_path = ft_path, exp.id = 229, nettype = "GNPS",
+                          nr_col = NULL,
+                          min = 100,
+                          thr1 = 2,
+                          thr2 = 0.02,
+                          thr3 = 0.3)
+
+Local.net_SQL(net.lst = addit, dbkey = 86228, nettype = "GNPS", nr_of_seq = 2)
+```
+```{r}
+quantile(edges.raw$ave.common, c(0.25, 0.5, 0.75))
+quantile(edges.raw$ave.dot, c(0.25, 0.5, 0.75))
+thr2 <- quantile(edges.raw$ave.common, 0.25)
+thr3 <- quantile(edges.raw$ave.dot, 0.25)
+```
+
+
+
+```{r}
+Overall.net_SQL(sql_path = ft_path, exp.id = 266, dbkey = 100988, min = 0,
+                            nr_of_seq = 2,
+                           thr1 = 1,
+                          thr2 = 0.3, 
+                          thr3 = 0.3)
+```
+
+
+```{r}
+Overall.net_SQL(sql_path = ft_path, exp.id = 266, dbkey = 100988, min = 0,
+                            nr_of_seq = 2,
+                           thr1 = 1,
+                          thr2 = 0.3, 
+                          thr3 = 0.3)
+```
+
+
+
+```{r}
+addit <- net.addit_SQL(sql_path = ft_path, exp.id = 266, nettype = "CSPP",
+                          nr_col = NULL,
+                    min = 0,
+                           thr1 = 1,
+                          thr2 = 0.3, 
+                          thr3 = 0.3)
+
+Local.net_SQL(net.lst = addit, dbkey = 100974, nettype = "CSPP", nr_of_seq = 2)
+```
+
+
+```{r}
+Overall.net_SQL(sql_path = ft_path, exp.id = 229, dbkey = 86228, min = 100,
+                            nr_of_seq = 1,
+                            thr1 = 1,
+                            thr2 = thr2,
+                            thr3 = thr3)
+```
+
+
+#get the corresponding aligned compounds of qtof data based on ftms compounds.
+```{r}
+#loading the txt file that contains the alignment results
+alignment_file <- here("data", "assoc_flax_63.txt")
+
+getAlignedCompids <- getAlignedCompids_SQL(
+compound_id = c(
+  100926, 100998, 100974, 100934, 101238, 100946, 101211, 100988, 101242, 
+  101097, 101141, 101019, 101147, 100991, 101098, 101296, 101154
+),
+  database_name = "DYL_FLAX_FTMSneg.sqlite",
+  alignment_file = alignment_file
+)
+print(getAlignedCompids)
+```
+
+#GNPS FTMS neg
+```{r}
+conv.GNPS_SQL(sql_path= ft_path, expid = 266,
+                          peakwidth = 0.2,
+                          mzerr = 0.015,
+                          min = 5,
+                          adduct = 46.0055,
+                          thr1 = 3,
+                          thr2 = 0.1,
+                          thr3 = 0.4,
+                          spectrum_type = "assembled", 
+                          IntThres = 0)
+```
+
+```{r}
+Overall.net_SQL(sql_path = ft_path, exp.id = 229, dbkey = 86228, min = 0,
+                            nr_of_seq = 1,
+                            thr1 = 3,
+                            thr2 = 0.1,
+                            thr3 = 0.4)
+```
+
+
+
+
+
+#QTOF neg Dynlib
+```{r}
+qt_path <- here("data", "DYL_FLAX_QTOFneg.sqlite")
+cspp_qt <- here("data","cspp_qtofneg.txt")
+# cspp.tot_SQL(qt_path, 52, mzerr = 0.15,
+#                          cspp = cspp_qt, peakwidth = NULL, IntThres  = 5)
+```
+
+```{r}
+qt_path <- here("data", "DYL_FLAX_QTOFneg.sqlite")
+dbq <- dbConnect(SQLite(), qt_path)
+dbGetQuery(dbq, "Select expid, compound_id from ms_compound 
+           where compound_id = 8600")
+```
+
+
+```{r}
+Overall.net_SQL(sql_path = qt_path, exp.id = 5, dbkey = 8600, min = 100,
+                            nr_of_seq = 2,
+                            thr1 = 1,
+                            thr2 = 0.1,
+                            thr3 = 0.2)
+```
+
+
+#QTOF pos Dynlib
+```{r}
+qtpos_path <- here("data", "DyLib_QTOF_pos.sqlite")
+cspp_qt <- here("data","cspp_qtofneg.txt")
+cspp.tot_SQL(qtpos_path, 52, mzerr = 0.15,
+                         cspp = cspp_qt, peakwidth = NULL, IntThres  = 5)
+```
+
+```{r}
+qtpos_path <- here("data", "DyLib_QTOF_pos.sqlite")
+dbq <- dbConnect(SQLite(), qtpos_path)
+dbGetQuery(dbq, "Select expid, compound_id from ms_compound 
+           where compound_id = 86000")
+```
+
+
+```{r}
+Overall.net_SQL(sql_path = qt_path, exp.id = 229, dbkey = 86600, min = 100,
+                            nr_of_seq = 2,
+                            thr1 = 1,
+                            thr2 = 0.1,
+                            thr3 = 0.2)
+```

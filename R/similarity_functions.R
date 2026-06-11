@@ -181,9 +181,9 @@ dynlibmatch2_map <- function(
     )
     
     idx_nl2 <- match(nl1, nl2)
-    valid_nl <- !is.na(idx_nl2)
+    valid_nl <- which(!is.na(idx_nl2))
     
-    if (any(valid_nl)) {
+    if (length(valid_nl) > 0) {
       
       matched1_nl <- cbind(
         mz = mz1[remaining1][valid_nl],

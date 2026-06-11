@@ -1,24 +1,43 @@
-CommonDotProd<-function(ac,bd){
-	y<-intersect(ac[,1],bd[,1])
-	if (length(y)==0){
-	 common.1<-0
-	 theta.1<-0
-	}else{
-	 zad<-length(y)+1
-	 v<-rep(0,length(y))
-	 w<-rep(0,length(y))
-	 i=1
-	 repeat{
-	  # sometimes multiple product ions might be present in a MS/MS spectrum
-	  # that have the same nominal mass: only the product ion with the highest
-	  # relative intensity is considered
-	  v[i]<-max(ac[which(ac[,1]==y[i]),2])
-	  w[i]<-max(bd[which(bd[,1]==y[i]),2])
-	  i=i+1
-	  if (i==zad) break
-	 }
-	 common.1<-length(y)
-	 theta.1<-sum(v*w)/(sqrt(sum(v*v))*sqrt(sum(w*w)))
-	}
-	return(list(common.1,theta.1))	
+CommonDotProd <- function(ac, bd, tol = 0.01) {
+  
+  # ac, bd must have columns: mz (or nloss), rint
+  
+  mz_a <- as.numeric(ac[[1]])
+  mz_b <- as.numeric(bd[[1]])
+  
+  matches <- which(abs(outer(mz_a, mz_b, "-")) <= tol, arr.ind = TRUE)
+  
+  # Ensure matches is always a matrix
+  if (is.null(dim(matches))) {
+    matches <- matrix(matches, ncol = 2)
+  }
+  
+  if (nrow(matches) == 0) {
+    return(list(0, 0))
+  }
+  
+  matched_pairs <- split(as.data.frame(matches), matches[,1])
+  
+  v <- numeric(length(matched_pairs))
+  w <- numeric(length(matched_pairs))
+  
+  i <- 1
+  for (idx in matched_pairs) {
+    
+    idx <- as.matrix(idx) 
+    
+    a_idx <- idx[1, 1]
+    b_idx <- idx[, 2]
+    
+    v[i] <- as.numeric(ac[a_idx, 2])
+    w[i] <- as.numeric(max(bd[b_idx, 2]))
+    
+    i <- i + 1
+  }
+  
+  common <- length(v)
+  
+  theta <- sum(v * w) / (sqrt(sum(v^2)) * sqrt(sum(w^2)))
+  
+  return(list(common, theta))
 }

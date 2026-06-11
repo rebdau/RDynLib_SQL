@@ -1,0 +1,84 @@
+---
+title: "SQL, Compdb, and spectra workflow"
+format:
+  html:
+    toc: true
+    self-contained: true
+author: "Ahlam Mentag, Rebecca Dauwe, Johannes Rainer"
+---
+
+## Shiny Documents
+
+This Quarto document is made to demonstrate how to convert an sql database to 
+a CompDB object and then to a spectra object.
+
+## Load required libraries
+
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+library(here)
+library(Spectra)
+library(CompoundDb)
+library(DBI)
+library(RSQLite)
+library(RDynLib)
+load_all()
+```
+#File paths to the input and output sql databases
+```{r}
+sql_db <- here("data", "DYL_FLAX_FTMSneg.sqlite")
+```
+
+#Convert SQl to a CompDb object
+```{r}
+cdb <- ExpCompDb(sql_db)
+```
+
+Print Compounds information
+```{r}
+cmp <- compounds(cdb)
+head(cmp)
+```
+
+```{r}
+tables(cdb)
+```
+
+The compound information of specific criterea:
+```{r}
+compounds(cdb, columns = c("compound_id", "name", "formula"),
+          filter = ~ name == "quercetin-hexoside-deoxyhexoside KA KM")
+```
+
+Print metadada information
+```{r}
+meta <- metadata(cdb)
+head(meta)
+```
+For more queries and details visit this workflow: https://www.bioconductor.org/packages//release/bioc/vignettes/CompoundDb/inst/doc/CompoundDb-usage.html
+
+
+#Convert the compDB object to a spectra object:
+```{r}
+sps <- Spectra(cdb)
+sps
+```
+Print spectra variables:
+```{r}
+spectraVariables(dy_sps)
+```
+
+Print specta Data:
+```{r}
+spectraData(dy_sps, columns = c("msLevel" , "retention_time", "precursorMz",
+                                "centroided","scanIndex", "dataOrigin", 
+                                "compound_id", "nodename" 
+                                ))
+```
+
+All the columns from the original SQL table are preserved and reported in 
+the spectraData of the converted specta object.
+
+

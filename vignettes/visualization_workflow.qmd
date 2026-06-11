@@ -1,0 +1,234 @@
+---
+title: "Integrated Workflow for Molecular Network Characterization, Spectral
+        Annotation, and Database Curation"
+format:
+  html:
+    toc: true
+    self-contained: true
+author: "Ahlam Mentag, Rebecca Dauwe, Johannes Rainer"
+---
+
+## Shiny Documents
+
+This Quarto document presents a workflow for the characterization and 
+visualization of molecular networks. It includes the analysis of known
+compounds detected in FT-MS data and their corresponding features in QTOF 
+datasets, as well as the visualization of ion trap–based and QTOF-based neutral
+loss analyses. The document further summarizes the results of CID spectral 
+matching, describes the annotation and incorporation of characterized molecules 
+into the database, and outlines the conversion of the global SQL database into
+an MGF format compatible with public repositories and analysis platforms 
+for further comparison with external public spectral databases.
+
+## Load required libraries
+
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+#' Load required libraries
+library(devtools)
+library(DBI)
+library(RSQLite)
+library(here)
+library(CompoundDb)
+library(MsBackendMgf)
+#rm(list = c("convert_compid_assoc"))
+#` Uploading RDynLib: Load all functions of the RDynlib directory
+load_all()
+```
+#FTMS flax negative
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+ft_path <- here("data", "DYL_FLAX_FTMSneg.sqlite")
+con <- dbConnect(RSQLite::SQLite(), ft_path)
+cspp_ft <- here("data","cspp_flax.txt")
+charge_file <- here("data", "ftms_all_compounds_RD.xlsx")
+```
+
+
+We start by the CID spectral matching of 101280 compound from ftms negative 
+database, To do that we need to convert tha database to a spectra object:
+```{r}
+dy_sps <- sql_to_spectra(ft_path)
+```
+
+
+```{r}
+cmp <- MultMatchCID_Spectra(
+  dy_sps,
+  101280,
+   spectrum_type_query = "not_assembled",
+  spectrum_type_target = "NA",
+   ms_level_query = 2,
+   ms_level_target = 2,
+  polarity_query = 0,
+  polarity_target = 0,
+  tolerance = 0,
+  ppm = 10,
+  minIons = ,
+    fragments_resolution = "unit.resolution",
+  requirePrecursor = T,
+)
+head(cmp, 5)
+```
+
+Then we update the cspp table:
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+cspp.tot_SQL(ft_path, 266, mzerr = 0.01,
+                         cspp = cspp_ft, peakwidth = 0.1, IntThres  = 0, mz_tol = 0.5,
+                         dot_thresh = 0, spectrum_type = "assembled",  
+                         min_common = 0, charge_file = charge_file)
+```
+
+Update the gnps table:
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+conv.GNPS_SQL(sql_path= ft_path, expid = 266, peakwidth = 0.2, mzerr = 0.015,
+              min = 5, adduct = 60.0211, thr1 = 2, thr2 = 0.1, thr3 = 0.3,
+              spectrum_type = "not_assembled", IntThres = 0)
+```
+
+Next we visualize the CSPP and GNPS network of 101280 compound from ftms neg:
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+#| #| dev: svg
+#| fig-width: 20
+#| fig-height: 15
+Overall.net_SQL(sql_path = ft_path, exp.id = 266, dbkey = 101280, min = 0,
+                nr_of_seq = 3, thr1 = 0.1, thr2 = 0.2, thr3 = 0.3)
+```
+
+Now we show the ion trap based analysis of 100988 compound:
+
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+#| #| dev: svg
+#| fig-width: 14
+#| fig-height: 8
+MSnplot_SQL(ft_path, 100988, thr_int = 100)
+```
+
+```{r}
+#| fig-width: 14
+#| fig-height: 4
+MSnplot_SQL(ft_path, 101155, thr_int = 100)
+```
+
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+#| #| dev: svg
+#| fig-width: 14
+#| fig-height: 8
+MSnplot_SQL(ft_path, 101283, thr_int = 100)
+```
+
+
+#Qtof flax analysis
+
+Import the database and required files:
+```{r}
+qt_path <- here("data", "DYL_FLAX_QTOFneg.sqlite")
+con_qt <- dbConnect(RSQLite::SQLite(), qt_path )
+neutral_loss_candid <- here("data", "neutral_loss_candid.txt")
+neutloss <- read.table(
+  neutral_loss_candid,
+  header = TRUE,
+  sep = "\t",
+  stringsAsFactors = FALSE
+)
+
+product_ion_candid <- here("data", "product_ion_candid_2.txt")
+prdion <- read.table(
+  product_ion_candid,
+  header = TRUE,
+  sep = "\t",
+  stringsAsFactors = FALSE
+)
+
+```
+
+
+The aligned compound in qtof data that corresponds to 100988 
+compound from ftms data:
+```{r}
+alignment_file <- here("data", "assoc_flax_63.txt")
+
+getAlignedCompids <- getAlignedCompids_SQL(
+compound_id = 100988,
+  database_name = "DYL_FLAX_FTMSneg.sqlite",
+  alignment_file = alignment_file
+)
+getAlignedCompids
+```
+The 45890 is the qtof compound_id that was aligned with 100988 ftms compound_id. 
+
+The msms_spectrum table linked to that compound_id to select the spectrum_id:
+```{r}
+list_spectrum <- get_spectrum_id(45890)
+list_spectrum
+```
+
+We chose the 46001 spectrum_id to show the qtof based neutral loss analysis:
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+#| #| dev: svg
+#| fig-width: 14
+#| fig-height: 8
+MSMSspecplot_SQL(qt_path, 46001, 
+                 prdion = prdion, neutloss = neutloss, err = NULL, 
+                 minum = NULL, nr_col = NULL,   nr_col2 = NULL)
+```
+
+Now we enter the characterization of the compounds found to the database:
+```{r}
+#EnterName_SQL(ft_path, CoMPID = 101143)
+```
+
+
+```{r}
+#EnterName_SQL(ft_path, CoMPID = 100988)
+```
+
+
+Next, we call the function to export the sql database to an mgf format that 
+could be used for further analysis and comparisons with public databases 
+available on public platforms like: GNPS...
+We start by converting ftms data
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+ft_assembled <- here("data", "ft_assembled.mgf")
+sql_to_mgf(ft_path, expid = 266, spectrum_type = "assembled", 
+           output_file = ft_assembled) 
+```
+
+Then, we convert qtof data:
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+qt_assembled <- here("data", "qt_assembled.mgf")
+sql_to_mgf(qt_path, expid = 52, spectrum_type = "intersect_single_energy", 
+           output_file = qt_assembled) 
+```
+
+
+
+

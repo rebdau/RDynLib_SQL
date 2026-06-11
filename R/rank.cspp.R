@@ -22,21 +22,54 @@
 # the conversion type allows to determine the column (indicated by conv.col) of
 # comp_app (and finally of compound_add.txt) to which the results need to be written. 
 
-rank.cspp<-function(cspp.df,conv.col,comp_add){
-	ave.cnt<-(cspp.df[,12]+cspp.df[,14])/2
-	ave.dot<-(cspp.df[,8]+cspp.df[,10])/2
-	cspp.df<-data.frame(cbind(cspp.df,ave.cnt,ave.dot))
-	cspp.df<-cspp.df[order(-cspp.df[,6],-cspp.df[,15],-cspp.df[,16]),]
-	while(dim(cspp.df)[1]!=0){
-	 compid.sub<-cspp.df[1,1]
-	 compid.prod<-cspp.df[1,4]
-	 cspp.name<-paste("!!",cspp.df[1,6],"!",
-				cspp.df[1,15],"!",cspp.df[1,16],
-				"!!",compid.prod,sep="")
-	 comp_add[compid.sub,conv.col]<-cspp.name
-	 res.prod<-which(cspp.df[,4]%in%compid.prod)
-	 res.sub<-which(cspp.df[,1]%in%compid.sub)
-	 cspp.df<-cspp.df[-sort(union(res.sub,res.prod)),]
-	}
-	return(comp_add)
+rank.cspp <- function(cspp.df, conv.col, comp_add) {
+  
+  if (is.null(cspp.df) || nrow(cspp.df) == 0) return(comp_add)
+  
+  cspp.df <- as.data.frame(cspp.df)
+  
+  # safety check
+  required <- c("COMPID.sub", "COMPID.prod",
+                "FORW_IONS", "REV_IONS",
+                "DOT_IONS", "DOT_LOSS",
+                "COMMON_IONS")
+  
+  if (!all(required %in% names(cspp.df))) {
+    stop("cspp.df missing required columns")
+  }
+  
+  cspp.df$ave.cnt <- (cspp.df$FORW_IONS + cspp.df$REV_IONS) / 2
+  cspp.df$ave.dot <- (cspp.df$DOT_IONS + cspp.df$DOT_LOSS) / 2
+  
+  cspp.df <- cspp.df[
+    order(-cspp.df$COMMON_IONS,
+          -cspp.df$ave.cnt,
+          -cspp.df$ave.dot),
+  ]
+  
+  rownames(comp_add) <- comp_add$compound_id
+  
+  while (nrow(cspp.df) > 0) {
+    
+    sub_id  <- cspp.df$COMPID.sub[1]
+    prod_id <- cspp.df$COMPID.prod[1]
+    
+    cspp.name <- paste0(
+      "!!", cspp.df$COMMON_IONS[1],
+      "!", cspp.df$ave.cnt[1],
+      "!", cspp.df$ave.dot[1],
+      "!!", prod_id
+    )
+    
+    comp_add[as.character(sub_id), conv.col] <- cspp.name
+    
+    rm_idx <- which(
+      cspp.df$COMPID.sub == sub_id |
+        cspp.df$COMPID.prod == prod_id
+    )
+    
+    cspp.df <- cspp.df[-rm_idx, , drop = FALSE]
+  }
+  
+  comp_add
 }

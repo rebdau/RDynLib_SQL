@@ -6,7 +6,7 @@
 #' @author Ahlam Mentag
 #' 
 #' @export
-MS2plot_SQL <- function(sql_path, dbkey, prcx = 0.7) {
+MS2plot_SQL <- function(sql_path, dbkey, prcx = 0.7, thr_int = 0) {
 
   
   con <- dbConnect(SQLite(), sql_path)
@@ -29,9 +29,9 @@ MS2plot_SQL <- function(sql_path, dbkey, prcx = 0.7) {
   peaks <- dbGetQuery(con, sprintf(
     "SELECT mz, intensity
    FROM msms_spectrum_peak
-   WHERE spectrum_id = %d
+   WHERE spectrum_id = %d and intensity >= %d
    ORDER BY mz",
-    spectrum_id
+    spectrum_id, thr_int
   ))
   
   if (nrow(peaks) == 0 || any(is.na(peaks$mz))) return()
