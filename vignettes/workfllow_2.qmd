@@ -12,6 +12,7 @@ author: "Ahlam Mentag, Rebecca Dauwe, Johannes Rainer"
 This Quarto document demonstrates
 (1) how to subset a DynLib SQL database by including certain experiments
 (2) how the DynLib infrastructure interoperates with the R for Mass Spectrometry ecosystem.
+(3) how to use RDynLib Accessors for Compound and Spectral Data
 
 # Load required libraries
 
@@ -48,7 +49,7 @@ We identify the expid of the experiment of interest: expid = ....
 filterDynLibDB(sql_db, expid=)
 ```
 
-#Convert a DynLib database to CompDb and Spectra objects
+# Convert a DynLib database to CompDb and Spectra objects
 Both `CompDb` and `Spectra` objects are part of the provide access to the R for Mass Spectrometry ecosystem. While `CompDb` offers a database-centric interface for querying and managing compound database content,`Spectra` provides a more spectrum-centric interface.
 
 ## CompDb object
@@ -96,9 +97,11 @@ spectraData(sps, columns = c("msLevel" , "retention_time", "precursorMz",
 
 All the columns from the original SQL table are preserved and reported in 
 the spectraData of the `Spectra` object.
+# Using RDynLib Accessors for Compound and Spectral Data
+#To facilitate retrieval of compound information in such cases,  \texttt{RDynLib} provides dedicated shortcut functions that exploit information available for all detected compounds. The  #\texttt{NodenameMass\_SQL()} function enables retrieval of compound records from a DynLib database based on a nodename, a complete or partial compound name, or a measured precursor m/z range within one or more #selected experiments, thereby providing the corresponding  \texttt{compound\_id} required for subsequent access to spectral data. The  \texttt{get\_spectrum\_id()} function retrieves the associated  #\texttt{spectrum\_id}(s) and spectral metadata from the  \texttt{msms\_spectrum} table, enabling extraction of the corresponding MS/MS or MS$^n$ spectra.
 
 # Retrieving a compound_id in a DynLib SQL database, using the `CompoundDb` package.
-
+# maybe not necessary
 Compound information can be extracted from a `CompDb` object using the `compounds()` function from the `CompoundDb` package. The resulting table corresponds to the `ms_compound` table in the SQL database and contains the compound identifier (compound_id), together with chromatographic information such as m/z and retention time, and structural annotation data, such as the compound name and molecular formula. By applying filters in the `compounds()` function, one can create a subsetted ms_compund table with compound identifiers (compound_id) of selected compounds corresponding to a defined value for `name` or `exactmass`.
 
 ```{r}
