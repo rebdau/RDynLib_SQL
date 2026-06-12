@@ -1,4 +1,4 @@
-#' @tiltle Load compound metadata from a SQLite database and association file
+#' @title Load compound metadata from a SQLite database and association file
 #'
 #' @description Files_TransferNames_SQL() function
 #' reads compound metadata from a SQLite database and prepares

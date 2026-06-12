@@ -1,5 +1,5 @@
 ---
-title: "SQL, Compdb, and spectra workflow"
+title: "SQL, Compdb, and Spectra workflow"
 format:
   html:
     toc: true
@@ -7,12 +7,13 @@ format:
 author: "Ahlam Mentag, Rebecca Dauwe, Johannes Rainer"
 ---
 
-## Shiny Documents
+# Shiny Documents
 
-This Quarto document is made to demonstrate how to convert an sql database to 
-a CompDB object and then to a spectra object.
+This Quarto document demonstrates
+(1) how to subset a DynLib SQL database by including certain experiments
+(2) how the DynLib infrastructure interoperates with the R for Mass Spectrometry ecosystem.
 
-## Load required libraries
+# Load required libraries
 
 ```{r}
 #| message: false
@@ -24,61 +25,122 @@ library(CompoundDb)
 library(DBI)
 library(RSQLite)
 library(RDynLib)
+library(devtools)
 load_all()
 ```
-#File paths to the input and output sql databases
+# Subset a DynLib SQL database
+The DynLib SQL database can archive many LC-MS experiments. The expid of each experiment can be retrieved in the experiment table. Here we filter an SQL database to contain only a single experiment experiment.
+
+COMMENT: we need to put an example dynlib database in the package, consisting of a subset of a published maize experiment and our new flax experiment
+
+## File paths to the input and output sql databases
+COMMENT: why output ?
 ```{r}
 sql_db <- here("data", "DYL_FLAX_FTMSneg.sqlite")
 ```
+## retrieve the expid
+COMMENT: put here SQL command to extract experiment table from the database
 
-#Convert SQl to a CompDb object
+We identify the expid of the experiment of interest: expid = ....
+
+## subsetting
+```{r}
+filterDynLibDB(sql_db, expid=)
+```
+
+#Convert a DynLib database to CompDb and Spectra objects
+Both `CompDb` and `Spectra` objects are part of the provide access to the R for Mass Spectrometry ecosystem. While `CompDb` offers a database-centric interface for querying and managing compound database content,`Spectra` provides a more spectrum-centric interface.
+
+## CompDb object
+We create a `CompDb` object `cdb` from the DynLib SQL database using the `ExpCOmpDb()` function from the `RDynLib` package. The resulting `CompDb` object represents the complete SQL database and provides access to all of its tables.
 ```{r}
 cdb <- ExpCompDb(sql_db)
-```
-
-Print Compounds information
-```{r}
-cmp <- compounds(cdb)
-head(cmp)
-```
-
-```{r}
-tables(cdb)
-```
-
-The compound information of specific criterea:
-```{r}
-compounds(cdb, columns = c("compound_id", "name", "formula"),
-          filter = ~ name == "quercetin-hexoside-deoxyhexoside KA KM")
-```
-
-Print metadada information
-```{r}
+# Print database metadada information
 meta <- metadata(cdb)
 head(meta)
+str(cdb)
 ```
-For more queries and details visit this workflow: https://www.bioconductor.org/packages//release/bioc/vignettes/CompoundDb/inst/doc/CompoundDb-usage.html
 
 
-#Convert the compDB object to a spectra object:
+## Spectra object
+A `CompDb` object can be converted into a `Spectra` object using the `Spectra()` function from the `Spectra` package. By default, the MzBackendCompDb backend is used, which keeps the spectra linked to the underlying compound database, allowing the entire database to be accessed through the resulting `Spectra` object.
+Alternatively, `RDynLib` provides a function to convert a DynLib SQL database directly into a Spectra object with MzBackendCompDb backend. 
+
 ```{r}
+# Using the Spectra package:
 sps <- Spectra(cdb)
 sps
+
+# Using the RDynLib package:
+sps.rdl <- sql_to_spectra(sql_db)
+
+str(sps)
+str(sps.rdl)
+
+
 ```
+The objects `sps` and `sps.rdl` are exactly the same `Spectra` objects.
+
 Print spectra variables:
 ```{r}
-spectraVariables(dy_sps)
+spectraVariables(sps)
 ```
 
-Print specta Data:
+Print spectra Data:
 ```{r}
-spectraData(dy_sps, columns = c("msLevel" , "retention_time", "precursorMz",
+spectraData(sps, columns = c("msLevel" , "retention_time", "precursorMz",
                                 "centroided","scanIndex", "dataOrigin", 
                                 "compound_id", "nodename" 
                                 ))
 ```
 
 All the columns from the original SQL table are preserved and reported in 
-the spectraData of the converted specta object.
+the spectraData of the `Spectra` object.
+
+# Retrieving a compound_id in a DynLib SQL database, using the `CompoundDb` package.
+
+Compound information can be extracted from a `CompDb` object using the `compounds()` function from the `CompoundDb` package. The resulting table corresponds to the `ms_compound` table in the SQL database and contains the compound identifier (compound_id), together with chromatographic information such as m/z and retention time, and structural annotation data, such as the compound name and molecular formula. By applying filters in the `compounds()` function, one can create a subsetted ms_compund table with compound identifiers (compound_id) of selected compounds corresponding to a defined value for `name` or `exactmass`.
+
+```{r}
+cmp <- compounds(cdb)
+head(cmp)
+```
+
+The compound information of specific criteria:
+```{r}
+supportedFilters(cdb)
+compounds(cdb, columns = c("compound_id", "name", "formula", "expid"),
+          filter = ~ name == "quercetin-hexoside-deoxyhexoside KA KM")
+
+```
+
+# Retrieving a spectrum of a specific compound from a DynLib SQL database, using the `CompoundDb` and `Spectra` packages.
+
+Spectral data can be accessed through a `Spectra` object. A spectrum can be retrieved by first filtering the `Spectra` object for a compound of interest using its `compound_id`. The corresponding spectrum identifiers (`spectrum_id`) (one or more may exist per compound_id) can then be extracted and used to select a specific spectrum. Finally, the fragment *m/z* and intensity values can be retrieved from the selected spectrum.
+
+Here we retrieve a spectrum for `compound_id ==2`.
+
+```{r}
+## Filter the Spectra object by compound_id
+## Retrieve spectrum_id corresponding to a compound_id.
+## Filter Spectra object based on spectrum_id.
+## Retrieve spectrum m/z intensity list.
+
+```
+
+
+
+
+COMMENT: This tables() command doesn't work for me:
+```{r}
+tables(cdb)
+```
+
+
+
+
+For more queries and details visit this workflow: https://www.bioconductor.org/packages//release/bioc/vignettes/CompoundDb/inst/doc/CompoundDb-usage.html
+
+
 
 

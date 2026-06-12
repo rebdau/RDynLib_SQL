@@ -63,7 +63,7 @@
 #' length(msn)
 #'
 #' @importFrom xcms featureSpectra
-#' @importFrom Spectra Spectra filterDataOrigin filterMsLevel spectra
+#' @import Spectra
 #' @importFrom S4Vectors findMatches
 #' @export
 ftms_all_levels <- function(ftms, ms2) {

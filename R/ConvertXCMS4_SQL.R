@@ -24,9 +24,9 @@
 #'
 #' @importFrom DBI dbDisconnect
 #'
-#' @importFrom Spectra
+#' @import Spectra
 #'
-#' @importFrom dplyr
+#' @import dplyr
 #'
 #' @author Ahlam Mentag
 #'
