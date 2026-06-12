@@ -1,7 +1,7 @@
-#' @title extracting the msms_spectrum table of a given compound_id  
+#' @title extracting the ms_compound table of a given compound_id  
 #'
 #' 
-#' @return the msms_spectrum table of a given compound_id 
+#' @return the ms_compound table of a given compound_id 
 #' 
 #' @import DBI
 #' @import RSQLite
@@ -10,9 +10,9 @@
 #' @author Ahlam Mentag
 #' 
 #' @export
-get_spectrum_id <- function(qt_path, compound_id){
+get_compound <- function(qt_path, compound_id){
   con_qt <- dbConnect(SQLite(), qt_path)
-  compound_id <- dbGetQuery(con_qt, sprintf("Select * from msms_spectrum 
+  compound_id <- dbGetQuery(con_qt, sprintf("Select * from ms_compound 
                                             where compound_id = %s", 
                                             compound_id))
 }

@@ -199,4 +199,9 @@ NodenameMass_SQL(
   nodename = "M299T356"
 )
 ```
+#Transfer names between the compounds that have been aligned in both sql databases
+```{r}
+dir <- here("data")
+SubDBNameTransfer_SQL(sqlite_dir = dir,  assoc_path = here("data","assoc_flax_63.txt") )
+```
 

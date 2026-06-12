@@ -1,5 +1,5 @@
 ---
-title: "SQL, Compdb, and Spectra workflow"
+title: "Integrating SQL in RDynlib workflow"
 format:
   html:
     toc: true
@@ -10,9 +10,10 @@ author: "Ahlam Mentag, Rebecca Dauwe, Johannes Rainer"
 # Shiny Documents
 
 This Quarto document demonstrates
-(1) how to subset a DynLib SQL database by including certain experiments
-(2) how the DynLib infrastructure interoperates with the R for Mass Spectrometry ecosystem.
-(3) how to use RDynLib Accessors for Compound and Spectral Data
+(1) how to subset a DynLib SQL database by including certain experiments.
+(2) how the DynLib infrastructure interoperates with the R for Mass Spectrometry
+    ecosystem.
+(3) how to use RDynLib Accessors for Compound and Spectral Data.
 
 # Load required libraries
 
@@ -25,35 +26,87 @@ library(Spectra)
 library(CompoundDb)
 library(DBI)
 library(RSQLite)
-library(RDynLib)
+#library(RDynLib)
 library(devtools)
 load_all()
 ```
 # Subset a DynLib SQL database
 The DynLib SQL database can archive many LC-MS experiments. The expid of each experiment can be retrieved in the experiment table. Here we filter an SQL database to contain only a single experiment experiment.
 
-COMMENT: we need to put an example dynlib database in the package, consisting of a subset of a published maize experiment and our new flax experiment
-
 ## File paths to the input and output sql databases
 COMMENT: why output ?
+Answer : is for storing the resulting sql database that contains just the selected experiment. 
 ```{r}
 sql_db <- here("data", "DYL_FLAX_FTMSneg.sqlite")
+output_db <- here("data", "subset.sqlite")
 ```
+
 ## retrieve the expid
-COMMENT: put here SQL command to extract experiment table from the database
 
-We identify the expid of the experiment of interest: expid = ....
-
-## subsetting
 ```{r}
-filterDynLibDB(sql_db, expid=)
+con <- dbConnect(RSQLite::SQLite(), sql_db)
+
+#Verify the experiment table
+dbGetQuery(con, "
+SELECT *
+FROM experiment LIMIT 5
+")
+```
+
+## Call the function to filter the database based on a single expid
+```{r}
+filterDynLibDB(
+  expid = 266,
+  input_db = sql_db,
+  output_db = output_db
+)
+```
+
+## Connection to the subseted database
+```{r}
+con_filter <- dbConnect(RSQLite::SQLite(), output_db)
+
+#Verify the experiment table
+dbGetQuery(con_filter , "
+SELECT *
+FROM experiment LIMIT 5
+")
+```
+
+## Print ms_compound table of the filtered database
+```{r}
+dbGetQuery(con_filter , "
+SELECT *
+FROM ms_compound LIMIT 5
+")
+```
+
+## filter the database based on a set of expids
+```{r}
+output_db2 <- here("data", "filter_set.sqlite")
+filterDynLibDB(
+    expid = c(5, 7, 12),
+    input_db = sql_db,
+    output_db = output_db2
+)
+```
+
+## Connection to the subseted database
+```{r}
+con_filter2 <- dbConnect(RSQLite::SQLite(), output_db2)
+
+#Verify the experiment table
+dbGetQuery(con_filter2 , "
+SELECT *
+FROM experiment
+")
 ```
 
 # Convert a DynLib database to CompDb and Spectra objects
 Both `CompDb` and `Spectra` objects are part of the provide access to the R for Mass Spectrometry ecosystem. While `CompDb` offers a database-centric interface for querying and managing compound database content,`Spectra` provides a more spectrum-centric interface.
 
 ## CompDb object
-We create a `CompDb` object `cdb` from the DynLib SQL database using the `ExpCOmpDb()` function from the `RDynLib` package. The resulting `CompDb` object represents the complete SQL database and provides access to all of its tables.
+We create a `CompDb` object `cdb` from the DynLib SQL database using the `ExpCompDb()` function from the `RDynLib` package. The resulting `CompDb` object represents the complete SQL database and provides access to all of its tables.
 ```{r}
 cdb <- ExpCompDb(sql_db)
 # Print database metadada information
@@ -62,6 +115,23 @@ head(meta)
 str(cdb)
 ```
 
+## Retrieving a compound_id in a DynLib SQL database, using the `CompoundDb` package.
+Compound information can be extracted from a `CompDb` object using the `compounds()` function from the `CompoundDb` package. The resulting table corresponds to the `ms_compound` table in the SQL database and contains the compound identifier (compound_id), together with chromatographic information such as m/z and retention time, and structural annotation data, such as the compound name and molecular formula. By applying filters in the `compounds()` function, one can create a subsetted ms_compund table with compound identifiers (compound_id) of selected compounds corresponding to a defined value for `name` or `exactmass`.
+
+```{r}
+cmp <- compounds(cdb)
+head(cmp)
+```
+
+The compound information of specific criteria:
+```{r}
+supportedFilters(cdb)
+compounds(cdb, columns = c("compound_id", "name", "formula", "expid"),
+          filter = ~ name == "quercetin-hexoside-deoxyhexoside KA KM")
+
+```
+
+For more queries and details visit this workflow: https://www.bioconductor.org/packages//release/bioc/vignettes/CompoundDb/inst/doc/CompoundDb-usage.html
 
 ## Spectra object
 A `CompDb` object can be converted into a `Spectra` object using the `Spectra()` function from the `Spectra` package. By default, the MzBackendCompDb backend is used, which keeps the spectra linked to the underlying compound database, allowing the entire database to be accessed through the resulting `Spectra` object.
@@ -97,53 +167,43 @@ spectraData(sps, columns = c("msLevel" , "retention_time", "precursorMz",
 
 All the columns from the original SQL table are preserved and reported in 
 the spectraData of the `Spectra` object.
-# Using RDynLib Accessors for Compound and Spectral Data
-#To facilitate retrieval of compound information in such cases,  \texttt{RDynLib} provides dedicated shortcut functions that exploit information available for all detected compounds. The  #\texttt{NodenameMass\_SQL()} function enables retrieval of compound records from a DynLib database based on a nodename, a complete or partial compound name, or a measured precursor m/z range within one or more #selected experiments, thereby providing the corresponding  \texttt{compound\_id} required for subsequent access to spectral data. The  \texttt{get\_spectrum\_id()} function retrieves the associated  #\texttt{spectrum\_id}(s) and spectral metadata from the  \texttt{msms\_spectrum} table, enabling extraction of the corresponding MS/MS or MS$^n$ spectra.
+# RDynLib Accessors for Compound and Spectral Data
+To facilitate retrieval of compound information in such cases,  \texttt{RDynLib} provides dedicated shortcut functions that exploit information available for all detected compounds. The  #\texttt{NodenameMass\_SQL()} function enables retrieval of compound records from a DynLib database based on a nodename, a complete or partial compound name, or a measured precursor m/z range within one or more #selected experiments, thereby providing the corresponding  \texttt{compound\_id} required for subsequent access to spectral data. The  \texttt{get\_spectrum\_id()} function retrieves the associated  \texttt{spectrum\_id}(s) and spectral metadata from the  \texttt{msms\_spectrum} table, enabling extraction of the corresponding MS/MS or MS$^n$ spectra.
 
-# Retrieving a compound_id in a DynLib SQL database, using the `CompoundDb` package.
-# maybe not necessary
-Compound information can be extracted from a `CompDb` object using the `compounds()` function from the `CompoundDb` package. The resulting table corresponds to the `ms_compound` table in the SQL database and contains the compound identifier (compound_id), together with chromatographic information such as m/z and retention time, and structural annotation data, such as the compound name and molecular formula. By applying filters in the `compounds()` function, one can create a subsetted ms_compund table with compound identifiers (compound_id) of selected compounds corresponding to a defined value for `name` or `exactmass`.
+testing the NodenameMass_SQL() function that extract the additional cololumns 
+and rows from ms_compound table of a given experiment, precursor_mz or name 
+or nodename.
 
+Here we test using expid and precursor mz within a mass range:
 ```{r}
-cmp <- compounds(cdb)
-head(cmp)
+FT_path <- here("data", "DYL_FLAX_FTMSneg.sqlite")
+
+NodenameMass_SQL(
+  sql_path = sql_db,
+  expid = 1,
+  mass_measured = 537.1976,
+  mass_range = 0.02
+)
 ```
 
-The compound information of specific criteria:
+Here we test using expid and a part of the name of the compounds we want to show:
 ```{r}
-supportedFilters(cdb)
-compounds(cdb, columns = c("compound_id", "name", "formula", "expid"),
-          filter = ~ name == "quercetin-hexoside-deoxyhexoside KA KM")
-
+res <-NodenameMass_SQL(
+  sql_path = sql_db,
+  expid = 1,
+  name = "hexoside"
+)
+head(res,3)
 ```
 
-# Retrieving a spectrum of a specific compound from a DynLib SQL database, using the `CompoundDb` and `Spectra` packages.
-
-Spectral data can be accessed through a `Spectra` object. A spectrum can be retrieved by first filtering the `Spectra` object for a compound of interest using its `compound_id`. The corresponding spectrum identifiers (`spectrum_id`) (one or more may exist per compound_id) can then be extracted and used to select a specific spectrum. Finally, the fragment *m/z* and intensity values can be retrieved from the selected spectrum.
-
-Here we retrieve a spectrum for `compound_id ==2`.
-
+show the msms_spectrum table of a given compound_id
 ```{r}
-## Filter the Spectra object by compound_id
-## Retrieve spectrum_id corresponding to a compound_id.
-## Filter Spectra object based on spectrum_id.
-## Retrieve spectrum m/z intensity list.
-
+sp_id <- get_spectrum_id(qt_path = sql_db, compound_id = 101280 )
+sp_id
 ```
 
-
-
-
-COMMENT: This tables() command doesn't work for me:
+Retreive the ms_compound table of a given compound_id
 ```{r}
-tables(cdb)
+compound <- get_compound(qt_path = sql_db, compound_id = 101280)
+compound
 ```
-
-
-
-
-For more queries and details visit this workflow: https://www.bioconductor.org/packages//release/bioc/vignettes/CompoundDb/inst/doc/CompoundDb-usage.html
-
-
-
-

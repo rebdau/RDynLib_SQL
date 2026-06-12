@@ -25,9 +25,10 @@
 #' 
 #' @export
 Files_TransferNames_SQL <- function(sqlite_dir, assoc_path) {
-
   
-  # Read association file
+  library(DBI)
+  library(RSQLite)
+  
   Assoc <- read.table(
     assoc_path,
     header = TRUE,
@@ -35,49 +36,57 @@ Files_TransferNames_SQL <- function(sqlite_dir, assoc_path) {
     stringsAsFactors = FALSE
   )
   
-  ref_db    <- unique(Assoc$ref_database)
+  ref_db <- unique(Assoc$ref_database)
   target_db <- unique(Assoc$target_database)
   
   if (length(ref_db) != 1 || length(target_db) != 1) {
-    stop("Association file must contain exactly one ref and one target database")
+    stop(
+      "Association file must contain exactly one ref_database and one target_database"
+    )
   }
   
-  ref_db    <- ref_db[1]
+  ref_db <- ref_db[1]
   target_db <- target_db[1]
   
-  # Helper function that connects to the correct database
   read_compounds <- function(db_name) {
     
-    sqlite_path <- file.path(sqlite_dir, paste0(db_name, ".sqlite"))
+    sqlite_path <- file.path(sqlite_dir, db_name)
+    
+    cat("Opening:", sqlite_path, "\n")
     
     if (!file.exists(sqlite_path)) {
       stop(paste("Database file not found:", sqlite_path))
     }
     
-    con <- dbConnect(SQLite(), sqlite_path)
+    con <- dbConnect(
+      RSQLite::SQLite(),
+      sqlite_path
+    )
+    
     on.exit(dbDisconnect(con), add = TRUE)
     
     df <- dbGetQuery(
       con,
-      "SELECT compound_id, name, subsid, smiles FROM ms_compound"
+      "SELECT compound_id, name, subsid, smiles
+       FROM ms_compound"
     )
     
     df[] <- lapply(df, as.character)
+    
     df$name[is.na(df$name)] <- "NULL"
     
     df
   }
   
-  # Load both databases
   ftng <- read_compounds(ref_db)
   ftps <- read_compounds(target_db)
   
   syn <- unique(rbind(ftng, ftps))
   
-  return(list(
+  list(
     ftng = ftng,
     ftps = ftps,
-    syn  = syn,
+    syn = syn,
     Assoc = Assoc
-  ))
+  )
 }

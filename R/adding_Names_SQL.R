@@ -101,3 +101,4 @@ adding_Names_SQL <- function(con_merged, sim_table) {
   
   invisible(nrow(sim_compound))
 }
+ 
