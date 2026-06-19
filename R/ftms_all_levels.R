@@ -89,5 +89,5 @@ ftms_all_levels <- function(ftms, ms2) {
     # Combine spectra for this origin
     c(ms2_subset, ms3_filtered, ms4_filtered)
   })
-  do.call(c, res)
+  do.call("c", res)
 }

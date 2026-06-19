@@ -38,147 +38,139 @@ filterDynLibDB <- function(expid,
     }
   }
   
-  con_in <- DBI::dbConnect(RSQLite::SQLite(), input_db)
-  con_out <- DBI::dbConnect(RSQLite::SQLite(), output_db)
+  ## Copy the entire database first
+  file.copy(input_db, output_db, overwrite = overwrite)
   
-  on.exit({
-    DBI::dbDisconnect(con_in)
-    DBI::dbDisconnect(con_out)
-  })
+  con <- DBI::dbConnect(RSQLite::SQLite(), output_db)
+  
+  on.exit(DBI::dbDisconnect(con))
   
   expid_sql <- paste(expid, collapse = ",")
   
-  ## experiment
-  experiment <- DBI::dbGetQuery(
-    con_in,
+  ## Verify requested experiments exist
+  existing <- DBI::dbGetQuery(
+    con,
     sprintf(
-      "SELECT * FROM experiment WHERE expid IN (%s)",
+      "SELECT expid FROM experiment WHERE expid IN (%s)",
       expid_sql
     )
   )
   
-  if (!nrow(experiment))
+  if (!nrow(existing))
     stop("None of the provided expid values were found.")
   
-  DBI::dbWriteTable(
-    con_out,
-    "experiment",
-    experiment,
-    row.names = FALSE
-  )
-  
-  ## ms_compound
-  compounds <- DBI::dbGetQuery(
-    con_in,
+  ## Get compound IDs to keep
+  compounds_keep <- DBI::dbGetQuery(
+    con,
     sprintf(
-      "SELECT * FROM ms_compound WHERE expid IN (%s)",
+      "SELECT DISTINCT compound_id
+             FROM ms_compound
+             WHERE expid IN (%s)",
       expid_sql
     )
   )
   
-  if (!nrow(compounds)) {
-    compounds <- DBI::dbGetQuery(
-      con_in,
-      "SELECT * FROM ms_compound WHERE 1 = 0"
-    )
-  }
+  compound_ids <- compounds_keep$compound_id
   
-  DBI::dbWriteTable(
-    con_out,
-    "ms_compound",
-    compounds,
-    row.names = FALSE
-  )
-  
-  compound_ids <- unique(compounds$compound_id)
-  
-  ## Feature_matrix
-  feature_matrix <- DBI::dbGetQuery(
-    con_in,
-    sprintf(
-      "SELECT * FROM Feature_matrix WHERE expid IN (%s)",
-      expid_sql
-    )
-  )
-  
-  if (!nrow(feature_matrix)) {
-    feature_matrix <- DBI::dbGetQuery(
-      con_in,
-      "SELECT * FROM Feature_matrix WHERE 1 = 0"
-    )
-  }
-  
-  DBI::dbWriteTable(
-    con_out,
-    "Feature_matrix",
-    feature_matrix,
-    row.names = FALSE
-  )
-  
-  ## msms_spectrum
+  ## Get spectrum IDs to keep
   if (length(compound_ids)) {
     
     compound_ids_sql <- paste(compound_ids, collapse = ",")
     
-    spectra <- DBI::dbGetQuery(
-      con_in,
+    spectra_keep <- DBI::dbGetQuery(
+      con,
       sprintf(
-        paste0(
-          "SELECT * FROM msms_spectrum ",
-          "WHERE compound_id IN (%s)"
-        ),
+        "SELECT DISTINCT spectrum_id
+                 FROM msms_spectrum
+                 WHERE compound_id IN (%s)",
+        compound_ids_sql
+      )
+    )
+    
+    spectrum_ids <- spectra_keep$spectrum_id
+    
+  } else {
+    
+    spectrum_ids <- integer()
+  }
+  
+  ## Remove unwanted experiment rows
+  DBI::dbExecute(
+    con,
+    sprintf(
+      "DELETE FROM experiment
+             WHERE expid NOT IN (%s)",
+      expid_sql
+    )
+  )
+  
+  ## Remove unwanted compounds
+  DBI::dbExecute(
+    con,
+    sprintf(
+      "DELETE FROM ms_compound
+             WHERE expid NOT IN (%s)",
+      expid_sql
+    )
+  )
+  
+  ## Remove unwanted feature matrix rows
+  fm_table <- if ("feature_matrix" %in% DBI::dbListTables(con))
+    "feature_matrix"
+  else
+    "Feature_matrix"
+  
+  DBI::dbExecute(
+    con,
+    sprintf(
+      "DELETE FROM %s
+             WHERE expid NOT IN (%s)",
+      fm_table,
+      expid_sql
+    )
+  )
+  
+  ## Remove unwanted spectra
+  if (length(compound_ids)) {
+    
+    DBI::dbExecute(
+      con,
+      sprintf(
+        "DELETE FROM msms_spectrum
+                 WHERE compound_id NOT IN (%s)",
         compound_ids_sql
       )
     )
     
   } else {
     
-    spectra <- DBI::dbGetQuery(
-      con_in,
-      "SELECT * FROM msms_spectrum WHERE 1 = 0"
+    DBI::dbExecute(
+      con,
+      "DELETE FROM msms_spectrum"
     )
   }
   
-  DBI::dbWriteTable(
-    con_out,
-    "msms_spectrum",
-    spectra,
-    row.names = FALSE
-  )
-  
-  ## msms_spectrum_peak
-  if (nrow(spectra)) {
+  ## Remove unwanted peaks
+  if (length(spectrum_ids)) {
     
-    spectrum_ids_sql <- paste(
-      unique(spectra$spectrum_id),
-      collapse = ","
-    )
+    spectrum_ids_sql <- paste(spectrum_ids, collapse = ",")
     
-    peaks <- DBI::dbGetQuery(
-      con_in,
+    DBI::dbExecute(
+      con,
       sprintf(
-        paste0(
-          "SELECT * FROM msms_spectrum_peak ",
-          "WHERE Spectrum_id IN (%s)"
-        ),
+        "DELETE FROM msms_spectrum_peak
+                 WHERE Spectrum_id NOT IN (%s)",
         spectrum_ids_sql
       )
     )
     
   } else {
     
-    peaks <- DBI::dbGetQuery(
-      con_in,
-      "SELECT * FROM msms_spectrum_peak WHERE 1 = 0"
+    DBI::dbExecute(
+      con,
+      "DELETE FROM msms_spectrum_peak"
     )
   }
-  
-  DBI::dbWriteTable(
-    con_out,
-    "msms_spectrum_peak",
-    peaks,
-    row.names = FALSE
-  )
   
   invisible(output_db)
 }

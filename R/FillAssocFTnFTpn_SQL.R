@@ -76,42 +76,83 @@
 #'
 #' @export
 FillAssocFTnFTpn_SQL <- function(
-    FTn_con, FTp_con, Assoc, FTn_expnr, FTp_expnr, cutoff = 1, rg = rg,
-    lc.err, err, minIon, polarity_ftn = 0, polarity_ftp = 1, FTn_path, FTp_path)
-  {
+    FTn_con,
+    FTp_con,
+    Assoc = NULL,
+    FTn_expnr,
+    FTp_expnr,
+    cutoff = 1,
+    rg,
+    lc.err,
+    err,
+    minIon,
+    polarity_ftn = 0,
+    polarity_ftp = 1,
+    FTn_path,
+    FTp_path
+) {
   
-  # Load FT and QTOF compounds
+  
+  if (is.null(Assoc)) {
+    Assoc <- data.frame(
+      ref_compid = integer(0),
+      target_compid = integer(0),
+      ref_database = character(0),
+      target_database = character(0),
+      stringsAsFactors = FALSE
+    )
+  }
+  
+  
   ftn.exp <- dbGetQuery(FTn_con, sprintf(
     "SELECT retention_time, mass_measured, compound_id, expid 
-     FROM ms_compound WHERE expid = %d", FTn_expnr))
+     FROM ms_compound WHERE expid = %d", FTn_expnr
+  ))
   
   ftp.exp <- dbGetQuery(FTp_con, sprintf(
-    "SELECT retention_time , mass_measured, compound_id, expid 
-     FROM ms_compound WHERE expid = %d", FTp_expnr))
+    "SELECT retention_time, mass_measured, compound_id, expid 
+     FROM ms_compound WHERE expid = %d", FTp_expnr
+  ))
   
-  o <- order(ftn.exp$mass_measured)
-  ftng.o <- ftn.exp[o, ]
-  o <- order(ftp.exp$mass_measured)
-  ftps.o <- ftp.exp[o, ]
+  if (nrow(ftn.exp) == 0 || nrow(ftp.exp) == 0) {
+    warning("Empty compound tables")
+    return(Assoc)
+  }
   
-  i <- 1
-  repeat {
+  ftng.o <- ftn.exp[order(ftn.exp$mass_measured), ]
+  ftps.o <- ftp.exp[order(ftp.exp$mass_measured), ]
+  
+  
+  ref_db <- FTn_path
+  tgt_db <- FTp_path
+  
+  for (i in seq_len(nrow(ftng.o))) {
+    
     mass.ftng <- ftng.o$mass_measured[i]
     time.ftng <- ftng.o$retention_time[i]
     COMPID.ftng <- ftng.o$compound_id[i]
     
-    pres <- Find_pos_compound(mass.ftng, time.ftng, ftps.o, err, lc.err, rg)
+    pres <- Find_pos_compound(
+      mass.ftng,
+      time.ftng,
+      ftps.o,
+      err,
+      lc.err,
+      rg
+    )
     
-    if (nrow(pres) == 0) {
-      if (i == nrow(ftng.o)) break
-      i <- i + 1
-      next
-    } else {
-      Assoc <- Sort_comp_matches(pres, Assoc, time.ftng, COMPID.ftng, rg)
-    }
+    if (is.null(pres) || nrow(pres) == 0) next
+    if (ncol(pres) < 3) next
     
-    if (i == nrow(ftng.o)) break
-    i <- i + 1
+    new_row <- data.frame(
+      ref_compid = COMPID.ftng,
+      target_compid = pres[1, 3],
+      ref_database = ref_db,
+      target_database = tgt_db,
+      stringsAsFactors = FALSE
+    )
+    
+    Assoc <- rbind(Assoc, new_row)
   }
   
   return(Assoc)

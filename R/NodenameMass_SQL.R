@@ -28,7 +28,7 @@
 #' @author Ahlam Mentag
 #' 
 #' @export
-NodenameMass_SQL <- function(sql_path, expid,
+NodenameMass_SQL <- function(sql_path, expid = NULL,
                              nodename = NULL,
                              name = NULL,
                              mass_measured = NULL,
@@ -36,60 +36,47 @@ NodenameMass_SQL <- function(sql_path, expid,
                              mass_range = 0.02,
                              rt_range = 1) {
   
-  # Create connection
   con <- DBI::dbConnect(RSQLite::SQLite(), sql_path)
-  
   on.exit(DBI::dbDisconnect(con), add = TRUE)
   
+  base_query <- "SELECT * FROM ms_compound"
+  
+  conditions <- c()
+  params <- list()
+  
+  # Optional expid filter
+  if (!is.null(expid)) {
+    conditions <- c(conditions, "expid = ?")
+    params <- c(params, expid)
+  }
+  
+  # Priority logic (same as your original structure)
   if (!is.null(nodename)) {
-    query <- "
-    SELECT *
-    FROM ms_compound
-    WHERE expid = ?
-    AND nodename = ?
-    "
+    conditions <- c(conditions, "nodename = ?")
+    params <- c(params, nodename)
     
-    return(DBI::dbGetQuery(con, query, params = list(expid, nodename)))
-  }
-  
-  if (!is.null(name)) {
-    query <- "
-    SELECT *
-    FROM ms_compound
-    WHERE expid = ?
-    AND name LIKE ?
-    "
+  } else if (!is.null(name)) {
+    conditions <- c(conditions, "name LIKE ?")
+    params <- c(params, paste0("%", name, "%"))
     
-    return(DBI::dbGetQuery(con, query,
-                           params = list(expid, paste0('%', name, '%'))))
-  }
-  
-  if (!is.null(mass_measured)) {
-    query <- "
-    SELECT *
-    FROM ms_compound
-    WHERE expid = ?
-    AND mass_measured BETWEEN ? AND ?
-    "
+  } else if (!is.null(mass_measured)) {
+    conditions <- c(conditions, "mass_measured BETWEEN ? AND ?")
+    params <- c(params, mass_measured - mass_range,
+                mass_measured + mass_range)
     
-    return(DBI::dbGetQuery(con, query,
-                           params = list(expid, mass_measured - mass_range, 
-                                         mass_measured + mass_range)))
-  }
-  
-  if (!is.null(rt)) {
-    
+  } else if (!is.null(rt)) {
     cat("the retention time should be in minutes\n")
     
-    query <- "
-    SELECT *
-    FROM ms_compound
-    WHERE expid = ?
-    AND retention_time BETWEEN ? AND ?
-    "
-    
-    return(DBI::dbGetQuery(con, query,
-                           params = list(expid, rt - rt_range, rt + rt_range)))
+    conditions <- c(conditions, "retention_time BETWEEN ? AND ?")
+    params <- c(params, rt - rt_range, rt + rt_range)
   }
   
+  # Build final query
+  if (length(conditions) > 0) {
+    query <- paste(base_query, "WHERE", paste(conditions, collapse = " AND "))
+  } else {
+    query <- base_query
+  }
+  
+  DBI::dbGetQuery(con, query, params = params)
 }

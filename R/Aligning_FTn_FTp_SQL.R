@@ -91,10 +91,18 @@
 #' @export
 Aligning_FTn_FTp_SQL <- function(
     FTn_path, FTp_path, FTn_expnr, FTp_expnr,
-    Assoc = NULL, err = 0.02, t.ini = 5,
-    lc.err = 1, rng = 2, minIon = 0.01, minPeaks = 0.6, startpoint = 1,
-    save_assoc = FALSE) {
+    Assoc = NULL,
+    err = 0.02,
+    t.ini = 5,
+    lc.err = 1,
+    rng = 2,
+    minIon = 0.01,
+    minPeaks = 0.6,
+    startpoint = 1,
+    save_assoc = FALSE
+) {
   
+  # Load / init Assoc
   if (is.character(Assoc)) {
     
     assoc_file <- Assoc
@@ -107,69 +115,108 @@ Aligning_FTn_FTp_SQL <- function(
         ref_compid = integer(0),
         target_compid = integer(0),
         ref_database = character(0),
-        target_database = character(0),
-        stringsAsFactors = FALSE
+        target_database = character(0)
       )
     }
     
   } else if (is.data.frame(Assoc)) {
-    
     Assoc_df <- Assoc
     assoc_file <- NULL
     
   } else {
-    
     Assoc_df <- data.frame(
       ref_compid = integer(0),
       target_compid = integer(0),
       ref_database = character(0),
-      target_database = character(0),
-      stringsAsFactors = FALSE
+      target_database = character(0)
     )
     assoc_file <- NULL
   }
   
+  # DB connection
+  FTn_con <- dbConnect(RSQLite::SQLite(), FTn_path)
+  FTp_con <- dbConnect(RSQLite::SQLite(), FTp_path)
   
-  FTn_con   <- dbConnect(SQLite(), FTn_path)
-  FTp_con <- dbConnect(SQLite(), FTp_path)
-  on.exit(dbDisconnect(FTn_con))
-  on.exit(dbDisconnect(FTp_con))
+  on.exit({
+    dbDisconnect(FTn_con)
+    dbDisconnect(FTp_con)
+  }, add = TRUE)
   
-  #Detect polarity
-  ftn_mode  <- dbGetQuery(FTn_con, sprintf("SELECT mode FROM experiment WHERE expid = %d", FTn_expnr))$mode
-  ftp_mode <- dbGetQuery(FTp_con, sprintf("SELECT mode FROM experiment WHERE expid = %d", FTp_expnr))$mode
   
-  if (!length(ftn_mode))
-    stop("Experiment '", FT_expnr,"' not found in the database '", FTn_path, "'")
-  if (!length(ftp_mode))
-    stop("Experiment '", QTOF_expnr,"' not found in the database '", FTp_path, "'")
+  # DB names 
+  ftn_db_name <- basename(FTn_path)
+  ftp_db_name <- basename(FTp_path)
   
-  polarity_ftn  <- ifelse(ft_mode == "neg", 0, 1)
-  polarity_ftp <- ifelse(qtof_mode == "neg", 0, 1)
+  # Experiment mode
+  ftn_mode <- dbGetQuery(
+    FTn_con,
+    sprintf("SELECT mode FROM experiment WHERE expid = %d", FTn_expnr)
+  )$mode
   
-  #Generate LCal and remove outliers
-  LCal <- Aligning_General_SQL(FT_con = FTn_con, QTOF_con = FTp_con, 
-                               FT_expnr = FTn_expnr, QTOF_expnr= FTp_expnr, err,
-                               t.ini)
-  LCal <- matchNegPos_SQL(LCal, FT_con = FTn_con, QTOF_con = FTp_con, 
-                         minPeaks = minPeaks, polarity_ftn = polarity_ftn,
-                         polarity_ftp = polarity_ftp)
+  ftp_mode <- dbGetQuery(
+    FTp_con,
+    sprintf("SELECT mode FROM experiment WHERE expid = %d", FTp_expnr)
+  )$mode
+  
+  if (!length(ftn_mode)) stop("FTn experiment not found")
+  if (!length(ftp_mode)) stop("FTp experiment not found")
+  
+  polarity_ftn <- ifelse(ftn_mode == "neg", 0, 1)
+  polarity_ftp <- ifelse(ftp_mode == "neg", 0, 1)
+  
+  
+  # Alignment
+  LCal <- Aligning_General_SQL(
+    FT_con = FTn_con,
+    QTOF_con = FTp_con,
+    FT_expnr = FTn_expnr,
+    QTOF_expnr = FTp_expnr,
+    err,
+    t.ini
+  )
+  
+  LCal <- matchNegPos_SQL(
+    LCal = LCal,
+    FTn_con = FTn_con,
+    FTp_con = FTp_con,
+    polarity_ftn = polarity_ftn,
+    polarity_ftp = polarity_ftp,
+    minIon = minIon
+  )
+  
   LCal <- RemoveOutliers(LCal, rng)
   
-  #Regression
   rg <- RegressionPie_LCalign_SQL(LCal, startpoint)
   PlotPie_LCalign(LCal, rg)
-  #Fill Assoc
-  Assoc_df <- FillAssocFTnFTpn_SQL(
-    FTn_con = FTn_con, FTp_con = FTp_con, Assoc = Assoc_df, FTn_expnr = FTn_expnr,
-    FTp_expnr = FTp_expnr, cutoff = 1, rg = rg, lc.err = lc.err, err = err,
-    minIon = minIon,
-    polarity_ftn = polarity_ftn, polarity_ftp = polarity_ftp,
-    FTn_path = FTn_path, FTp_path = FTp_path)
   
-  #Save updated Assoc if requested
+  
+  # Fill associations
+  Assoc_df <- FillAssocFTnFTpn_SQL(
+    FTn_con = FTn_con,
+    FTp_con = FTp_con,
+    Assoc = Assoc_df,
+    FTn_expnr = FTn_expnr,
+    FTp_expnr = FTp_expnr,
+    cutoff = 1,
+    rg = rg,
+    lc.err = lc.err,
+    err = err,
+    minIon = minIon,
+    polarity_ftn = polarity_ftn,
+    polarity_ftp = polarity_ftp,
+    FTn_path = ftn_db_name,
+    FTp_path = ftp_db_name
+  )
+  
+  
   if (save_assoc && !is.null(assoc_file)) {
-    write.table(Assoc_df, file = assoc_file, sep = "\t", row.names = FALSE, quote = FALSE)
+    write.table(
+      Assoc_df,
+      file = assoc_file,
+      sep = "\t",
+      row.names = FALSE,
+      quote = FALSE
+    )
   }
   
   return(Assoc_df)

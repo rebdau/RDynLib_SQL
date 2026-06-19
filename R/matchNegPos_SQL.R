@@ -37,87 +37,71 @@ matchNegPos_SQL <- function(
     FTp_con,
     polarity_ftn = 0,
     polarity_ftp = 1,
-    minPeaks = 0.2
+    minIon = 0.2,
+    tol = 0.01
 ) {
   
-  ## Load negative-mode compound table
-  subdb_neg <- dbGetQuery(
-    FTn_con,
-    "SELECT retention_time, mass_measured, compound_id
-     FROM ms_compound ORDER BY compound_id"
-  )
-  
-
-  ## Load negative-mode MS2 peaks
-  neg_cols <- dbListFields(FTn_con, "msms_spectrum")
   
   
   ms2_neg_df <- dbGetQuery(FTn_con, sprintf("
     SELECT s.compound_id, p.mz
     FROM msms_spectrum s
-      JOIN msms_spectrum_peak p USING(spectrum_id)
+    JOIN msms_spectrum_peak p USING(spectrum_id)
     WHERE s.ms_level = 2
       AND s.polarity = %d
-    ORDER BY s.compound_id, p.mz
   ", polarity_ftn))
   
-  ms2_neg_list <- split(round(ms2_neg_df$mz), ms2_neg_df$compound_id)
-  ms2_neg_list <- lapply(ms2_neg_list, unique)
   
-  ## Load positive-mode MS2 peaks
-  pos_cols <- dbListFields(FTp_con, "msms_spectrum")
-
   
   ms2_pos_df <- dbGetQuery(FTp_con, sprintf("
     SELECT s.compound_id, p.mz
     FROM msms_spectrum s
-      JOIN msms_spectrum_peak p USING(spectrum_id)
+    JOIN msms_spectrum_peak p USING(spectrum_id)
     WHERE s.ms_level = 2
       AND s.polarity = %d
-    ORDER BY s.compound_id, p.mz
   ", polarity_ftp))
   
-  ms2_pos_list <- split(round(ms2_pos_df$mz), ms2_pos_df$compound_id)
-  ms2_pos_list <- lapply(ms2_pos_list, unique)
   
-  ## Align negative MS2 list to compound table
-  ms2_neg <- ms2_neg_list[ as.character(subdb_neg$compound_id) ]
-  ms2_neg[sapply(ms2_neg, is.null)] <- list(integer(0))
   
-  ## Replace NULL in positive MS2 list with empty vectors
-  ms2_pos_list[sapply(ms2_pos_list, is.null)] <- list(integer(0))
+  ms2_neg <- split(ms2_neg_df$mz, ms2_neg_df$compound_id)
+  ms2_pos <- split(ms2_pos_df$mz, ms2_pos_df$compound_id)
   
-
-  ## Apply peak-overlap filtering
-  if (is.null(LCal) || nrow(LCal) == 0) {
-    message("No candidate neg–pos alignments found; returning empty LCal.")
-    return(LCal)
-  }
+  
+  
+  if (is.null(LCal) || nrow(LCal) == 0) return(LCal)
   
   i <- 1
+  
+  
+  
   while (i <= nrow(LCal)) {
     
-    neg_id <- LCal[i, 1]   # FT negative COMPID
-    pos_id <- LCal[i, 7]   # FT positive COMPID
+    neg_id <- LCal[i, 1]
+    pos_id <- LCal[i, 7]
     
-    neg_row <- which(subdb_neg$compound_id == neg_id)
+    neg_peaks <- ms2_neg[[as.character(neg_id)]]
+    pos_peaks <- ms2_pos[[as.character(pos_id)]]
     
-    ## Remove pair if negative COMPID not found
-    if (length(neg_row) == 0) {
-      LCal <- LCal[-i, ]
-      next
-    }
-    neg_peaks <- ms2_neg[[neg_row]]
-    pos_peaks <- ms2_pos_list[[as.character(pos_id)]]
-    if (length(neg_peaks) == 0 || length(pos_peaks) == 0) {
+    # remove empty spectra
+    if (is.null(neg_peaks) || is.null(pos_peaks)) {
       LCal <- LCal[-i, ]
       next
     }
     
-    pos_corrected <- pos_peaks - 2
-    same_ion <- sum(neg_peaks %in% pos_corrected)
     
-    if (same_ion / length(neg_peaks) < minPeaks) {
+     pos_peaks <- pos_peaks - 2
+    
+    
+    
+    same_ion <- sum(sapply(neg_peaks, function(x) {
+      any(abs(pos_peaks - x) <= tol)
+    }))
+    
+    ratio <- same_ion / length(neg_peaks)
+    
+    
+    
+    if (ratio < minIon) {
       LCal <- LCal[-i, ]
       next
     }
@@ -125,5 +109,5 @@ matchNegPos_SQL <- function(
     i <- i + 1
   }
   
-  return(unique(LCal))
+  unique(LCal)
 }

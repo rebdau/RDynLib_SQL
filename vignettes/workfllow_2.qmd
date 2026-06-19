@@ -34,42 +34,45 @@ load_all()
 The DynLib SQL database can archive many LC-MS experiments. The expid of each experiment can be retrieved in the experiment table. Here we filter an SQL database to contain only a single experiment experiment.
 
 ## File paths to the input and output sql databases
-COMMENT: why output ?
-Answer : is for storing the resulting sql database that contains just the selected experiment. 
+
 ```{r}
-sql_db <- here("data", "DYL_FLAX_FTMSneg.sqlite")
-output_db <- here("data", "subset.sqlite")
+data <- here("data", "Dynlib_ament.sqlite")
+sub_data <- here("data", "subset.sqlite")
 ```
 
 ## retrieve the expid
 
 ```{r}
-con <- dbConnect(RSQLite::SQLite(), sql_db)
+con <- dbConnect(RSQLite::SQLite(), data)
 
 #Verify the experiment table
-dbGetQuery(con, "
+exp <- dbGetQuery(con, "
 SELECT *
-FROM experiment LIMIT 5
+FROM experiment 
 ")
+
+exp[exp$species=="Zea mays",]
 ```
+
+
 
 ## Call the function to filter the database based on a single expid
 ```{r}
 filterDynLibDB(
-  expid = 266,
-  input_db = sql_db,
-  output_db = output_db
+  expid = 192,
+  input_db = data,
+  output_db = sub_data
 )
 ```
 
 ## Connection to the subseted database
 ```{r}
-con_filter <- dbConnect(RSQLite::SQLite(), output_db)
+con_filter <- dbConnect(RSQLite::SQLite(), sub_data)
 
 #Verify the experiment table
 dbGetQuery(con_filter , "
 SELECT *
-FROM experiment LIMIT 5
+FROM experiment 
 ")
 ```
 
@@ -85,8 +88,8 @@ FROM ms_compound LIMIT 5
 ```{r}
 output_db2 <- here("data", "filter_set.sqlite")
 filterDynLibDB(
-    expid = c(5, 7, 12),
-    input_db = sql_db,
+    expid = c(194, 196 ,197),
+    input_db = data,
     output_db = output_db2
 )
 ```
@@ -108,7 +111,7 @@ Both `CompDb` and `Spectra` objects are part of the provide access to the R for 
 ## CompDb object
 We create a `CompDb` object `cdb` from the DynLib SQL database using the `ExpCompDb()` function from the `RDynLib` package. The resulting `CompDb` object represents the complete SQL database and provides access to all of its tables.
 ```{r}
-cdb <- ExpCompDb(sql_db)
+cdb <- ExpCompDb(data)
 # Print database metadada information
 meta <- metadata(cdb)
 head(meta)
@@ -118,17 +121,18 @@ str(cdb)
 ## Retrieving a compound_id in a DynLib SQL database, using the `CompoundDb` package.
 Compound information can be extracted from a `CompDb` object using the `compounds()` function from the `CompoundDb` package. The resulting table corresponds to the `ms_compound` table in the SQL database and contains the compound identifier (compound_id), together with chromatographic information such as m/z and retention time, and structural annotation data, such as the compound name and molecular formula. By applying filters in the `compounds()` function, one can create a subsetted ms_compund table with compound identifiers (compound_id) of selected compounds corresponding to a defined value for `name` or `exactmass`.
 
-```{r}
-cmp <- compounds(cdb)
-head(cmp)
-```
+
 
 The compound information of specific criteria:
 ```{r}
 supportedFilters(cdb)
-compounds(cdb, columns = c("compound_id", "name", "formula", "expid"),
-          filter = ~ name == "quercetin-hexoside-deoxyhexoside KA KM")
+compounds(cdb, columns = c("compound_id", "name", "formula", "expid"))
 
+```
+
+```{r}
+compounds(cdb, columns = c("compound_id", "name", "formula", "expid"),
+          filter = ~ name == "maysin 2 PU KM")
 ```
 
 For more queries and details visit this workflow: https://www.bioconductor.org/packages//release/bioc/vignettes/CompoundDb/inst/doc/CompoundDb-usage.html
@@ -147,8 +151,6 @@ sps.rdl <- sql_to_spectra(sql_db)
 
 str(sps)
 str(sps.rdl)
-
-
 ```
 The objects `sps` and `sps.rdl` are exactly the same `Spectra` objects.
 
@@ -174,23 +176,40 @@ testing the NodenameMass_SQL() function that extract the additional cololumns
 and rows from ms_compound table of a given experiment, precursor_mz or name 
 or nodename.
 
-Here we test using expid and precursor mz within a mass range:
+Here we test using expid and precursor mz within a mass range for a given experiment:
 ```{r}
 FT_path <- here("data", "DYL_FLAX_FTMSneg.sqlite")
 
 NodenameMass_SQL(
-  sql_path = sql_db,
-  expid = 1,
+  sql_path = data,
+  expid = 191,
+  mass_measured = 537.1976,
+  mass_range = 0.02
+)
+```
+Next, we look for a given mz range in the whole database without specify the expid:
+```{r}
+NodenameMass_SQL(
+  sql_path = data,
   mass_measured = 537.1976,
   mass_range = 0.02
 )
 ```
 
+
 Here we test using expid and a part of the name of the compounds we want to show:
 ```{r}
 res <-NodenameMass_SQL(
-  sql_path = sql_db,
-  expid = 1,
+  sql_path = data,
+  expid = 198,
+  name = "hexoside"
+)
+head(res,3)
+```
+Next, we look for a given name in the whole database without specify the expid:
+```{r}
+res <-NodenameMass_SQL(
+  sql_path = data,
   name = "hexoside"
 )
 head(res,3)
@@ -198,12 +217,12 @@ head(res,3)
 
 show the msms_spectrum table of a given compound_id
 ```{r}
-sp_id <- get_spectrum_id(qt_path = sql_db, compound_id = 101280 )
+sp_id <- get_spectrum_id(qt_path = sql_db, compound_id = 68855 )
 sp_id
 ```
 
 Retreive the ms_compound table of a given compound_id
 ```{r}
-compound <- get_compound(qt_path = sql_db, compound_id = 101280)
+compound <- get_compound(qt_path = sql_db, compound_id = 68855)
 compound
 ```
