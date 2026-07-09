@@ -38,12 +38,11 @@
 #' corresponds to one candidate conversion and includes fragment ion and
 #' neutral loss similarity scores.
 #'
-#'@import data.table
+#' @import data.table
 #' @author Ahlam Mentag
 #'
 #'
 #' @export
-NULL
 
 conv.CSPP_SQL <- function(inp.x,
                           mzdiff,

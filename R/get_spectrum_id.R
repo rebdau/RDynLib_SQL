@@ -1,6 +1,5 @@
 #' @title extracting the msms_spectrum table of a given compound_id  
 #'
-#' 
 #' @return the msms_spectrum table of a given compound_id 
 #' 
 #' @import DBI

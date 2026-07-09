@@ -1,6 +1,5 @@
 #' @title extracting the ms_compound table of a given compound_id  
 #'
-#' 
 #' @return the ms_compound table of a given compound_id 
 #' 
 #' @import DBI
