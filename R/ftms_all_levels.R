@@ -53,6 +53,7 @@
 #' }
 #'
 #' @examples
+#' \dontrun{
 #' ## Assume 'ftms' is an XcmsExperiment object
 #' ## Extract MS2 spectra associated with features
 #' ms2 <- xcms::featureSpectra(ftms, msLevel = 2L)
@@ -61,6 +62,7 @@
 #' msn <- ftms_all_levels(ftms, ms2)
 #'
 #' length(msn)
+#'}
 #'
 #' @importFrom xcms featureSpectra
 #' @import Spectra
