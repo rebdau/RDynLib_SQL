@@ -92,7 +92,7 @@ Next we calculate the similarity score between the dynlib and flax seed FTMS neg
 
 ```{r}
 
-ftms_matches3 <- similarity_RDynlib_match(
+ftms_matches3 <- similarity_RDynLib_match(
   ftms_all,
   ftms_msn_tree_herba,
   polarity_query = 0,

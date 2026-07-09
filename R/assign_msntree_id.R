@@ -24,10 +24,12 @@
 #' descendant spectra for easier feature linking.
 #'
 #' @examples
+#' \dontrun{
 #' ## Assume 'msn' is a Spectra object containing MS2–MSn spectra
 #' msn <- assign_msntree_id(msn)
 #' msn$MSntreeID
 #' msn$precursorMz.MS2
+#' }
 #'
 #' @export
 #' @importFrom Spectra msLevel scanIndex precScanNum dataOrigin precursorMz

@@ -33,9 +33,11 @@ hierarchically: MS2 spectra start new trees, and higher-level spectra
 descendant spectra for easier feature linking.
 }
 \examples{
+\dontrun{
 ## Assume 'msn' is a Spectra object containing MS2–MSn spectra
 msn <- assign_msntree_id(msn)
 msn$MSntreeID
 msn$precursorMz.MS2
+}
 
 }
