@@ -32,81 +32,116 @@
 #' @export
 merge_databases <- function(main_db, add_db, output_db) {
   
-  library(DBI)
-  library(RSQLite)
-  library(dplyr)
+  if (file.exists(output_db)) {
+    
+    con_test <- tryCatch(
+      DBI::dbConnect(RSQLite::SQLite(), output_db),
+      error = function(e) NULL
+    )
+    
+    if (!is.null(con_test)) {
+      DBI::dbDisconnect(con_test)
+      file.remove(output_db)
+    } else {
+      stop("Output database is locked. Close all connections first.")
+    }
+  }
   
-  if (file.exists(output_db))
-    file.remove(output_db)
   
-  con_main <- dbConnect(SQLite(), main_db)
-  con_add  <- dbConnect(SQLite(), add_db)
-  con_out  <- dbConnect(SQLite(), output_db)
+  con_main <- DBI::dbConnect(RSQLite::SQLite(), main_db)
+  con_add  <- DBI::dbConnect(RSQLite::SQLite(), add_db)
+  con_out  <- DBI::dbConnect(RSQLite::SQLite(), output_db)
+  
   
   on.exit({
-    dbDisconnect(con_main)
-    dbDisconnect(con_add)
-    dbDisconnect(con_out)
+    DBI::dbDisconnect(con_main)
+    DBI::dbDisconnect(con_add)
+    DBI::dbDisconnect(con_out)
   })
   
-  tables_main <- setdiff(dbListTables(con_main), "sqlite_sequence")
-  tables_add  <- setdiff(dbListTables(con_add), "sqlite_sequence")
   
-  tables_main_l <- tolower(tables_main)
-  tables_add_l  <- tolower(tables_add)
+  tables_main <- setdiff(DBI::dbListTables(con_main), "sqlite_sequence")
+  tables_add  <- setdiff(DBI::dbListTables(con_add), "sqlite_sequence")
   
-  all_tables <- union(tables_main_l, tables_add_l)
+  all_tables <- union(tables_main, tables_add)
   
-  required_tables <- c(
-    "synonym",
-    "experiment",
-    "ms_compound",
-    "msms_spectrum",
-    "msms_spectrum_peak"
-  )
-  
-  all_tables <- union(all_tables, required_tables)
   
   safe_read <- function(con, tables_vec, tbl_name) {
     
-    hit <- tables_vec[tolower(tables_vec) == tbl_name]
+    hit <- tables_vec[
+      tolower(tables_vec) == tolower(tbl_name)
+    ]
     
     if (length(hit) == 0)
       return(NULL)
     
-    dbReadTable(con, hit[1])
+    DBI::dbReadTable(con, hit[1])
   }
   
-  shift_ids <- function(df,
-                        exp_shift,
-                        spectrum_shift,
-                        peak_shift,
-                        compound_shift) {
+  
+  get_schema <- function(con, tbl_name) {
     
-    if ("expid" %in% names(df))
-      df$expid <- as.integer(df$expid) + exp_shift
-    
-    if ("spectrum_id" %in% names(df))
-      df$spectrum_id <- as.integer(df$spectrum_id) + spectrum_shift
-    
-    if ("peak_id" %in% names(df))
-      df$peak_id <- as.integer(df$peak_id) + peak_shift
-    
-    if ("compound_id" %in% names(df))
-      df$compound_id <- as.character(
-        as.integer(df$compound_id) + compound_shift
+    res <- DBI::dbGetQuery(
+      con,
+      sprintf(
+        "SELECT sql
+         FROM sqlite_master
+         WHERE type='table'
+         AND lower(name)=lower('%s')",
+        tbl_name
       )
+    )
     
-    if ("subsid" %in% names(df))
-      df$subsid <- as.integer(df$subsid)
+    if (nrow(res) != 1)
+      return(NULL)
     
-    df
+    res$sql[[1]]
   }
   
-  compute_shift <- function(con_main,
-                            con_add,
-                            table,
-                            key) {
+  
+  normalize_types <- function(main_df, add_df) {
+    
+    common <- intersect(
+      names(main_df),
+      names(add_df)
+    )
+    
+    for (col in common) {
+      
+      if (col == "expid") {
+        main_df[[col]] <- as.character(main_df[[col]])
+        add_df[[col]]  <- as.character(add_df[[col]])
+        next
+      }
+      
+      
+      cl <- class(main_df[[col]])[1]
+      
+      if (cl == "character") {
+        
+        main_df[[col]] <- as.character(main_df[[col]])
+        add_df[[col]]  <- as.character(add_df[[col]])
+        
+      } else if (cl == "integer") {
+        
+        main_df[[col]] <- as.integer(main_df[[col]])
+        add_df[[col]]  <- as.integer(add_df[[col]])
+        
+      } else if (cl == "numeric") {
+        
+        main_df[[col]] <- as.numeric(main_df[[col]])
+        add_df[[col]]  <- as.numeric(add_df[[col]])
+      }
+    }
+    
+    list(
+      main = main_df,
+      add = add_df
+    )
+  }
+  
+  
+  compute_shift <- function(table, key) {
     
     main_tbl <- safe_read(con_main, tables_main, table)
     add_tbl  <- safe_read(con_add, tables_add, table)
@@ -114,118 +149,68 @@ merge_databases <- function(main_db, add_db, output_db) {
     if (is.null(main_tbl) || is.null(add_tbl))
       return(0)
     
-    if (!key %in% names(main_tbl))
+    if (!key %in% names(main_tbl) ||
+        !key %in% names(add_tbl))
       return(0)
     
-    if (!key %in% names(add_tbl))
+    main_val <- suppressWarnings(as.integer(main_tbl[[key]]))
+    add_val  <- suppressWarnings(as.integer(add_tbl[[key]]))
+    
+    if (length(main_val) == 0 ||
+        length(add_val) == 0)
       return(0)
     
-    main_vals <- suppressWarnings(
-      as.integer(main_tbl[[key]])
-    )
-    
-    add_vals <- suppressWarnings(
-      as.integer(add_tbl[[key]])
-    )
-    
-    max_main <- if (length(main_vals))
-      max(main_vals, na.rm = TRUE) else 0
-    
-    min_add <- if (length(add_vals))
-      min(add_vals, na.rm = TRUE) else 0
-    
-    max_main + 1 - min_add
+    max(main_val, na.rm = TRUE) + 1 -
+      min(add_val, na.rm = TRUE)
   }
   
-  exp_shift <- compute_shift(
-    con_main, con_add,
-    "experiment", "expid"
-  )
-  
-  compound_shift <- compute_shift(
-    con_main, con_add,
-    "ms_compound", "compound_id"
-  )
   
   spectrum_shift <- compute_shift(
-    con_main, con_add,
-    "msms_spectrum", "spectrum_id"
+    "msms_spectrum",
+    "spectrum_id"
   )
   
   peak_shift <- compute_shift(
-    con_main, con_add,
-    "msms_spectrum_peak", "peak_id"
+    "msms_spectrum_peak",
+    "peak_id"
   )
   
-  FTMS_SCHEMA <- list(
-    expid = "integer",
-    spectrum_id = "integer",
-    peak_id = "integer",
-    compound_id = "character",
-    subsid = "integer",
-    rtime = "numeric",
-    retention_time = "numeric",
-    ppm_deviation = "numeric"
+  compound_shift <- compute_shift(
+    "ms_compound",
+    "compound_id"
   )
   
-  force_schema <- function(df, schema) {
+  
+  shift_ids <- function(df) {
     
-    if (is.null(df))
-      return(df)
+    if ("spectrum_id" %in% names(df))
+      df$spectrum_id <-
+        as.integer(df$spectrum_id) +
+        spectrum_shift
     
-    for (col in names(schema)) {
-      
-      if (!col %in% names(df))
-        next
-      
-      df[[col]] <- switch(
-        schema[[col]],
-        character = as.character(df[[col]]),
-        integer   = as.integer(df[[col]]),
-        numeric   = as.numeric(df[[col]]),
-        df[[col]]
-      )
-    }
+    if ("peak_id" %in% names(df))
+      df$peak_id <-
+        as.integer(df$peak_id) +
+        peak_shift
+    
+    if ("compound_id" %in% names(df))
+      df$compound_id <-
+        as.character(
+          as.integer(df$compound_id) +
+            compound_shift
+        )
+    
+    if ("expid" %in% names(df))
+      df$expid <- as.character(df$expid)
     
     df
   }
   
-  normalize_types <- function(df1, df2) {
-    
-    common_cols <- intersect(
-      names(df1),
-      names(df2)
-    )
-    
-    for (col in common_cols) {
-      
-      cls1 <- class(df1[[col]])[1]
-      cls2 <- class(df2[[col]])[1]
-      
-      if (cls1 %in% c("numeric", "integer") ||
-          cls2 %in% c("numeric", "integer")) {
-        
-        df1[[col]] <- suppressWarnings(
-          as.numeric(df1[[col]])
-        )
-        
-        df2[[col]] <- suppressWarnings(
-          as.numeric(df2[[col]])
-        )
-        
-      } else {
-        
-        df1[[col]] <- as.character(df1[[col]])
-        df2[[col]] <- as.character(df2[[col]])
-      }
-    }
-    
-    list(df1 = df1, df2 = df2)
-  }
   
   for (tbl_name in all_tables) {
     
     cat("Processing:", tbl_name, "\n")
+    
     
     tbl_main <- safe_read(
       con_main,
@@ -239,64 +224,109 @@ merge_databases <- function(main_db, add_db, output_db) {
       tbl_name
     )
     
-    if (is.null(tbl_main) && is.null(tbl_add))
+    
+    if (!is.null(tbl_main) &&
+        is.null(tbl_add)) {
+      
+      schema <- get_schema(
+        con_main,
+        tbl_name
+      )
+      
+      DBI::dbExecute(con_out, schema)
+      
+      DBI::dbAppendTable(
+        con_out,
+        tbl_name,
+        tbl_main
+      )
+      
+      cat("Copied main:", tbl_name, "\n")
       next
+    }
     
-    if (is.null(tbl_main))
-      tbl_main <- tbl_add[0, , drop = FALSE]
     
-    if (is.null(tbl_add))
-      tbl_add <- tbl_main[0, , drop = FALSE]
+    if (is.null(tbl_main) &&
+        !is.null(tbl_add)) {
+      
+      schema <- get_schema(
+        con_add,
+        tbl_name
+      )
+      
+      DBI::dbExecute(con_out, schema)
+      
+      DBI::dbAppendTable(
+        con_out,
+        tbl_name,
+        tbl_add
+      )
+      
+      cat("Copied add:", tbl_name, "\n")
+      next
+    }
     
-    tbl_main <- force_schema(
-      tbl_main,
-      FTMS_SCHEMA
-    )
-    
-    tbl_add <- force_schema(
-      tbl_add,
-      FTMS_SCHEMA
-    )
     
     fixed <- normalize_types(
       tbl_main,
       tbl_add
     )
     
-    tbl_main <- fixed$df1
-    tbl_add  <- fixed$df2
+    tbl_main <- fixed$main
+    tbl_add  <- fixed$add
     
-    if (nrow(tbl_add) > 0) {
-      
-      tbl_add <- shift_ids(
-        tbl_add,
-        exp_shift,
-        spectrum_shift,
-        peak_shift,
-        compound_shift
-      )
-      
-      if ("rtime" %in% names(tbl_add))
-        tbl_add$rtime <- as.numeric(tbl_add$rtime) / 60
-      
-      if ("retention_time" %in% names(tbl_add))
-        tbl_add$retention_time <- as.numeric(tbl_add$retention_time) / 60
-    }
     
-    merged_tbl <- bind_rows(
+    tbl_add <- shift_ids(tbl_add)
+    
+    
+    if ("rtime" %in% names(tbl_add))
+      tbl_add$rtime <-
+      as.numeric(tbl_add$rtime) / 60
+    
+    
+    if ("retention_time" %in% names(tbl_add))
+      tbl_add$retention_time <-
+      as.numeric(tbl_add$retention_time) / 60
+    
+    
+    merged <- dplyr::bind_rows(
       tbl_main,
       tbl_add
     )
     
-    dbWriteTable(
+    
+    schema <- get_schema(
+      con_main,
+      tbl_name
+    )
+    
+    
+    if (tbl_name == "experiment") {
+      
+      schema <- gsub(
+        "`expid` INTEGER",
+        "`expid` TEXT",
+        schema
+      )
+    }
+    
+    
+    DBI::dbExecute(
+      con_out,
+      schema
+    )
+    
+    
+    DBI::dbAppendTable(
       con_out,
       tbl_name,
-      merged_tbl,
-      overwrite = TRUE
+      merged
     )
+    
     
     cat("Merged:", tbl_name, "\n")
   }
+  
   
   cat(
     "\nDatabase merge completed.\nOutput:",

@@ -1,4 +1,4 @@
-assembleSpectraTree <- function(sps) {
+msntree_to_pseudoMS2 <- function(sps) {
   
   # Ensure memory backend
   sps <- setBackend(sps, MsBackendMemory())

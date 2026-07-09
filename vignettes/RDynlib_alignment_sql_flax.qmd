@@ -149,7 +149,7 @@ n_new
 #compound IDs with their database names of given  compounds.
      
 ```{r}
-alignment_file <- here("data", "assoc_flax.txt")
+alignment_file <- here("data", "assoc_flax_63.txt")
 
 getAlignedCompids_SQL(
   compound_id = 101030,
@@ -164,6 +164,11 @@ getAlignedCompids_SQL(
   database_name = "DYL_FLAX_QTOFneg.sqlite",
   alignment_file = alignment_file
 )
+```
+
+```{r}
+cmp <- get_compound(qt_path = QTOF_path, compound_id = 101030)
+cmp
 ```
 
 

@@ -66,24 +66,9 @@ Next we convert the "Dynlib_FTMS_neg.sqlite" database to a spectra object
 
 ```{r}
 
-dbf <- here("data", "DyLib_FTMS_neg_or.sqlite")
+dbf <- here("data", "DYL_flax_herba_FTMSneg.sqlite")
 db <- dbConnect(SQLite(), dbf)
-dbListTables(db)
-#dbExecute(db, "DROP TABLE IF EXISTS feature_matrix ")
-experiment_df <- dbGetQuery(db, "SELECT * FROM experiment")
-
-#here we remove "x", "x.1" columns from experiment table 
-experiment_df <- experiment_df[, !names(experiment_df) %in% c("x", "x.1")]
-dbExecute(db, "DROP TABLE experiment")
-dbWriteTable(db, "experiment", experiment_df)
-
-#the columns have been successfully deleted
-dbGetQuery(db, "PRAGMA table_info(experiment)")
-dbDisconnect(db)
-#we convert the sql database to a Compdb object
-cdb <- ExpCompDb(dbf)
-#we convert the Compdb object to a spectra object
-dy_sps <- Spectra(cdb)
+dy_sps <- sql_to_spectra(dbf)
 ```
 
 ```{r}
@@ -107,15 +92,16 @@ Next we calculate the similarity score between the dynlib and flax seed FTMS neg
 
 ```{r}
 
-ftms_matches <- similarity_RDynlib_match(
+ftms_matches3 <- similarity_RDynlib_match(
   ftms_all,
-  dy_sps,
+  ftms_msn_tree_herba,
   polarity_query = 0,
   polarity_target = 0,
   requirePrecursor = FALSE,
   tolerance = 0,
   ppm = 5,
-  fragments_resolution = "unit.resolution",
+  threshold = 0.6,
+  fragments_resolution = "unit.resolution"
 )
 
 
@@ -125,9 +111,21 @@ print the similarity matrix and the number of rows (matches)
 
 ```{r}
 
-print(ftms_matches)
-nrow(ftms_matches) # 324 
+print(ftms_matches3)
+nrow(ftms_matches3) # 324 
 ```
+
+
+```{r}
+library(dplyr)
+library(stringr)
+
+ftms_matches2 %>%
+  filter(str_detect(target_name, regex("herba", ignore_case = TRUE)))
+```
+
+
+
 
 save the resulting object:
 
@@ -139,3 +137,37 @@ save(ftms_matches, file = here("data/database_FTMS_neg", "ftms_matches.RData"))
 ```{r}
 load(here("data/database_FTMS_pos","ftms_matches.RData"))
 ```
+
+```{r}
+colnames(ftms_matches2)
+```
+
+```{r}
+library(dplyr)
+
+best_hits <- ftms_matches2 %>%
+    arrange(desc(score)) %>%   
+    slice_head(n = 10)                
+
+best_hits
+```
+
+
+```{r}
+best_hits %>%
+    select(
+        
+        precursorMz,
+        target_precursorMz,
+        
+      score,
+        target_name,
+        target_expid
+    )
+```
+
+
+```{r}
+MSnplot_SQL(dbf, 101280, )
+```
+
