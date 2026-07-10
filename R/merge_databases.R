@@ -180,28 +180,28 @@ merge_databases <- function(main_db, add_db, output_db) {
     "compound_id"
   )
   
+  experiment_shift <- compute_shift(
+    "experiment",
+    "expid"
+  )
   
   shift_ids <- function(df) {
     
     if ("spectrum_id" %in% names(df))
-      df$spectrum_id <-
-        as.integer(df$spectrum_id) +
-        spectrum_shift
+      df$spectrum_id <- as.integer(df$spectrum_id) + spectrum_shift
     
     if ("peak_id" %in% names(df))
-      df$peak_id <-
-        as.integer(df$peak_id) +
-        peak_shift
+      df$peak_id <- as.integer(df$peak_id) + peak_shift
     
     if ("compound_id" %in% names(df))
-      df$compound_id <-
-        as.character(
-          as.integer(df$compound_id) +
-            compound_shift
-        )
+      df$compound_id <- as.character(
+        as.integer(df$compound_id) + compound_shift
+      )
     
     if ("expid" %in% names(df))
-      df$expid <- as.character(df$expid)
+      df$expid <- as.character(
+        as.integer(df$expid) + experiment_shift
+      )
     
     df
   }

@@ -60,6 +60,12 @@ dynlib_symmetric_dotproduct <- function(x, y, n = 3, m = 0.6, ...) {
   if (!nrow(x) || !nrow(y))
     return(0.0)
   
+  if (nrow(x) < 2 || nrow(y) < 2)
+    return(0.0)
+  
+  if (anyNA(x) || anyNA(y))
+    return(0.0)
+  
   mz1 <- x[, 1]
   intensity1 <- x[, 2]
   mz2 <- y[, 1]
@@ -177,8 +183,14 @@ dynlibmatch2_map <- function(
 
   ## Combine matched peaks
 
-  matched1 <- matched1_frag
-  matched2 <- matched2_frag
+  
+  if (length(matched1_frag) == 0) {
+    matched1 <- matrix(numeric(), ncol = 2, nrow = 0)
+    matched2 <- matrix(numeric(), ncol = 2, nrow = 0)
+  } else {
+    matched1 <- matched1_frag
+    matched2 <- matched2_frag
+  }
   
   if (!is.null(matched1_nl)) {
     matched1 <- rbind(matched1, matched1_nl)
@@ -186,17 +198,26 @@ dynlibmatch2_map <- function(
   }
   
   
-  if (nrow(matched1) != nrow(matched2)) {
-    stop("dynlibmatch_map(): internal error - unmatched row counts.")
+  ## Ensure matrix format
+  if (nrow(matched1) == 0) {
+    empty <- matrix(numeric(), ncol = 2, nrow = 0)
+    attr(empty, "wintensity_sum") <- 0
+    
+    return(list(empty, empty))
   }
   
+  
   attr(matched1, "wintensity_sum") <-
-    sum(((int1^n) * (mz1^m))^2)
+    sum(((matched1[,2]^n) * (matched1[,1]^m))^2)
   
   attr(matched2, "wintensity_sum") <-
-    sum(((int2^n) * (mz2^m))^2)
+    sum(((matched2[,2]^n) * (matched2[,1]^m))^2)
+  
+  if (nrow(matched1) < 2) {
+    empty <- matrix(numeric(), ncol = 2, nrow = 0)
+    attr(empty, "wintensity_sum") <- 0
+    return(list(empty, empty))
+  }
   
   return(list(matched1, matched2))
 }
-
-
