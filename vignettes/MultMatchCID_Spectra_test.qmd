@@ -13,6 +13,8 @@ This quarto document represents the workflow for calling the`MultMatchCID_Spectr
 from the [MultMatchCID_Spectra.R](https://github.com/rebdau/RDynLib_SQL/blob/Ahlam/R/MultMatchCID_Spectra.R)
 file to calculate the similarity between  a given compound_id from the DynLib 
 FTMS negative database and the other compounds from the same database.
+Also, we show how to create a molecular network from a given compound_id, and 
+finaly we export the sql databases to a mgf files for further analyses.
 
 # Required packages
 
@@ -61,7 +63,9 @@ library(MetaboAnnotation)
 library(DBI)
 library(RSQLite)
 library(devtools)
-
+library(here)
+library(dplyr)
+library(stringr)
 #` Uploading RDynLibSQL: Load all functions of the RDynlib directory
 load_all()
 ```
@@ -71,96 +75,206 @@ load_all()
 Next we convert the "Dynlib_FTMS_neg.sqlite" database to a spectra object
 
 ```{r}
-
-dbf <- here("data", "DYL_FLAX_FTMSneg.sqlite")
+dbf <- here("data", "DYL_flax_herba_FTMSneg.sqlite")
 db <- dbConnect(SQLite(), dbf)
-dbListTables(db)
-#dbExecute(db, "DROP TABLE IF EXISTS feature_matrix ")
-experiment_df <- dbGetQuery(db, "SELECT * FROM experiment")
-
-#here we remove "x", "x.1" columns from experiment table 
-experiment_df <- experiment_df[, !names(experiment_df) %in% c("x", "x.1")]
-dbExecute(db, "DROP TABLE experiment")
-dbWriteTable(db, "experiment", experiment_df)
-
-#the columns have been successfully deleted
-dbGetQuery(db, "PRAGMA table_info(experiment)")
-dbDisconnect(db)
-#we convert the sql database to a Compdb object
-cdb <- ExpCompDb(dbf)
-#we convert the Compdb object to a spectra object
-dy_sps <- Spectra(cdb)
+dy_sps <- sql_to_spectra(dbf)
 ```
 
 ```{r}
 spectraData(dy_sps, columns = c("retention_time"))
 ```
 
-
-
 #test the 'MultMatchCID_Spectra()' function to return the matches of a given 
 #compound_id with the whole database(where the user should enter the spectrum 
 #type and mslevel )
 
+We start by matching the 101280 compound with the database:
+
 ```{r}
-cmp_matches <- MultMatchCID_Spectra(
+mt_3_3 <- MultMatchCID_Spectra(
   dy_sps,
-  100988,
+  101280,
+  spectrum_type_query = "not_assembled",
+  spectrum_type_target = "not_assembled",
+  ms_level_query = 3,
+  ms_level_target = 3,
   polarity_query = 0,
   polarity_target = 0,
-  tolerance = 0,
-  ppm = 10,
+  tolerance = 0.6,
+  ppm = 100,
   minIons = 2,
+  threshold = 0.8,
   fragments_resolution = "unit.resolution",
   requirePrecursor = T,
 )
-
-
+mt_3_3
 ```
+The MS3 vs MS3 returns 71 match in the database.
 
 
 ```{r}
-cmp <- MultMatchCID_Spectra(
+mt_2_2 <- MultMatchCID_Spectra(
   dy_sps,
   101280,
-   spectrum_type_query = "not_assembled",
-   ms_level_query = 2,
-   ms_level_target = 2,
-    polarity_query = 0,
+  spectrum_type_query = "not_assembled",
+  spectrum_type_target = "not_assembled",
+  ms_level_query = 2,
+  ms_level_target = 2,
+  polarity_query = 0,
   polarity_target = 0,
-  tolerance = 0,
-  ppm = 10,
-  minIons = ,
-    fragments_resolution = "unit.resolution",
+  tolerance = 0.6,
+  ppm = 100,
+  minIons = 2,
+  threshold = 0.8,
+  fragments_resolution = "unit.resolution",
   requirePrecursor = T,
 )
+mt_2_2
+```
+
+The MS2 vs MS2 returns 28 match in the database.
+
+```{r}
+mt_4_3 <- MultMatchCID_Spectra(
+  dy_sps,
+  101280,
+  spectrum_type_query = "not_assembled",
+  spectrum_type_target = "not_assembled",
+  ms_level_query = 4,
+  ms_level_target = 3,
+  polarity_query = 0,
+  polarity_target = 0,
+  tolerance = 0.6,
+  ppm = 100,
+  minIons = 2,
+  threshold = 0.8,
+  fragments_resolution = "unit.resolution",
+  requirePrecursor = T,
+)
+mt_4_3
+```
+
+The MS4 vs MS3 returns 13 match in the database.
+
+```{r}
+mt_4_4 <- MultMatchCID_Spectra(
+  dy_sps,
+  101280,
+  spectrum_type_query = "not_assembled",
+  spectrum_type_target = "not_assembled",
+  ms_level_query = 4,
+  ms_level_target = 4,
+  polarity_query = 0,
+  polarity_target = 0,
+  tolerance = 0.6,
+  ppm = 100,
+  minIons = 2,
+  threshold = 0.8,
+  fragments_resolution = "unit.resolution",
+  requirePrecursor = T,
+)
+mt_4_4
+```
+
+The MS4 vs MS3 returns 1 match in the database.
+
+look for a given name
+```{r}
+mt_3_3 %>%
+  filter(str_detect(target_name, regex("herbacetin 3,8-di-o-beta-d-glucopyranoside ID AM", ignore_case = TRUE)))
+```
+we look for the ms_compound table of a given compound_id of HDG-succinate-HDG:
+```{r}
+cmp <- get_compound(dbf, 101099)
 cmp
 ```
 
-
-
-print the results:
+First we fill in the cspp table:
 
 ```{r}
-print(cmp_matches)
-nrow(cmp_matches)
+ft_path <- here("data", "DYL_flax_herba_FTMSneg.sqlite")
+alg <- here("data", "assoc_flax_63.txt")
+cspp_flax <- here("data","cspp_flax.txt")
+charge_file <- here("data", "ftms_all_compounds_RD.xlsx")
 ```
 
 
-#test
 ```{r}
-sum(round(test2$`m/z`,2) != 355.07)
+cspp.tot_SQL(ft_path, 266, mzerr = 0.01,
+                         cspp = cspp_ft, peakwidth = 0.1, IntThres  = 0, mz_tol = 0.5,
+                         dot_thresh = 0, spectrum_type = "assembled",  
+                         min_common = 0, charge_file = charge_file)
 ```
 
 
+Here we show the cspp network of that compound
+```{r}
+Overall.net_SQL(sql_path = ft_path, exp.id = 266, dbkey = 100988, min = 0,
+                nr_of_seq = 3, thr1 = 0.1, thr2 = 0.2, thr3 = 0.3)
+```
 
-save the resulting object:
+Next, we print the compounds from qtof neg that have been aligned with
+HDG-succinate-HDG:
 
 ```{r}
-save(cmp_matches, file = "data/cmp_matches.RData")
+qt_path <- here("data","DYL_FLAX_QTOFneg.sqlite")
 ```
 
 ```{r}
-load("data/cmp_matches.RData")
+getAlignedCompids_SQL(100988, "DYL_FLAX_FTMSneg.sqlite", alg )
 ```
+
+fill in the gnps_add table
+```{r}
+conv.GNPS_SQL(sql_path = qt_path, expid= 52, mzerr = 0.015,
+              min = 5, adduct = 60.0211, thr1 = 3, thr2 = 0.1, thr3 = 0.4,
+              spectrum_type = "merged_MSMS_all_energies", IntThres = 5)
+```
+
+fill in the cspp_add table
+```{r}
+cspp.tot_SQL(qt_path, 52, mzerr = 0.01,
+                         cspp = cspp_flax, peakwidth = 0.2, IntThres  = 0, mz_tol = 0.5,
+                         dot_thresh = 0.7, spectrum_type = "intersect_single_energy",  
+                         min_common = 3, charge_file = charge_file)
+```
+
+
+Here we print the ms_compound table of that compound from qtof database:
+```{r}
+cmp_qt <- get_compound(qt_path, 45890)
+cmp_qt
+```
+
+Finaly, we show the GNPS network of that compound
+```{r}
+Overall.net_SQL(sql_path = qt_path, exp.id = 52, dbkey = 45890, min = 0,
+                nr_of_seq = 3, thr1 = 0.1, thr2 = 0.2, thr3 = 0.3)
+```
+
+
+Next, we call the function to export the sql database to an mgf format that 
+could be used for further analysis and comparisons with public databases 
+available on public platforms like: GNPS...
+We start by converting ftms data
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+ft_assembled <- here("data", "ft_assembled.mgf")
+sql_to_mgf(ft_path, expid = 266, spectrum_type = "assembled", 
+           output_file = ft_assembled) 
+```
+
+Then, we convert qtof data:
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+qt_assembled <- here("data", "qt_assembled.mgf")
+sql_to_mgf(qt_path, expid = 52, spectrum_type = "intersect_single_energy", 
+           output_file = qt_assembled) 
+```
+
+
 

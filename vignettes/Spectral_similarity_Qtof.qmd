@@ -21,7 +21,8 @@ library(MetaboAnnotation)
 library(DBI)
 library(RSQLite)
 library(devtools)
-
+library(dplyr)
+library(stringr)
 #` Uploading RDynLibSQL: Load all functions of the RDynlib directory
 load_all()
 ```
@@ -32,35 +33,21 @@ Then, install the new CompoundDb version:
 BiocManager::install("RforMassSpectrometry/CompoundDb", ref = "jomain", force = TRUE)
 ```
 
+## convert the "DyLib_QTOF_neg.sqlite" database to a spectra object
+
+Next we convert the "Dynlib_FTMS_neg.sqlite" database to a spectra object
 ```{r}
-ExpCompDb <- function(x) {
-    cdb <- CompDb(x)
-    CompoundDb::addJoinDefinition(cdb, "ms_compound", "experiment", "expid", "expid")
-}
-```
 
-Next we convert the "DyLib_QTOF_neg2.sqlite" database to a spectra object
+pth <- here("data", "DYL_FLAX_QTOFneg.sqlite")
+con <- dbConnect(SQLite(), pth)
+dbExecute(
+  con,
+  "UPDATE msms_spectrum
+   SET spectrum_type = 'not_assembled'
+   WHERE spectrum_type IS NULL"
+)
 
-```{r}
-library(DBI)
-library(RSQLite)
-dbf <- here("data", "DyLib_QTOF_neg.sqlite")
-db <- dbConnect(SQLite(), dbf)
-dbExecute(db, "DROP TABLE IF EXISTS feature_matrix ")
-experiment_df <- dbGetQuery(db, "SELECT * FROM experiment")
-
-#here we remove "x", "x.1" columns from experiment table 
-experiment_df <- experiment_df[, !names(experiment_df) %in% c("x", "x.1")]
-dbExecute(db, "DROP TABLE experiment")
-dbWriteTable(db, "experiment", experiment_df)
-
-#the columns have been successfully deleted
-dbGetQuery(db, "PRAGMA table_info(experiment)")
-dbDisconnect(db)
-#we convert the sql database to a Compdb object
-cdb <- ExpCompDb(dbf)
-#we convert the Compdb object to a spectra object
-qt_dy_sps <- Spectra(cdb)
+qt_dy_sps <- sql_to_spectra(pth)
 ```
 
 Here we load the QTOF of flax seed database (it's already a spectra object), you can load it from: [qtof_filtering.qmd](https://github.com/rebdau/RDynLib_qtof/blob/ahlam/qtof_filtering.qmd)
@@ -74,10 +61,9 @@ spectraData(qtof_neg)
 Next we calculate the similarity score between the dynlib and flax seed QTOF negative integuments.(intersect_single_energy)
 
 ```{r}
-qtof_matches <- similarity_RDynLib_match(
+qtof_matchesF <- similarity_RDynLib_match(
   qtof_neg,
   qt_dy_sps,
-  
   polarity_query = 0,
   polarity_target = 0,
   fragments_resolution = "high.resolution",
@@ -91,12 +77,59 @@ qtof_matches <- similarity_RDynLib_match(
 print the similarity matrix and the number of rows (matches)
 
 ```{r}
-print(qtof_matches)
-nrow(qtof_matches)
+print(qtof_matchesF)
+nrow(qtof_matchesF)
 ```
+
+Adding names of the new matches:
+
+```{r}
+pth <- here("data", "DYL_FLAX_QTOFneg.sqlite")
+qt_con <- dbConnect(SQLite(), pth)
+```
+
+
+```{r}
+add_spectral_matches(qt_con, qtof_matchesF)
+```
+
+```{r}
+dbGetQuery(qt_con, "Select * from msms_spectrum where match_name IS not null LIMIT 1")
+```
+
+look for a given name
+```{r}
+qtof_matchesF %>%
+  filter(str_detect(target_name, regex("trans-aconitic acid AN KM", ignore_case = TRUE)))
+```
+
+
+Select the first 10 matches with the highest common peaks
+```{r}
+best_hits2 <- qtof_matchesF %>%
+    arrange(desc(matched_peaks_count)) %>%   
+    slice_head(n = 10)                
+
+best_hits
+```
+
+```{r}
+best_hits2 %>%
+    select(
+        
+        precursorMz,
+        target_precursorMz,
+        msLevel,
+        target_msLevel,
+      score,
+        target_name,
+        matched_peaks_count
+    )
+```
+
 
 save the resulting object:
 
 ```{r}
-save(qtof_matches, file = here("data/database_QTOF_neg", "qtof_matches.RData"))
+save(qtof_matchesF, file = here("data/database_QTOF_neg", "qtof_matchesF.RData"))
 ```

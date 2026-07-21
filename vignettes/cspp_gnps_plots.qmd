@@ -311,7 +311,7 @@ DBI::dbGetQuery(db_qt, "
 #cspp conversion
 ```{r}
 cspp.tot_SQL(qt_path, 52, mzerr = 0.01,
-                         cspp = cspp_ft, peakwidth = 0.2, IntThres  = 0, mz_tol = 0.5,
+                         cspp = cspp_qt, peakwidth = 0.2, IntThres  = 0, mz_tol = 0.5,
                          dot_thresh = 0.7, spectrum_type = "intersect_single_energy",  
                          min_common = 3, charge_file = charge_file)
 ```

@@ -1,0 +1,268 @@
+---
+title: "workflow to test the similarity_RDynlib() function on ftms data"
+format: html
+  server: shiny
+    toc: true
+    self-contained: true
+author: "Ahlam Mentag, Rebecca Dauwe, Johannes Rainer"
+---
+
+## Shiny Documents
+
+This quarto document represents the workflow for calling the `similarity_RDynlib()` from the [similarity_functions.R](https://github.com/rebdau/RDynLib_SQL/blob/Ahlam/R/similarity_functions.R) file to calculate the similarity between FTMS flax data and the RDynLib FTMS database.
+
+# Required packages
+
+This project follows an R package layout as follows:
+
+The main project folder is:
+
+RDynLib_SQL/
+
+Within this directory, the structure is organized as follows:
+
+RDynLib_SQL/ ├── data/ ├── R/ └── vignettes/
+
+### `data/`
+
+Contains the SQLite database files used in the workflow (e.g., `ftms_flax_neg.sqlite`).
+
+### `R/`
+
+Contains the R source files (`.R`) that define the package functions and core implementation.
+
+### `vignettes/`
+
+Contains Quarto (`.qmd`) files that document the workflow and provide reproducible examples.
+
+In this workflow, the working directory is set to the project root:
+
+RDynLib_SQL/
+
+## Loading required packages
+
+First, install the new CompoundDb version:
+
+```{r}
+BiocManager::install("RforMassSpectrometry/CompoundDb", ref = "jomain", force = TRUE)
+```
+
+```{r}
+library(here)
+library(Spectra)
+library(CompoundDb)
+library(MetaboAnnotation)
+library(DBI)
+library(RSQLite)
+library(devtools)
+library(dplyr)
+library(stringr)
+#library(RDynLib)
+#` Uploading RDynLibSQL: Load all functions of the RDynlib directory
+load_all()
+```
+
+## convert the "Dynlib_FTMS_neg.sqlite" database to a spectra object
+
+Next we convert the "Dynlib_FTMS_neg.sqlite" database to a spectra object
+
+```{r}
+
+dbf <- here("data", "DYL_flax_herba_FTMSneg.sqlite")
+db <- dbConnect(SQLite(), dbf)
+dy_sps <- sql_to_spectra(dbf)
+```
+
+```{r}
+spectraData(dy_sps, columns = c("retention_time"))
+```
+
+Here we load the FTMS of flax seed database that contains both spectrum types : the assembled and not assembled one (it's already a spectra object),\
+you can load it from: [ftmsneg_flax_sql.qmd](https://github.com/rebdau/RDynLib_ftms/blob/ahlam/ftmsneg_flax_sql.qmd)
+
+```{r}
+
+load(here("data","database_FTMS_neg","ftms_all.RData"))
+ftms_all <- ftms_all
+spectraData(ftms_all)
+
+```
+filter out all peaks that have intensity below 1% (or 0.5%) of the base peak
+
+```{r}
+ftms_flax <- filter_basepeak(ftms_all, threshold = 0.01)
+```
+
+```{r}
+cbind(
+  before = lengths(peaksData(ftms_all)),
+  after  = lengths(peaksData(ftms_flax))
+)
+```
+
+
+Next we calculate the similarity score between the dynlib and flax seed FTMS negative integuments.
+
+#test the new function(where the user should enter the spectrum type and mslevel )
+
+We start by calculating the spectral similarity between MS2 spectra:
+```{r}
+ftms_matches2_T <- similarity_RDynLib_match(
+  ftms_flax,
+   dy_sps,
+  polarity_query = 0,
+   polarity_target = 0,
+   requirePrecursor = TRUE,
+   tolerance = 0,
+   ppm = 5,
+   threshold = 0.9,
+   fragments_resolution = "unit.resolution"
+ )
+```
+
+print the similarity matrix and the number of rows (matches)
+```{r}
+
+print(ftms_matches2_T)
+nrow(ftms_matches2_T) 
+```
+
+Adding names of the new matches:
+```{r}
+add_spectral_matches(db, ftms_matches2_T)
+```
+
+```{r}
+dbGetQuery(db, "Select * from msms_spectrum where match_name IS not null LIMIT 1")
+```
+
+look for a given name
+```{r}
+ftms_matches2_T %>%
+  filter(str_detect(target_name, regex("herbacetin 3,8-di-o-beta-d-glucopyranoside ID AM", ignore_case = TRUE)))
+```
+
+```{r}
+quercetin <- ftms_matches2_T %>%
+  filter(str_detect(target_name, regex("diglucoside", ignore_case = TRUE)))
+
+quercetin$target_name
+```
+
+Select the first 10 matches with the highest common peaks
+```{r}
+best_hits2 <- ftms_matches2_T %>%
+    arrange(desc(matched_peaks_count)) %>%   
+    slice_head(n = 10)                
+
+best_hits
+```
+
+```{r}
+best_hits2 %>%
+    select(
+        
+        precursorMz,
+        target_precursorMz,
+        msLevel,
+        target_msLevel,
+      score,
+        target_name,
+        matched_peaks_count
+    )
+```
+
+Next, we calculate the spectral similarity between MS3 spectra:
+```{r}
+ftms_matches3_T <- similarity_RDynLib_match(
+  ftms_flax,
+   dy_sps,
+  polarity_query = 0,
+   polarity_target = 0,
+   requirePrecursor = TRUE,
+   tolerance = 0,
+   ppm = 5,
+   threshold = 0.9,
+   fragments_resolution = "unit.resolution"
+ )
+```
+
+print the similarity matrix and the number of rows (matches)
+```{r}
+
+print(ftms_matches3_T)
+nrow(ftms_matches3_T) 
+```
+
+look for a given name
+```{r}
+ftms_matches3_T %>%
+  filter(str_detect(target_name, regex("herbacetin 3,8-di-o-beta-d-glucopyranoside ID AM", ignore_case = TRUE)))
+```
+
+Adding names of the new matches:
+```{r}
+add_spectral_matches(db, ftms_matches3_T)
+```
+
+```{r}
+dbGetQuery(db, "Select * from msms_spectrum where match_name IS not null")
+```
+
+the 10 highest peak for ms3 matches
+```{r}
+best_hits3_T <- ftms_matches3_T %>%
+    arrange(desc(matched_peaks_count)) %>%   
+    slice_head(n = 10)                
+
+best_hits
+```
+
+
+```{r}
+best_hits3_T %>%
+    select(
+        
+        precursorMz,
+        target_precursorMz,
+        msLevel,
+        target_msLevel,
+      score,
+        target_name,
+        matched_peaks_count
+    )
+```
+
+save the resulting object:
+
+```{r}
+#DYNLIB MS3 (INCLUDING HERBA) VS FLAX
+save(ftms_matches3_T, file = here("data/database_FTMS_neg", "ftms_matches3_T.RData"))
+#DYNLIB MS2 (INCLUDING HERBA) VS FLAX
+save(ftms_matches2_T, file = here("data/database_FTMS_neg", "ftms_matches2_T.RData"))
+```
+
+# Export the spectra that have a match
+
+```{r}
+msms_matches <- dbGetQuery(
+  db,
+  "
+  SELECT *
+  FROM msms_spectrum
+  WHERE match_name IS NOT NULL
+  "
+)
+nrow(msms_matches)
+```
+
+Export it to a csv file
+```{r}
+write.csv(
+  msms_matches,
+  "data/msms_spectrum_matches_ftneg.csv",
+  row.names = FALSE
+)
+```
+
+

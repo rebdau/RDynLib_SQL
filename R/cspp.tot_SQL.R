@@ -61,16 +61,13 @@ cspp.tot_SQL <- function(sql_path, expid,
                          min_common = 0,
                          spectrum_type = "assembled",
                          charge_file = NULL,
-                         reset = TRUE,        
+                         reset = TRUE,
                          verbose = TRUE) {
-  
-
   
   log <- function(...) if (verbose) message(sprintf(...))
   
   con <- dbConnect(SQLite(), sql_path)
   on.exit(dbDisconnect(con), add = TRUE)
-  
   
   inp.x <- as.data.table(dbGetQuery(con, sprintf("
     SELECT compound_id, mass_measured, retention_time
@@ -83,8 +80,6 @@ cspp.tot_SQL <- function(sql_path, expid,
   
   log("Loaded MS1 compounds: %d", nrow(inp.x))
   
-  
-
   if (!is.null(charge_file)) {
     
     charge_dt <- as.data.table(readxl::read_excel(charge_file))
@@ -108,8 +103,6 @@ cspp.tot_SQL <- function(sql_path, expid,
     
     log("Charge correction applied from Excel file.")
   }
-
-  
   
   conv_raw <- fread(cspp)
   
@@ -119,9 +112,7 @@ cspp.tot_SQL <- function(sql_path, expid,
     direc = as.integer(conv_raw[[5]])
   )
   
-
   conv[, col_name := type]
-  
   
   spec_df <- as.data.table(dbGetQuery(con, sprintf("
     SELECT spectrum_id, compound_id, precursor_mz
@@ -142,39 +133,63 @@ cspp.tot_SQL <- function(sql_path, expid,
   
   log("Loaded MS2 compounds: %d", length(ms2_list))
   
+  ## Create compound_add if it does not exist
   
-  comp_add <- as.data.table(dbReadTable(con, "compound_add"))
-  comp_add[, compound_id := as.character(compound_id)]
-  
-
-  missing_ids <- setdiff(inp.x$compound_id, comp_add$compound_id)
-  
-  if (length(missing_ids) > 0) {
-    
-    log("Adding %d missing compound_ids to compound_add",
-        length(missing_ids))
-    
-    new_rows <- data.table(compound_id = missing_ids)
-    
-    comp_add <- rbind(
-      comp_add,
-      new_rows,
-      fill = TRUE
-    )
-  }
-
-  
- 
   cspp_cols <- unique(conv$col_name)
-  missing_cols <- setdiff(cspp_cols, names(comp_add))
   
-  if (length(missing_cols) > 0) {
-    log("Adding missing columns to compound_add: %s",
-        paste(missing_cols, collapse = ", "))
+  if (!DBI::dbExistsTable(con, "compound_add")) {
     
-    comp_add[, (missing_cols) := NA_character_]
+    log("Creating compound_add table.")
+    
+    comp_add <- data.table(
+      compound_id = unique(inp.x$compound_id)
+    )
+    
+    ## keep GNPS column
+    comp_add[, GNPS := NA_character_]
+    
+    ## create one column per conversion in the cspp file
+    for (cl in cspp_cols) {
+      comp_add[, (cl) := NA_character_]
+    }
+    
+    setcolorder(comp_add,
+                c("compound_id", "GNPS", cspp_cols))
+    
+  } else {
+    
+    comp_add <- as.data.table(dbReadTable(con, "compound_add"))
+    comp_add[, compound_id := as.character(compound_id)]
+    
+    ## add missing compounds
+    missing_ids <- setdiff(inp.x$compound_id,
+                           comp_add$compound_id)
+    
+    if (length(missing_ids) > 0) {
+      
+      log("Adding %d missing compound_ids to compound_add",
+          length(missing_ids))
+      
+      comp_add <- rbind(
+        comp_add,
+        data.table(compound_id = missing_ids),
+        fill = TRUE
+      )
+    }
+    
+    ## add missing conversion columns
+    missing_cols <- setdiff(cspp_cols,
+                            names(comp_add))
+    
+    if (length(missing_cols) > 0) {
+      
+      log("Adding missing columns to compound_add: %s",
+          paste(missing_cols, collapse = ", "))
+      
+      comp_add[, (missing_cols) := NA_character_]
+    }
   }
-
+  
   
   
   if (reset) {
@@ -186,7 +201,6 @@ cspp.tot_SQL <- function(sql_path, expid,
   }
   
   success <- character()
-  
   
   for (k in seq_len(nrow(conv))) {
     
@@ -205,11 +219,13 @@ cspp.tot_SQL <- function(sql_path, expid,
       min_common = min_common
     )
     
-    if (is.null(res) || nrow(res) == 0) next
+    if (is.null(res) || nrow(res) == 0)
+      next
     
     res <- as.data.table(res)
     
-    res <- unique(res, by = c("COMPID.sub", "COMPID.prod"))
+    res <- unique(res,
+                  by = c("COMPID.sub", "COMPID.prod"))
     
     res[, val := paste0(
       "!!", COMMON_IONS,
@@ -218,39 +234,53 @@ cspp.tot_SQL <- function(sql_path, expid,
       "!!", COMPID.prod
     )]
     
-    res_agg <- res[, .(val = paste(unique(val), collapse = "|")), by = COMPID.sub]
+    res_agg <- res[, .(
+      val = paste(unique(val), collapse = "|")
+    ),
+    by = COMPID.sub]
+    
     res_agg[, sub_id := as.character(COMPID.sub)]
     
     col <- conv$col_name[k]
-    if (!(col %in% names(comp_add))) next
     
-    comp_add[res_agg,
-             on = .(compound_id = sub_id),
-             (col) := {
-               
-               old <- get(col)
-               
-               combined <- ifelse(
-                 is.na(old) | old == "",
-                 val,
-                 paste0(old, "|", val)
-               )
-               
-               # remove duplicates safely
-               sapply(strsplit(combined, "\\|"), function(x) {
-                 paste(unique(x), collapse = "|")
-               })
-             }
+    if (!(col %in% names(comp_add)))
+      next
+    
+    comp_add[
+      res_agg,
+      on = .(compound_id = sub_id),
+      (col) := {
+        old <- get(col)
+        
+        combined <- ifelse(
+          is.na(old) | old == "",
+          val,
+          paste0(old, "|", val)
+        )
+        
+        sapply(strsplit(combined, "\\|"), function(x)
+          paste(unique(x), collapse = "|"))
+      }
     ]
-    
     
     success <- c(success, col)
   }
   
-  dbWriteTable(con, "compound_add", comp_add, overwrite = TRUE)
+  ## Write (creates or replaces the table)
+  dbWriteTable(
+    con,
+    "compound_add",
+    comp_add,
+    overwrite = TRUE
+  )
   
-  log("Successful conversions: %s",
-      if (length(success) == 0) "none" else paste(unique(success), collapse = ", "))
+  log(
+    "Successful conversions: %s",
+    if (length(success) == 0)
+      "none"
+    else
+      paste(unique(success), collapse = ", ")
+  )
   
   invisible(comp_add)
 }

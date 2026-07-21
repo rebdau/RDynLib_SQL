@@ -1,7 +1,7 @@
 ## Helper function: calculate rounded neutral losses
 neutral_loss <- function(mz_values, precursorMz) {
   
-
+  
   
   round_perl(precursorMz- mz_values)
 }
@@ -9,14 +9,14 @@ neutral_loss <- function(mz_values, precursorMz) {
 ## Helper function: round the mz values depending on the resolution type chosen by the user.
 round_perl <- function(number) {
   
-
-    floor(number + 0.5)
+  
+  floor(number + 0.5)
 }
 
 ## Helper function: remove the duplicate mz values after the rounding.
 remove_duplicates <- function(mz, intensity) {
   
-
+  
   mz <- round_perl(mz)
   
   unique_mz <- unique(mz)
@@ -100,16 +100,16 @@ dynlibmatch2_map <- function(
 ) {
   
   fragments_method <- match.arg(fragments_method)
-
+  
   ## Return empty aligned matrices if one spectrum has no peaks
   if (!nrow(x) || !nrow(y)) {
     empty <- matrix(numeric(), ncol = 2, nrow = 0)
     return(list(empty, empty))
   }
   
-
+  
   ## Clean fragment peaks
-
+  
   cleaned1 <- remove_duplicates(
     x[, 1], x[, 2]
   )
@@ -124,9 +124,9 @@ dynlibmatch2_map <- function(
   mz2 <- cleaned2$mz
   int2 <- cleaned2$intensity
   
-
+  
   ## Exact fragment matching
-
+  
   idx2 <- match(mz1, mz2)
   valid_frag <- !is.na(idx2)
   
@@ -140,9 +140,9 @@ dynlibmatch2_map <- function(
     intensity = int2[idx2[valid_frag]]
   )
   
-
+  
   ## Neutral loss matching
-
+  
   remaining1 <- !valid_frag
   used2 <- rep(FALSE, length(mz2))
   used2[idx2[valid_frag]] <- TRUE
@@ -180,9 +180,9 @@ dynlibmatch2_map <- function(
     }
   }
   
-
+  
   ## Combine matched peaks
-
+  
   
   if (length(matched1_frag) == 0) {
     matched1 <- matrix(numeric(), ncol = 2, nrow = 0)
