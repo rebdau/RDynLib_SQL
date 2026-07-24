@@ -1,7 +1,7 @@
 ---
 title: "workflow to test the MultMatchCID_Spectra() function on ftms data"
-format: html
-  server: shiny
+format:
+  html:
     toc: true
     self-contained: true
 author: "Ahlam Mentag, Rebecca Dauwe, Johannes Rainer"
@@ -266,6 +266,15 @@ sql_to_mgf(ft_path, expid = 266, spectrum_type = "assembled",
            output_file = ft_assembled) 
 ```
 
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+ft_assembled <- here("data", "ft_MS2.mgf")
+sql_to_mgf(ft_path, expid = 266, spectrum_type = "not_assembled", 
+           msLevel = 2, output_file = ft_assembled) 
+```
+
 Then, we convert qtof data:
 ```{r}
 #| message: false
@@ -277,4 +286,12 @@ sql_to_mgf(qt_path, expid = 52, spectrum_type = "intersect_single_energy",
 ```
 
 
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+qt_assembled <- here("data", "qt_merged.mgf")
+sql_to_mgf(qt_path, expid = 52, spectrum_type = "merged_MSMS_all_energies", 
+           output_file = qt_assembled)
+```
 

@@ -27,18 +27,16 @@ library(RDynLib)
 load_all()
 ```
 
-#File paths to the input and output sql databases
+#File paths to the input and output sql databasesftms
 ```{r}
-input_db <- here("data", "DYL_FLAX_FTMSneg.sqlite")
-output_db <- here("data", "filter_flax.sqlite")
-output_db2 <- here("data", "filter_5_7_12.sqlite")
-
+input_db <- here("data", "DYL_flax_herba_FTMSneg.sqlite")
+output_db <- here("data", "Ftmsflax_266_267.sqlite")
 ```
 
 #Call the function to filter the database based on a single expid
 ```{r}
 filterDynLibDB(
-  expid = 266,
+  expid = c(266,267),
   input_db = input_db,
   output_db = output_db
 )
@@ -62,26 +60,99 @@ SELECT *
 FROM ms_compound
 ")
 ```
+```{r}
+dbGetQuery(con_filter , "
+SELECT *
+FROM msms_spectrum
+")
+```
 
 
-#Call the function to filter the database based on a set of expids
+```{r}
+dbGetQuery(con_filter, "
+SELECT COUNT(*) AS n_rows
+FROM ms_compound
+WHERE expid = 266  
+")
+```
+```{r}
+dbGetQuery(con_filter, "
+SELECT COUNT(*) AS n_rows
+FROM msms_spectrum s
+JOIN ms_compound c
+  ON s.compound_id = c.compound_id
+WHERE c.expid = 266 and s.ms_level = 4 and s.spectrum_type = 'not_assembled'
+")
+```
+```{r}
+dbGetQuery(con_filter, "
+SELECT COUNT(*) AS n_rows
+FROM msms_spectrum_peak p
+JOIN msms_spectrum s
+  ON p.spectrum_id = s.spectrum_id
+JOIN ms_compound c
+  ON s.compound_id = c.compound_id
+WHERE c.expid = 267
+")
+```
+
+#QTOF
+#File paths to the input and output sql databases
+```{r}
+input_qt <- here("data", "DyLib_QTOF_pos.sqlite")
+output_qt <- here("data/database_to_publish", "qtof_52.sqlite")
+```
+
+#Call the function to filter the database based on a single expid
 ```{r}
 filterDynLibDB(
-    expid = c(5, 7, 12),
-    input_db = input_db,
-    output_db = output_db2
+  expid = 52,
+  input_db = input_qt,
+  output_db = output_qt
 )
 ```
 
-
-
-#Connection to the output2 database
+#Connection to the output database
 ```{r}
-con_filter2 <- dbConnect(RSQLite::SQLite(), output_db2)
+qt_filter <- dbConnect(RSQLite::SQLite(), output_qt)
 
 #Verify the experiment table
-dbGetQuery(con_filter2 , "
+dbGetQuery(qt_filter , "
 SELECT *
-FROM experiment
+FROM msms_spectrum 
 ")
 ```
+
+```{r}
+dbGetQuery(qt_filter, "
+SELECT COUNT(*) AS n_rows
+FROM feature_matrix
+WHERE expid = 52  
+")
+```
+```{r}
+dbGetQuery(qt_filter, "
+SELECT COUNT(*) AS n_rows
+FROM msms_spectrum s
+JOIN ms_compound c
+  ON s.compound_id = c.compound_id
+WHERE c.expid = 52 and s.ms_level = 2
+")
+```
+```{r}
+dbGetQuery(qt_filter, "
+SELECT COUNT(*) AS n_rows
+FROM msms_spectrum
+WHERE spectrum_type = 'intersect_single_energy'
+  AND dataOrigin LIKE '%DDA1%'
+")
+```
+
+```{r}
+dbGetQuery(qt_filter, "
+SELECT COUNT(*) AS n_rows
+FROM msms_spectrum
+WHERE spectrum_type = 'merged_MSMS_all_energies'
+")
+```
+
