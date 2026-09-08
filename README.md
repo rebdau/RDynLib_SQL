@@ -6,7 +6,7 @@ FROM README Similarity/QTOF
 
 -   "sim_functions_qtofneg.R" : contains all the similarity functions.
 
--   "QTOF_neg_call.qmd" : in this file we call the similarity functions from the "sim_functions_qtofneg.R" to calculate the similarity between flax qtof negative and Dynlib qtof negative data.
+-   "Spectral_similarity_Qtof.qmd" : in this file we call the similarity functions from the "sim_functions_qtofneg.R" to calculate the similarity between flax qtof negative and Dynlib qtof negative data.
 
 -   "test_real_spectra.qmd" : here we test the similarity functions from "sim_functions_qtofneg.R" on some spectra examples and we compare the results with other similarity measures such as compareSpectra() from the spectra package, and NeutralLossesCosine() from the Python's matchms library.
 
@@ -18,7 +18,7 @@ FROM README Similarity/QTOF
 
 1.  "sim_functions_qtofneg.R"
 
-2.  "QTOF_neg_call.qmd"
+2.  "Spectral_similarity_Qtof.qmd"
 
 3.  "unit_test_qtofneg.R"
 
@@ -33,7 +33,7 @@ FROM README Similarity/FTMS
 
 -   "sim_functions_ftmsneg.R" : contains all the similarity functions.
 
--   "FTMS_neg_call.qmd" : in this file we call the similarity functions from the "sim_functions_ftmsneg.R" to calculate the similarity between flax ftms negative and Dynlib ftms negative data.
+-   "Spectral_similarity_FTMS.qmd" : in this file we call the similarity functions from the "sim_functions_ftmsneg.R" to calculate the similarity between flax ftms negative and Dynlib ftms negative data.
 
 -   "test_real_spectra.qmd" : here we test the similarity functions from "sim_functions_ftmsneg.R" on some spectra examples and we compare the results with other similarity measures such as compareSpectra() from the spectra package, and NeutralLossesCosine() from the Python's matchms library.
 
@@ -47,7 +47,7 @@ FROM README Similarity/FTMS
 
 <!-- -->
 
-1.  "FTMS_neg_call.qmd"
+1.  "Spectral_similarity_FTMS.qmd"
 
 2.  "unit_test_ftmsneg"
 

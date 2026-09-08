@@ -77,7 +77,7 @@ con_flax <- dbConnect(RSQLite::SQLite(), db_flax)
 
 Loading the sql database of Dynlib qtof negative
 ```{r}
-db_dyl <- here("data", "QTOF_flax_neg.sqlite")
+db_dyl <- here("data", "DyLib_QTOF_neg.sqlite")
 con_dyL <- dbConnect(RSQLite::SQLite(), db_dyl)
 ```
 
@@ -132,6 +132,20 @@ The new experiment has 52 as expid
 #Ensuring the ms_compound has been well merged
 ```{r}
 dbGetQuery(con_merged, "Select * from ms_compound where expid = 52 LIMIT 10")
+```
+
+Add accessions to the database with specefic initials for flax and herbacetin 
+experiments, the other experiments would have the first two letters of the user
+column from experiment table as initials.
+```{r}
+add_accessions(dbf, 
+                initials_overrides = c("52" = "RD"))
+```
+```{r}
+dbReadTable(con_merged, "experiment")
+```
+```{r}
+dbReadTable(con_merged, "ms_compound")
 ```
 
 
