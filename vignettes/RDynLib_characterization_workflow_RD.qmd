@@ -1,0 +1,279 @@
+---
+title: "RDynLib workflow for metabolite structural annotation"
+format:
+  html:
+    toc: true
+    self-contained: true
+author: "Ahlam Mentag, Rebecca Dauwe"
+---
+
+# Overview
+
+This workflow illustrates how the **RDynLib infrastructure supports metabolite structural annotation**, from spectral data exploration and comparison to the recording of compound annotations and their provenance in DynLib databases.
+
+A flax seed DynLib database, generated from a new LC-MS experiment containing compounds to be structurally annotated, serves as the **query database** throughout the workflow. It is compared with a maize DynLib database containing previously characterized metabolites and their associated spectra, which serves as the **reference database**.
+
+The workflow progresses from general **spectral similarity searching** against a reference DynLib database (the maize database in this example) and the **export of spectral data for further analysis with external databases and tools**, to detailed comparison and **visualization of individual spectra**, including **matching across different MSⁿ levels**. A key functionality of RDynLib is the **joint exploitation of complementary fragmentation information acquired on different mass spectrometry platforms**, such as ion trap and QTOF instruments, to support structural characterization. Biochemical and spectral relationships are explored through the construction and visualization of **CSPP and GNPS-like molecular networks**.
+
+Finally, the resulting **compound annotation is written to the flaxseed DynLib database**. Along with the structural annotation itself, the evidence and reasoning underlying the characterization are recorded as an **annotation event**, preserving the provenance of the annotation and documenting the justification for the **assigned confidence level**.
+
+# Workflow setup
+
+## Loading required packages
+
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+#| 
+library(devtools)
+library(DBI)
+library(RSQLite)
+library(here)
+library(CompoundDb)
+library(MsBackendMgf)
+
+# TODO: Replace with library(RDynLib) once the package is finalized.
+load_all()
+```
+
+## Retrieving DynLib datasets from Zenodo
+
+The DynLib SQLite databases used in this workflow are provided through Zenodo. Each database contains the features detected in one or more LC-MS experiments together with their associated mass spectral data and experimental metadata and compound annotations. Separate databases are used for each mass spectrometry platform and ionization mode:
+
+-   **FTneg / FTpos**: LTQ-Orbitrap FT-MS data acquired in negative / positive ionization mode, including MSⁿ spectra
+-   **QTOFneg / QTOFpos**: QTOF-MS data acquired in negative / positive ionization mode, including MS/MS spectra
+
+```{r}
+# TODO: this chunk is for the working document and needs to be replaced by the Zenodo chunk when we will have deposited the databases.
+#| message: false
+#| results: "hide"
+#| warning: false
+ft_path <- here("data", "DYL_FLAX_herba_FTMSneg.sqlite")
+con <- dbConnect(RSQLite::SQLite(), ft_path)
+
+# TODO # Ahlam : 
+# create also a path to the QTOFneg database, and by subsetting create the following databases:
+# maize_FTneg
+# maize_QTOFneg
+# flaxseed_FTneg
+# flaxseed_QTOFneg
+# HDG_FTneg
+# HDG_QTOFneg
+```
+
+```{r}
+# TODO: this chunk is for the working document and needs to be replaced by the Zenodo chunk when we will have deposited the databases.
+#| message: false
+#| results: "hide"
+#| warning: false
+ft_path <- here("data", "DYL_FLAX_herba_FTMSneg.sqlite")
+con <- dbConnect(RSQLite::SQLite(), ft_path)
+
+# TODO # Ahlam : 
+# create also a path to the QTOFneg database, and by subsetting create the following databases:
+# maize_FTneg
+# maize_QTOFneg
+# flaxseed_FTneg
+# flaxseed_QTOFneg
+# HDG_FTneg
+
+```
+
+To create the target library for spectral matching, the maize FTneg DynLib database is merged with the HDG_FTneg DynLib database.
+
+```{r}
+# TODO # Ahlam : 
+
+target_DL_FTneg <- 
+ 
+
+```
+
+# Spectral similarity searching against a reference DynLib database
+
+TODO: Ahlam: insert here the code for MS2-MS2 similarity search of flax FTneg against maize+HDG FTneg (target_DL_FTneg) similarity search of flax QTOFneg against maize QTOFneg (=target_DL_QTOFneg) As optional code, add also Adding_names () function
+
+=====================================================================
+
+We start by the CID spectral matching of 101280 compound from ftms negative database, To do that we need to convert tha database to a spectra object:
+
+```{r}
+dy_sps <- sql_to_spectra(ft_path)
+```
+
+```{r}
+cmp <- MultMatchCID_Spectra(
+  dy_sps,
+  101280,
+   spectrum_type_query = "not_assembled",
+  spectrum_type_target = "not_assembled",
+   ms_level_query = 2,
+   ms_level_target = 2,
+  polarity_query = 0,
+  polarity_target = 0,
+  tolerance = 0,
+  ppm = 10,
+  minIons = ,
+    fragments_resolution = "unit.resolution",
+  requirePrecursor = T,
+)
+head(cmp, 5)
+```
+
+Then we update the cspp table:
+
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+cspp.tot_SQL(ft_path, 266, mzerr = 0.01,
+                         cspp = cspp_ft, peakwidth = 0.1, IntThres  = 0, mz_tol = 0.5,
+                         dot_thresh = 0, spectrum_type = "assembled",  
+                         min_common = 0, charge_file = charge_file)
+```
+
+Update the gnps table:
+
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+conv.GNPS_SQL(sql_path= ft_path, expid = 266, peakwidth = 0.2, mzerr = 0.015,
+              min = 5, adduct = 60.0211, thr1 = 2, thr2 = 0.1, thr3 = 0.3,
+              spectrum_type = "not_assembled", IntThres = 0)
+```
+
+Next we visualize the CSPP and GNPS network of 101280 compound from ftms neg:
+
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+#| #| dev: svg
+#| fig-width: 20
+#| fig-height: 15
+Overall.net_SQL(sql_path = ft_path, exp.id = 266, dbkey = 101280, min = 0,
+                nr_of_seq = 3, thr1 = 0.1, thr2 = 0.2, thr3 = 0.3)
+```
+
+Now we show the ion trap based analysis of 100988 compound:
+
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+#| #| dev: svg
+#| fig-width: 14
+#| fig-height: 8
+MSnplot_SQL(ft_path, 100988, thr_int = 100)
+```
+
+```{r}
+#| fig-width: 14
+#| fig-height: 4
+MSnplot_SQL(ft_path, 101155, thr_int = 100)
+```
+
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+#| #| dev: svg
+#| fig-width: 14
+#| fig-height: 8
+MSnplot_SQL(ft_path, 101283, thr_int = 100)
+```
+
+#Qtof flax analysis
+
+Import the database and required files:
+
+```{r}
+qt_path <- here("data", "DYL_FLAX_QTOFneg.sqlite")
+con_qt <- dbConnect(RSQLite::SQLite(), qt_path )
+neutral_loss_candid <- here("data", "neutral_loss_candid.txt")
+neutloss <- read.table(
+  neutral_loss_candid,
+  header = TRUE,
+  sep = "\t",
+  stringsAsFactors = FALSE
+)
+
+product_ion_candid <- here("data", "product_ion_candid_2.txt")
+prdion <- read.table(
+  product_ion_candid,
+  header = TRUE,
+  sep = "\t",
+  stringsAsFactors = FALSE
+)
+
+```
+
+The aligned compound in qtof data that corresponds to 100988 compound from ftms data:
+
+```{r}
+alignment_file <- here("data", "assoc_flax_63.txt")
+
+getAlignedCompids <- getAlignedCompids_SQL(
+compound_id = 100988,
+  database_name = "DYL_FLAX_FTMSneg.sqlite",
+  alignment_file = alignment_file
+)
+getAlignedCompids
+```
+
+The 45890 is the qtof compound_id that was aligned with 100988 ftms compound_id.
+
+The msms_spectrum table linked to that compound_id to select the spectrum_id:
+
+```{r}
+list_spectrum <- get_spectrum_id(45890)
+list_spectrum
+```
+
+We chose the 46001 spectrum_id to show the qtof based neutral loss analysis:
+
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+#| #| dev: svg
+#| fig-width: 14
+#| fig-height: 8
+MSMSspecplot_SQL(qt_path, 46001, 
+                 prdion = prdion, neutloss = neutloss, err = NULL, 
+                 minum = NULL, nr_col = NULL,   nr_col2 = NULL)
+```
+
+Now we enter the characterization of the compounds found to the database:
+
+```{r}
+#EnterName_SQL(ft_path, CoMPID = 101143)
+```
+
+```{r}
+#EnterName_SQL(ft_path, CoMPID = 100988)
+```
+
+Next, we call the function to export the sql database to an mgf format that could be used for further analysis and comparisons with public databases available on public platforms like: GNPS... We start by converting ftms data
+
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+ft_assembled <- here("data", "ft_assembled.mgf")
+sql_to_mgf(ft_path, expid = 266, spectrum_type = "assembled", 
+           output_file = ft_assembled) 
+```
+
+Then, we convert qtof data:
+
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+qt_assembled <- here("data", "qt_assembled.mgf")
+sql_to_mgf(qt_path, expid = 52, spectrum_type = "intersect_single_energy", 
+           output_file = qt_assembled) 
+```
