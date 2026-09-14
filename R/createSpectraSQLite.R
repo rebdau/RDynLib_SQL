@@ -476,6 +476,8 @@ createSpectraSQLite <- function(
       ionisationEnergy REAL,
       lowMZ REAL,
       highMZ REAL,
+      msn_tree_id INTEGER,
+      merged_msn_tree_id INTEGER,
       mergedScan INTEGER,
       mergedResultScanNum INTEGER,
       mergedResultStartScanNum INTEGER,
@@ -578,6 +580,12 @@ createSpectraSQLite <- function(
     totIonCurrent =
       getcol("totIonCurrent"),
     
+    msn_tree_id =
+      getcol("MSntreeID"),
+    
+    merged_msn_tree_id =
+      getcol("MergedMSntreeID"),
+    # 
     basePeakMZ =
       getcol("basePeakMZ"),
     
@@ -696,7 +704,7 @@ createSpectraSQLite <- function(
     
     stringsAsFactors = FALSE
   )
-  
+   
   
   ## Link spectra to compounds
   

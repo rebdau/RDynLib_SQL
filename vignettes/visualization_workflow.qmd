@@ -61,7 +61,7 @@ cmp <- MultMatchCID_Spectra(
   dy_sps,
   101280,
    spectrum_type_query = "not_assembled",
-  spectrum_type_target = "NA",
+  spectrum_type_target = "not_assembled",
    ms_level_query = 2,
    ms_level_target = 2,
   polarity_query = 0,

@@ -35,10 +35,12 @@ sql_to_mgf <- function(sqlite_path,
                        spectrum_type = NULL,
                        output_file) {
   
-  # GNPS helper functions
-  source("https://raw.githubusercontent.com/jorainer/xcms-gnps-tools/master/customFunctions.R")
+  ## GNPS helper functions
+  source(
+    "https://raw.githubusercontent.com/jorainer/xcms-gnps-tools/master/customFunctions.R"
+  )
   
-  ## Load database as Spectra
+  ## Load database
   cdb <- CompDb(sqlite_path)
   
   cdb <- addJoinDefinition(
@@ -49,6 +51,7 @@ sql_to_mgf <- function(sqlite_path,
     column_b = "nodename"
   )
   
+  ## Convert database to Spectra
   sps <- Spectra(cdb)
   
   ## Filtering
@@ -62,57 +65,73 @@ sql_to_mgf <- function(sqlite_path,
     sps <- sps[sps$spectrum_type %in% spectrum_type]
   }
   
-  if (length(sps) == 0)
+  if (length(sps) == 0) {
     stop("No spectra left after filtering")
+  }
   
-  # Restrict variables to GNPS relevant ones
+  ## Keep variables needed for export
   sps <- selectSpectraVariables(
     sps,
-    c( "compound_id",
-       "precursorMz",
-       "rtime",
-       "nodename",
-       "dataOrigin",
-       "msLevel",
-       "precScanNum"
+    c(
+      "spectrum_id",
+      "compound_id",
+      "compound_accession",
+      "precursorMz",
+      "rtime",
+      "nodename",
+      "dataOrigin",
+      "msLevel",
+      "precScanNum"
     )
   )
   
-  
-  ## Map nodename to feature_id (GNPS requirement)
+  ## nodename becomes GNPS feature ID
   sps$feature_id <- sps$nodename
   
-  sps <- selectSpectraVariables(
-    sps,
-    c( "compound_id",
-       "precursorMz",
-       "rtime",
-       "feature_id",
-       "dataOrigin",
-       "msLevel",
-       "precScanNum"
-    )
-  )
-  
+  ## Save metadata before formatSpectraForGNPS()
+  spectrum_ids <- sps$spectrum_id
+  compound_ids <- sps$compound_id
+  compound_accessions <- sps$compound_accession
+  ms_levels <- sps$msLevel
+  prec_scan_nums <- sps$precScanNum
+  data_origins <- sps$dataOrigin
   
   ## Format spectra for GNPS
   sps_gnps <- formatSpectraForGNPS(sps)
   
-  sps_gnps$COMPOUND_ID <- sps$compound_id
-  sps_gnps$MSLEVEL     <- sps$msLevel
-  sps_gnps$PRECSANNUM <- sps$precScanNum
-  sps_gnps$DATAORIGIN  <- sps$dataOrigin
   
+  sps_gnps$scan_accession <- paste0(
+    compound_accessions,
+    "_",
+    spectrum_ids
+  )
   
-  ## Export MGF using MsBackendMgf
+  ## Additional MGF metadata
+  sps_gnps$COMPOUND_ID <- compound_ids
+  sps_gnps$COMPOUND_ACCESSION <- compound_accessions
+  sps_gnps$MSLEVEL <- ms_levels
+  sps_gnps$PRECSANNUM <- prec_scan_nums
+  sps_gnps$DATAORIGIN <- data_origins
+  
+  ## MGF mapping
+  
+  mgf_mapping <- spectraVariableMapping(MsBackendMgf())
+  
+  ## Remove the normal acquisitionNum -> SCANS mapping
+  mgf_mapping <- mgf_mapping[
+    !(names(mgf_mapping) == "acquisitionNum")
+  ]
+  
+  ## Map our character identifier to SCANS
+  mgf_mapping["scan_accession"] <- "SCANS"
+  
+  ## Export MGF
   export(
     sps_gnps,
     backend = MsBackendMgf(),
-    file    = output_file
+    file = output_file,
+    mapping = mgf_mapping
   )
   
   invisible(TRUE)
 }
-
-
-
