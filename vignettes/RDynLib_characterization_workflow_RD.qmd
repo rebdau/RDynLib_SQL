@@ -109,17 +109,53 @@ con_hdgft <- dbConnect(RSQLite::SQLite(), hdg_ftms)
 #| message: false
 #| results: "hide"
 #| warning: false
-ft_path <- here("data", "DYL_FLAX_herba_FTMSneg.sqlite")
-con <- dbConnect(RSQLite::SQLite(), ft_path)
-
-# TODO # Ahlam : 
-# create also a path to the QTOFneg database, and by subsetting create the following databases:
+# Import the data from zenodo and create the connections
 # maize_FTneg
-# maize_QTOFneg
-# flaxseed_FTneg
-# flaxseed_QTOFneg
-# HDG_FTneg
+get_dynlib_zenodo(
+  doi = ,
+  file = "maize_ftms.sqlite",
+  destdir = "data"
+)
+maize_ftms <- here("data", "maize_ftms.sqlite")
+con_mft <- dbConnect(RSQLite::SQLite(), maize_ftms)
 
+# maize_QTOFneg
+get_dynlib_zenodo(
+  doi = ,
+  file = "maize_qtof.sqlite",
+  destdir = "data"
+)
+maize_qtof <- here("data", "maize_qtof.sqlite")
+con_mqt <- dbConnect(RSQLite::SQLite(), maize_qtof)
+
+# flaxseed_FTneg
+get_dynlib_zenodo(
+  doi = ,
+  file = "flax_ftms.sqlite",
+  destdir = "data"
+)
+flax_ftms <- here("data", "flax_ftms.sqlite")
+con_fft <- dbConnect(RSQLite::SQLite(), flax_ftms)
+
+# flaxseed_QTOFneg
+get_dynlib_zenodo(
+  doi = ,
+  file = "flax_qtof.sqlite",
+  destdir = "data"
+)
+flax_qtof <- here("data", "flax_qtof.sqlite")
+con_fqt <- dbConnect(RSQLite::SQLite(), flax_qtof)
+
+# HDG_FTneg 
+get_dynlib_zenodo(
+  doi = ,
+  file = "flax_qtof.sqlite",
+  destdir = "data"
+)
+hdg_ftms <- here("data", "hdg_ftms.sqlite")
+con_hdgft <- dbConnect(RSQLite::SQLite(), hdg_ftms)
+
+#Ahlam : we don't have hdg in qtof
 ```
 
 To create the target library for spectral matching, the maize FTneg DynLib database is merged with the HDG_FTneg DynLib database.
