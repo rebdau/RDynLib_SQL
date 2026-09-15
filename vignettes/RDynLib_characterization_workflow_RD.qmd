@@ -149,7 +149,7 @@ con_fqt <- dbConnect(RSQLite::SQLite(), flax_qtof)
 # HDG_FTneg 
 get_dynlib_zenodo(
   doi = ,
-  file = "flax_qtof.sqlite",
+  file = "hdg_ftms.sqlite",
   destdir = "data"
 )
 hdg_ftms <- here("data", "hdg_ftms.sqlite")
