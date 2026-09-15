@@ -50,16 +50,58 @@ The DynLib SQLite databases used in this workflow are provided through Zenodo. E
 #| results: "hide"
 #| warning: false
 ft_path <- here("data", "DYL_FLAX_herba_FTMSneg.sqlite")
-con <- dbConnect(RSQLite::SQLite(), ft_path)
+con_ft <- dbConnect(RSQLite::SQLite(), ft_path)
 
 # TODO # Ahlam : 
 # create also a path to the QTOFneg database, and by subsetting create the following databases:
+#Qtof database
+qt_path <- here("data", "DYL_FLAX_QTOFneg.sqlite")
+con_qt <- dbConnect(RSQLite::SQLite(), qt_path)
+
 # maize_FTneg
+maize_ftms <- here("data", "maize_ftms.sqlite")
+filterDynLibDB(
+  expid = ,
+  input_db = ft_path,
+  output_db = maize_ftms
+)
+con_mft <- dbConnect(RSQLite::SQLite(), maize_ftms)
+
 # maize_QTOFneg
+maize_qtof <- here("data", "maize_qtof.sqlite")
+filterDynLibDB(
+  expid = ,
+  input_db = ft_path,
+  output_db = maize_qtof
+)
+con_mqt <- dbConnect(RSQLite::SQLite(), maize_qtof)
+
 # flaxseed_FTneg
+flax_ftms <- here("data", "flax_ftms.sqlite")
+filterDynLibDB(
+  expid = 266,
+  input_db = ft_path,
+  output_db = here("data", "flax_ftms.sqlite")
+)
+con_fft <- dbConnect(RSQLite::SQLite(), flax_ftms)
 # flaxseed_QTOFneg
-# HDG_FTneg
-# HDG_QTOFneg
+flax_qtof <- here("data", "flax_qtof.sqlite")
+filterDynLibDB(
+  expid = 52,
+  input_db = input_db,
+  output_db = here("data", "flax_qtof.sqlite")
+)
+con_fqt <- dbConnect(RSQLite::SQLite(), flax_qtof)
+
+# HDG_FTneg 
+hdg_ftms <- here("data", "hdg_ftms.sqlite")
+filterDynLibDB(
+  expid = 267,
+  input_db = ft_path,
+  output_db = here("data", "hdg_ftms.sqlite")
+con_hdgft <- dbConnect(RSQLite::SQLite(), hdg_ftms)
+
+#Ahlam : we don't have hdg in qtof
 ```
 
 ```{r}
@@ -84,16 +126,128 @@ To create the target library for spectral matching, the maize FTneg DynLib datab
 
 ```{r}
 # TODO # Ahlam : 
+#FTMS 
+target_DL_FTneg <- here("data", "FT_maize_hdg.sqlite")
 
-target_DL_FTneg <- 
- 
+merge_databases(main_db  = maize_ftms, add_db = hdg_ftms,
+                output_db = target_DL_FTneg)
+
+con_merged <- dbConnect(RSQLite::SQLite(), target_DL_FTneg)
 
 ```
 
 # Spectral similarity searching against a reference DynLib database
 
-TODO: Ahlam: insert here the code for MS2-MS2 similarity search of flax FTneg against maize+HDG FTneg (target_DL_FTneg) similarity search of flax QTOFneg against maize QTOFneg (=target_DL_QTOFneg) As optional code, add also Adding_names () function
+TODO: Ahlam: insert here the code for MS2-MS2 similarity search of flax FTneg against maize+HDG FTneg (target_DL_FTneg) similarity search of flax QTOFneg against maize QTOFneg (=target_DL_QTOFneg ) As optional code, add also Adding_names () function
+ 
+Ahlam: for qtof similarity we don't have hdg in qtof so we will just calculate the similarity between qtof flax and qtof maize?
 
+We start by MS2-MS2 similarity search of flax FTneg against maize+HDG FTneg
+(target_DL_FTneg) 
+
+#FTMS spectra similarity(maize_hdg vs flax)
+
+First we convert both sql databases to a spectra object:
+```{r}
+sp_maize_hdg <- sql_to_spectra(target_DL_FTneg)
+sp_ftflax <- sql_to_spectra(flax_ftms)
+```
+
+Next we extract the available spectrum types in both databases
+```{r}
+available_spectrum_types(con_merged)
+```
+
+```{r}
+available_spectrum_types(con_fft) 
+```
+
+Then we call the similarity_RDynLib_match() function : 
+```{r}
+ftms_matches2_T <- similarity_RDynLib_match(
+  sp_ftflax,
+  sp_maize_hdg,
+  polarity_query = 0,
+  polarity_target = 0,
+  msLevel_query = 2,
+  msLevel_target = 2,
+  spectrum_type_query = "not_assembled",
+  spectrum_type_target = "not_assembled",
+  requirePrecursor = TRUE,
+  tolerance = 0,
+  ppm = 5,
+  threshold = 0.7,
+  fragments_resolution = "unit.resolution"
+ )
+```
+
+Show the number of the found matches
+```{r}
+print(ftms_matches2_T)
+nrow(ftms_matches2_T) 
+```
+
+Adding names of the new matches to flax ftms sql database:
+```{r}
+add_spectral_matches(con_fft, ftms_matches2_T)
+```
+
+In case of matches, verify if they are well added to the database:
+```{r}
+dbGetQuery(con_fft, "Select * from msms_spectrum where match_name IS not null LIMIT 1")
+```
+
+#QTOF spectral similarity (maize vs flax)
+
+First we convert both sql databases to a spectra object:
+```{r}
+sp_qtmaize <- sql_to_spectra(maize_qtof)
+sp_qtflax <- sql_to_spectra(flax_qtof)
+```
+
+Next we extract the available spectrum types in both databases
+```{r}
+available_spectrum_types(con_mqt)
+```
+
+```{r}
+available_spectrum_types(con_fqt) 
+```
+
+Then we call the similarity_RDynLib_match() function : 
+```{r}
+qtof_matches2_T <- similarity_RDynLib_match(
+  sp_qtflax,
+  sp_qtmaize,
+  polarity_query = 0,
+  polarity_target = 0,
+  msLevel_query = 2,
+  msLevel_target = 2,
+  spectrum_type_query = "Intersect_single_energy",
+  spectrum_type_target = "Intersect_single_energy",
+  requirePrecursor = TRUE,
+  tolerance = 0,
+  ppm = 5,
+  threshold = 0.7,
+  fragments_resolution = "high.resolution"
+ )
+```
+
+Show the number of the found matches
+```{r}
+print(qtof_matches2_T)
+nrow(qtof_matches2_T) 
+```
+
+Adding names of the new matches to flax qtof sql database:
+```{r}
+add_spectral_matches(con_fqt, qtof_matches2_T)
+```
+
+In case of matches, verify if they are well added to the database:
+```{r}
+dbGetQuery(con_fqt, "Select * from msms_spectrum where match_name IS not null LIMIT 1")
+```
 =====================================================================
 
 We start by the CID spectral matching of 101280 compound from ftms negative database, To do that we need to convert tha database to a spectra object:
