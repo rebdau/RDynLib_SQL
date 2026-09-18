@@ -41,6 +41,10 @@ add_spectral_matches <- function(con_merged, sim_table) {
       
       match_compound_id = target_compound_id,
       
+      match_spectrum_id = target_spectrum_id,
+      
+      match_compound_accession = target_compound_accession,
+      
       match_precursor_mz = target_precursorMz,
       
       match_score = score,
@@ -60,6 +64,8 @@ add_spectral_matches <- function(con_merged, sim_table) {
     matches = "TEXT",
     match_name = "TEXT",
     match_compound_id = "INTEGER",
+    match_spectrum_id = "INTEGER",
+    match_compound_accession = "TEXT",
     match_precursor_mz = "REAL",
     match_score = "REAL",
     match_common = "INTEGER",
@@ -135,6 +141,23 @@ add_spectral_matches <- function(con_merged, sim_table) {
 
       match_compound_id = (
         SELECT match_compound_id
+        FROM tmp_matches t
+        WHERE t.dataOrigin = msms_spectrum.dataOrigin
+        AND t.acquisitionNum = msms_spectrum.acquisitionNum
+        AND t.msLevel = msms_spectrum.ms_level
+        AND t.spectrum_type = msms_spectrum.spectrum_type
+      ),
+      
+      match_spectrum_id = (
+        SELECT match_spectrum_id
+        FROM tmp_matches t
+        WHERE t.dataOrigin = msms_spectrum.dataOrigin
+        AND t.acquisitionNum = msms_spectrum.acquisitionNum
+        AND t.msLevel = msms_spectrum.ms_level
+        AND t.spectrum_type = msms_spectrum.spectrum_type
+      ),
+      match_compound_accession = (
+        SELECT match_compound_accession
         FROM tmp_matches t
         WHERE t.dataOrigin = msms_spectrum.dataOrigin
         AND t.acquisitionNum = msms_spectrum.acquisitionNum

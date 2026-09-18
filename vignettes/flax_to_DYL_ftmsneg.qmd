@@ -131,7 +131,7 @@ dbReadTable(con_merged, "experiment")
 ```
 
 ```{r}
-dbGetQuery(con_merged, "Select * from experiment where user = 'Ahlam'")
+dbGetQuery(con_merged, "Select * from experiment where user = 'ament'")
 ```
 
 The new experiment has 266 as expid
@@ -233,7 +233,8 @@ con_merged <- dbConnect(RSQLite::SQLite(), dbf)
 
 
 ```{r}
-adding_Names_SQL(con_merged, ftms_matches)
+adding_Names_SQL(db,  spectrum_type = "not_assembled", msLevel = 2, compound_id = NULL,
+    overwrite = FALSE )
 ```
 
 ```{r}

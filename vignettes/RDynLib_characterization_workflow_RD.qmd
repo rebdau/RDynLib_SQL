@@ -226,6 +226,13 @@ print(ftms_matches2_T)
 nrow(ftms_matches2_T) 
 ```
 
+Store the first 20 matches based on the matched_peaks_count:
+```{r}
+ft_20_matches <- ftms_matches2_T %>%
+  arrange(desc(matched_peaks_count)) %>%
+  slice_head(n = 20)
+```
+
 The spectral matches can be added to the `msms_spectrum` table of the sql database.
 
 ```{r}
@@ -235,7 +242,11 @@ add_spectral_matches(con_fft, ftms_matches2_T)
 
 # TODO : print only selected relevant columns
 
-dbGetQuery(con_fft, "Select * from msms_spectrum where match_name IS not null LIMIT 1")
+dbGetQuery(con_fft, "Select spectrum_id, ms_level, compound_id, precursor_mz,
+                     spectrum_type, matches, match_mslevel, match_common,
+                     match_precursor_mz, match_compound_id, match_spectrum_type,
+                     match_spectrum_id
+           from msms_spectrum where match_name IS not null LIMIT 1")
 
 ```
 
@@ -243,7 +254,8 @@ Based on the spectral matches, compound names can be automatically added to the 
 
 Each automatic annotation also creates an **annotation event** in the `annotation_history` table. The event records information supporting the match, including the spectral similarity score and the experiment accession of the matched compound. While the name stored in `ms_compound` can subsequently be replaced as the compound is further characterized, the annotation event is retained in the annotation history, providing a persistent record of the spectral match and the progression of the compound annotation.
 ```{r}
-TODO
+adding_Names_SQL(con_fft,  spectrum_type = "not_assembled", msLevel = 2, compound_id = NULL,
+    overwrite = FALSE )
 ```
 
 ## QTOF spectral similarity (maize vs flax)
@@ -285,14 +297,21 @@ qtof_matches2_T <- similarity_RDynLib_match(
  )
 ```
 
-Show the number of the found matches
 
+Show the matches:
 ```{r}
 print(qtof_matches2_T)
 nrow(qtof_matches2_T) 
 ```
 
-Adding names of the new matches to flax qtof sql database:
+Store the first 20 matches based on the matched_peaks_count:
+```{r}
+qt_20_matches <- qtof_matches2_T %>%
+  arrange(desc(matched_peaks_count)) %>%
+  slice_head(n = 20)
+```
+
+The spectral matches can be added to the `msms_spectrum` table of the sql database.
 
 ```{r}
 add_spectral_matches(con_fqt, qtof_matches2_T)
@@ -301,7 +320,17 @@ add_spectral_matches(con_fqt, qtof_matches2_T)
 In case of matches, verify if they are well added to the database:
 
 ```{r}
-dbGetQuery(con_fqt, "Select * from msms_spectrum where match_name IS not null LIMIT 1")
+dbGetQuery(con_fqt, "Select spectrum_id, ms_level, compound_id, precursor_mz,
+                     spectrum_type, matches, match_mslevel, match_common,
+                     match_precursor_mz, match_compound_id, match_spectrum_type,
+                     match_spectrum_id
+           from msms_spectrum where match_name IS not null LIMIT 1")
+```
+
+Adding names as ftms
+```{r}
+adding_Names_SQL(con_fft,  spectrum_type = "not_assembled", msLevel = 2, compound_id = NULL,
+    overwrite = FALSE )
 ```
 
 # Spectral similarity searching against a public spectral database

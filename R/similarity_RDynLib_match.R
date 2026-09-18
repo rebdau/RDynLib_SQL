@@ -323,7 +323,9 @@ similarity_RDynLib_match <- function(
     "name",
     "scanIndex",
     "dataOrigin",
-    "compound_id"
+    "compound_id",
+    "compound_accession",
+    "spectrum_id"
   )
   
   
@@ -424,7 +426,18 @@ similarity_RDynLib_match <- function(
     ] <- "target_compound_id"
   }
   
-  
+  if ("compound_accession" %in% names(df)) {
+    
+    names(df)[
+      names(df) == "compound_accession"
+    ] <- "target_compound_accession"
+  }
+  if ("spectrum_id" %in% names(df)) {
+    
+    names(df)[
+      names(df) == "spectrum_id"
+    ] <- "target_spectrum_id"
+  }
   
   df <- df[
     !is.na(df$score) &
