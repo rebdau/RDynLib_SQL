@@ -90,7 +90,7 @@ filterDynLibDB(
   input_db = qtofneg_path,
   output_db = here("data", "flax_qtofneg.sqlite")
 )
-con_fqt <- dbConnect(RSQLite::SQLite(), flax_qtof)
+con_fqt <- dbConnect(RSQLite::SQLite(), flax_qtofneg)
 
 # HDG FTneg 
 hdg_ftneg <- here("data", "hdg_ftneg.sqlite")
@@ -161,8 +161,9 @@ To create the target library for spectral matching, the maize FTneg DynLib datab
 ```{r}
 target_DL_FTneg <- here("data", "FTneg_maize_hdg.sqlite")
 
+#convert_add_rt is False because both databases are already in minutes so no need for conversion
 merge_databases(main_db  = maize_ftneg, add_db = hdg_ftneg,
-                output_db = target_DL_FTneg)
+                output_db = target_DL_FTneg, convert_add_rt = FALSE)
 
 con_merged <- dbConnect(RSQLite::SQLite(), target_DL_FTneg)
 
@@ -263,14 +264,14 @@ adding_Names_SQL(con_fft,  spectrum_type = "not_assembled", msLevel = 2, compoun
 First we convert both sql databases to a spectra object:
 
 ```{r}
-sp_qtmaize <- sql_to_spectra(maize_qtof)
-sp_qtflax <- sql_to_spectra(flax_qtof)
+sp_qtmaize <- sql_to_spectra(maize_qtofneg)
+sp_qtflax <- sql_to_spectra(flax_qtofneg)
 ```
 
 Next we extract the available spectrum types in both databases:
 
 ```{r}
-available_spectrum_types(con_mqt)
+available_spectrum_types(con_mqt) 
 ```
 
 ```{r}
@@ -287,8 +288,8 @@ qtof_matches2_T <- similarity_RDynLib_match(
   polarity_target = 0,
   msLevel_query = 2,
   msLevel_target = 2,
-  spectrum_type_query = "Intersect_single_energy",
-  spectrum_type_target = "Intersect_single_energy",
+  spectrum_type_query = "intersect_single_energy",
+  spectrum_type_target = "not_assembled",
   requirePrecursor = TRUE,
   tolerance = 0,
   ppm = 5,

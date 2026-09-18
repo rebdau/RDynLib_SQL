@@ -67,37 +67,62 @@ similarity_RDynLib_match <- function(
   fragments_resolution <- match.arg(fragments_resolution)
   
   
-  pol_st <- spectraData(st_sps, "polarity")[["polarity"]]
-  st_filtered <- st_sps[pol_st == polarity_query]
+  # Polarity filtering
   
-  dy_meta <- spectraData(dy_sps, c("polarity", "name"))
+  pol_st <- Spectra::spectraData(
+    st_sps,
+    "polarity"
+  )[["polarity"]]
   
-  keep_dy <- dy_meta$polarity == polarity_target &
+  st_filtered <- st_sps[
+    !is.na(pol_st) &
+      pol_st == polarity_query
+  ]
+  
+  
+  dy_meta <- Spectra::spectraData(
+    dy_sps,
+    c("polarity", "name")
+  )
+  
+  keep_dy <- !is.na(dy_meta$polarity) &
+    dy_meta$polarity == polarity_target &
     !is.na(dy_meta$name) &
     dy_meta$name != "" &
     !grepl("^!", dy_meta$name)
   
-  dy_filtered <- dy_sps[keep_dy]
+  dy_filtered <- dy_sps[
+    keep_dy
+  ]
   
-  if (length(st_filtered) == 0 || length(dy_filtered) == 0)
+  
+  if (
+    length(st_filtered) == 0 ||
+    length(dy_filtered) == 0
+  ) {
     return(data.frame())
+  }
   
   
-
+  # Detect spectrum type column
   
   detect_spectrum_type_column <- function(sps) {
     
-    cols <- spectraVariables(sps)
+    cols <- Spectra::spectraVariables(sps)
     
-    if ("spectrum.type" %in% cols)
+    if ("spectrum.type" %in% cols) {
       return("spectrum.type")
+    }
     
-    if ("spectrum_type" %in% cols)
+    if ("spectrum_type" %in% cols) {
       return("spectrum_type")
+    }
     
     return(NULL)
   }
   
+  
+  # Filter spectra by spectrum type and MS level
   
   filter_spectra <- function(
     sps,
@@ -106,26 +131,26 @@ similarity_RDynLib_match <- function(
     spectrum_type = NULL
   ) {
     
-    # Spectrum type
+    # Spectrum type filtering
     
     type_col <- detect_spectrum_type_column(sps)
     
     if (!is.null(type_col)) {
       
-      type_data <- spectraData(
+      type_data <- Spectra::spectraData(
         sps,
         type_col
       )[[type_col]]
       
       available_types <- sort(
-        unique(na.omit(type_data))
+        unique(
+          stats::na.omit(type_data)
+        )
       )
       
       
       if (length(available_types) > 0) {
         
-        # If spectrum type was not supplied:
-        # ask interactively
         if (is.null(spectrum_type)) {
           
           repeat {
@@ -141,19 +166,25 @@ similarity_RDynLib_match <- function(
               )
             )
             
-            # User cancelled
-            if (is.null(type_input))
+            if (is.null(type_input)) {
               return(NULL)
+            }
             
             chosen_types <- trimws(
               unlist(
-                strsplit(type_input, ",")
+                strsplit(
+                  type_input,
+                  ","
+                )
               )
             )
             
             if (
               length(chosen_types) > 0 &&
-              all(chosen_types %in% available_types)
+              all(
+                chosen_types %in%
+                available_types
+              )
             ) {
               spectrum_type <- chosen_types
               break
@@ -162,11 +193,16 @@ similarity_RDynLib_match <- function(
           
         } else {
           
-          # Check supplied spectrum types
-          if (!all(spectrum_type %in% available_types)) {
+          if (
+            !all(
+              spectrum_type %in%
+              available_types
+            )
+          ) {
             
             stop(
-              "Invalid spectrum type for ", label,
+              "Invalid spectrum type for ",
+              label,
               ". Available spectrum types: ",
               paste(
                 available_types,
@@ -177,35 +213,41 @@ similarity_RDynLib_match <- function(
         }
         
         
-        # Apply spectrum type filter
         sps <- sps[
-          type_data %in% spectrum_type
+          !is.na(type_data) &
+            type_data %in%
+            spectrum_type
         ]
       }
     }
     
     
-    if (length(sps) == 0)
+    if (length(sps) == 0) {
       return(NULL)
+    }
     
-
     
-    if ("msLevel" %in% spectraVariables(sps)) {
+    # MS level filtering
+    
+    if (
+      "msLevel" %in%
+      Spectra::spectraVariables(sps)
+    ) {
       
-      ms_data <- spectraData(
+      ms_data <- Spectra::spectraData(
         sps,
         "msLevel"
       )[["msLevel"]]
       
       available_ms <- sort(
-        unique(na.omit(ms_data))
+        unique(
+          stats::na.omit(ms_data)
+        )
       )
       
       
       if (length(available_ms) > 0) {
         
-        # If MS level was not supplied:
-        # ask interactively
         if (is.null(msLevel)) {
           
           repeat {
@@ -221,14 +263,17 @@ similarity_RDynLib_match <- function(
               )
             )
             
-            # User cancelled
-            if (is.null(ms_input))
+            if (is.null(ms_input)) {
               return(NULL)
+            }
             
             chosen_ms <- suppressWarnings(
               as.numeric(
                 unlist(
-                  strsplit(ms_input, ",")
+                  strsplit(
+                    ms_input,
+                    ","
+                  )
                 )
               )
             )
@@ -239,7 +284,10 @@ similarity_RDynLib_match <- function(
             
             if (
               length(chosen_ms) > 0 &&
-              all(chosen_ms %in% available_ms)
+              all(
+                chosen_ms %in%
+                available_ms
+              )
             ) {
               msLevel <- chosen_ms
               break
@@ -248,11 +296,16 @@ similarity_RDynLib_match <- function(
           
         } else {
           
-          # Check supplied MS levels
-          if (!all(msLevel %in% available_ms)) {
+          if (
+            !all(
+              msLevel %in%
+              available_ms
+            )
+          ) {
             
             stop(
-              "Invalid MS level for ", label,
+              "Invalid MS level for ",
+              label,
               ". Available MS levels: ",
               paste(
                 available_ms,
@@ -263,24 +316,30 @@ similarity_RDynLib_match <- function(
         }
         
         
-        # Apply MS level filter
+        ms_data <- Spectra::spectraData(
+          sps,
+          "msLevel"
+        )[["msLevel"]]
+        
         sps <- sps[
-          ms_data %in% msLevel
+          !is.na(ms_data) &
+            ms_data %in%
+            msLevel
         ]
       }
     }
     
     
-    if (length(sps) == 0)
+    if (length(sps) == 0) {
       return(NULL)
+    }
     
     
     return(sps)
   }
   
   
-
-  # Query filtering
+  # Filter query spectra
   
   st_filtered <- filter_spectra(
     st_filtered,
@@ -289,12 +348,16 @@ similarity_RDynLib_match <- function(
     spectrum_type = spectrum_type_query
   )
   
-  if (is.null(st_filtered) || length(st_filtered) == 0)
+  if (
+    is.null(st_filtered) ||
+    length(st_filtered) == 0
+  ) {
     return(data.frame())
+  }
   
   
-
-  # Target filtering
+  # Filter target spectra
+  
   dy_filtered <- filter_spectra(
     dy_filtered,
     label = "target",
@@ -302,9 +365,15 @@ similarity_RDynLib_match <- function(
     spectrum_type = spectrum_type_target
   )
   
-  if (is.null(dy_filtered) || length(dy_filtered) == 0)
+  if (
+    is.null(dy_filtered) ||
+    length(dy_filtered) == 0
+  ) {
     return(data.frame())
+  }
   
+  
+  # Detect spectrum type columns
   
   query_type_col <- detect_spectrum_type_column(
     st_filtered
@@ -315,6 +384,31 @@ similarity_RDynLib_match <- function(
   )
   
   
+  # Define query variables
+  
+  query_vars <- c(
+    "msLevel",
+    "rtime",
+    "precursorMz",
+    "acquisitionNum",
+    "scanIndex",
+    "dataOrigin"
+  )
+  
+  if (!is.null(query_type_col)) {
+    query_vars <- c(
+      query_vars,
+      query_type_col
+    )
+  }
+  
+  query_vars <- intersect(
+    query_vars,
+    Spectra::spectraVariables(st_filtered)
+  )
+  
+  
+  # Define target variables
   
   target_vars <- c(
     "msLevel",
@@ -328,23 +422,107 @@ similarity_RDynLib_match <- function(
     "spectrum_id"
   )
   
-  
   if (!is.null(target_type_col)) {
-    
     target_vars <- c(
       target_vars,
       target_type_col
     )
   }
   
-  
-  dy_filtered <- selectSpectraVariables(
-    dy_filtered,
-    target_vars
+  target_vars <- intersect(
+    target_vars,
+    Spectra::spectraVariables(dy_filtered)
   )
-
   
-  if (fragments_resolution == "unit.resolution") {
+  
+  # Extract query metadata and peaks
+  
+  query_data <- Spectra::spectraData(
+    st_filtered,
+    columns = query_vars
+  )
+  
+  query_peaks <- Spectra::peaksData(
+    st_filtered
+  )
+  
+  
+  # Extract target metadata and peaks
+  
+  target_data <- Spectra::spectraData(
+    dy_filtered,
+    columns = target_vars
+  )
+  
+  target_peaks <- Spectra::peaksData(
+    dy_filtered
+  )
+  
+  
+  # Store query peaks as mz and intensity list-columns
+  
+  query_data$mz <- S4Vectors::List(
+    lapply(
+      query_peaks,
+      function(x) {
+        as.numeric(x[, "mz"])
+      }
+    )
+  )
+  
+  query_data$intensity <- S4Vectors::List(
+    lapply(
+      query_peaks,
+      function(x) {
+        as.numeric(x[, "intensity"])
+      }
+    )
+  )
+  
+  
+  # Store target peaks as mz and intensity list-columns
+  
+  target_data$mz <- S4Vectors::List(
+    lapply(
+      target_peaks,
+      function(x) {
+        as.numeric(x[, "mz"])
+      }
+    )
+  )
+  
+  target_data$intensity <- S4Vectors::List(
+    lapply(
+      target_peaks,
+      function(x) {
+        as.numeric(x[, "intensity"])
+      }
+    )
+  )
+  
+  
+  # Convert query spectra to in-memory backend
+  
+  st_filtered <- Spectra::Spectra(
+    query_data,
+    backend = Spectra::MsBackendDataFrame()
+  )
+  
+  
+  # Convert target spectra to in-memory backend
+  
+  dy_filtered <- Spectra::Spectra(
+    target_data,
+    backend = Spectra::MsBackendDataFrame()
+  )
+  
+  
+  # Perform spectral matching
+  
+  if (
+    fragments_resolution ==
+    "unit.resolution"
+  ) {
     
     param <- MetaboAnnotation::CompareSpectraParam(
       ppm = ppm,
@@ -357,13 +535,11 @@ similarity_RDynLib_match <- function(
       fragments_method = fragments_resolution
     )
     
-    
     matches <- MetaboAnnotation::matchSpectra(
       query = st_filtered,
       target = dy_filtered,
       param = param
     )
-    
     
   } else {
     
@@ -377,7 +553,6 @@ similarity_RDynLib_match <- function(
       matchedPeaksCount = TRUE
     )
     
-    
     matches <- MetaboAnnotation::matchSpectra(
       query = st_filtered,
       target = dy_filtered,
@@ -386,10 +561,21 @@ similarity_RDynLib_match <- function(
   }
   
   
+  # Convert matching results to data.frame
+  
   df <- as.data.frame(
-    MetaboAnnotation::matchedData(matches)
+    MetaboAnnotation::matchedData(
+      matches
+    )
   )
   
+  
+  if (nrow(df) == 0) {
+    return(df)
+  }
+  
+  
+  # Rename query spectrum type
   
   if (
     !is.null(query_type_col) &&
@@ -401,6 +587,8 @@ similarity_RDynLib_match <- function(
     ] <- "query_spectrum_type"
   }
   
+  
+  # Rename target spectrum type
   
   if (!is.null(target_type_col)) {
     
@@ -418,83 +606,167 @@ similarity_RDynLib_match <- function(
   }
   
   
+  # Rename target identifiers if necessary
   
-  if ("compound_id" %in% names(df)) {
+  if (
+    "compound_id" %in% names(df) &&
+    !"target_compound_id" %in% names(df)
+  ) {
     
     names(df)[
       names(df) == "compound_id"
     ] <- "target_compound_id"
   }
   
-  if ("compound_accession" %in% names(df)) {
+  
+  if (
+    "compound_accession" %in% names(df) &&
+    !"target_compound_accession" %in% names(df)
+  ) {
     
     names(df)[
       names(df) == "compound_accession"
     ] <- "target_compound_accession"
   }
-  if ("spectrum_id" %in% names(df)) {
+  
+  
+  if (
+    "spectrum_id" %in% names(df) &&
+    !"target_spectrum_id" %in% names(df)
+  ) {
     
     names(df)[
       names(df) == "spectrum_id"
     ] <- "target_spectrum_id"
   }
   
-  df <- df[
-    !is.na(df$score) &
-      df$score >= threshold,
-  ]
   
+  # Filter by similarity score
   
-  if (nrow(df) == 0)
+  if ("score" %in% names(df)) {
+    
+    df <- df[
+      !is.na(df$score) &
+        df$score >= threshold,
+      ,
+      drop = FALSE
+    ]
+  }
+  
+  # Round similarity score to 3 decimal places
+  
+  if ("score" %in% names(df)) {
+    df$score <- round(df$score, 3)
+  }
+  if (nrow(df) == 0) {
     return(df)
-  
-  print(
-    df %>%
-      dplyr::count(
-        msLevel,
-        target_msLevel
-      )
-  )
+  }
   
   
-  cat(
-    "Number of Herbacetin matches before filtering:",
-    sum(
-      grepl(
-        "herbac",
-        df$target_name,
-        ignore.case = TRUE
-      )
+  # Show MS level combinations before best-match filtering
+  
+  if (
+    all(
+      c(
+        "msLevel",
+        "target_msLevel"
+      ) %in% names(df)
+    )
+  ) {
+    
+    print(
+      df %>%
+        dplyr::count(
+          msLevel,
+          target_msLevel
+        )
+    )
+  }
+  
+  
+  # Count Herbacetin matches before best-match filtering
+  
+  if ("target_name" %in% names(df)) {
+    
+    cat(
+      "Number of Herbacetin matches before filtering:",
+      sum(
+        grepl(
+          "herbac",
+          df$target_name,
+          ignore.case = TRUE
+        ),
+        na.rm = TRUE
+      ),
+      "\n"
+    )
+  }
+  
+  
+  # Keep the best target match for each query spectrum
+  
+  grouping_vars <- intersect(
+    c(
+      "dataOrigin",
+      "acquisitionNum"
     ),
-    "\n"
+    names(df)
   )
   
   
-  df <- df %>%
-    dplyr::group_by(
-      dataOrigin,
-      acquisitionNum
-    ) %>%
-    dplyr::slice_max(
-      score,
-      n = 1,
-      with_ties = TRUE
-    ) %>%
-    dplyr::slice_max(
-      matched_peaks_count,
-      n = 1,
-      with_ties = FALSE
-    ) %>%
-    dplyr::ungroup()
-  
-  
-  print(
-    df %>%
-      dplyr::count(
-        msLevel,
-        target_msLevel
+  if (length(grouping_vars) > 0) {
+    
+    df <- df %>%
+      dplyr::group_by(
+        dplyr::across(
+          dplyr::all_of(grouping_vars)
+        )
+      ) %>%
+      dplyr::slice_max(
+        score,
+        n = 1,
+        with_ties = TRUE
       )
-  )
+    
+    
+    if (
+      "matched_peaks_count" %in%
+      names(df)
+    ) {
+      
+      df <- df %>%
+        dplyr::slice_max(
+          matched_peaks_count,
+          n = 1,
+          with_ties = FALSE
+        )
+    }
+    
+    
+    df <- df %>%
+      dplyr::ungroup()
+  }
+  
+  
+  # Show final MS level combinations
+  
+  if (
+    all(
+      c(
+        "msLevel",
+        "target_msLevel"
+      ) %in% names(df)
+    )
+  ) {
+    
+    print(
+      df %>%
+        dplyr::count(
+          msLevel,
+          target_msLevel
+        )
+    )
+  }
   
   
   return(df)
