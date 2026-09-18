@@ -347,7 +347,7 @@ The following example illustrates the selection of an experiment, spectrum type,
 We start by the CID spectral matching of 101280 compound from ftms negative database, To do that we need to convert tha database to a spectra object:
 
 ```{r}
-dy_sps <- sql_to_spectra(ft_path)
+dy_sps <- sql_to_spectra(ftneg_path)
 ```
 
 ```{r}
@@ -375,7 +375,7 @@ Then we update the cspp table:
 #| message: false
 #| results: "hide"
 #| warning: false
-cspp.tot_SQL(ft_path, 266, mzerr = 0.01,
+cspp.tot_SQL(ftneg_path, 266, mzerr = 0.01,
                          cspp = cspp_ft, peakwidth = 0.1, IntThres  = 0, mz_tol = 0.5,
                          dot_thresh = 0, spectrum_type = "assembled",  
                          min_common = 0, charge_file = charge_file)
@@ -387,7 +387,7 @@ Update the gnps table:
 #| message: false
 #| results: "hide"
 #| warning: false
-conv.GNPS_SQL(sql_path= ft_path, expid = 266, peakwidth = 0.2, mzerr = 0.015,
+conv.GNPS_SQL(sql_path= ftneg_path, expid = 266, peakwidth = 0.2, mzerr = 0.015,
               min = 5, adduct = 60.0211, thr1 = 2, thr2 = 0.1, thr3 = 0.3,
               spectrum_type = "not_assembled", IntThres = 0)
 ```
@@ -401,7 +401,7 @@ Next we visualize the CSPP and GNPS network of 101280 compound from ftms neg:
 #| #| dev: svg
 #| fig-width: 20
 #| fig-height: 15
-Overall.net_SQL(sql_path = ft_path, exp.id = 266, dbkey = 101280, min = 0,
+Overall.net_SQL(sql_path = ftneg_path, exp.id = 266, dbkey = 101280, min = 0,
                 nr_of_seq = 3, thr1 = 0.1, thr2 = 0.2, thr3 = 0.3)
 ```
 
@@ -414,13 +414,13 @@ Now we show the ion trap based analysis of 100988 compound:
 #| #| dev: svg
 #| fig-width: 14
 #| fig-height: 8
-MSnplot_SQL(ft_path, 100988, thr_int = 100)
+MSnplot_SQL(ftneg_path, 100988, thr_int = 100)
 ```
 
 ```{r}
 #| fig-width: 14
 #| fig-height: 4
-MSnplot_SQL(ft_path, 101155, thr_int = 100)
+MSnplot_SQL(ftneg_path, 101155, thr_int = 100)
 ```
 
 ```{r}
@@ -430,7 +430,7 @@ MSnplot_SQL(ft_path, 101155, thr_int = 100)
 #| #| dev: svg
 #| fig-width: 14
 #| fig-height: 8
-MSnplot_SQL(ft_path, 101283, thr_int = 100)
+MSnplot_SQL(ftneg_path, 101283, thr_int = 100)
 ```
 
 #Qtof flax analysis
@@ -511,7 +511,7 @@ Next, we call the function to export the sql database to an mgf format that coul
 #| results: "hide"
 #| warning: false
 ft_assembled <- here("data", "ft_assembled.mgf")
-sql_to_mgf(ft_path, expid = 266, spectrum_type = "assembled", 
+sql_to_mgf(ftneg_path, expid = 266, spectrum_type = "assembled", 
            output_file = ft_assembled) 
 ```
 
