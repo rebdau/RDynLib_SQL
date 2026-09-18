@@ -114,8 +114,8 @@ get_dynlib_zenodo(
   file = "maize_ftms.sqlite",
   destdir = "data"
 )
-maize_ftneg <- here("data", "maize_ftms.sqlite")
-con_mft <- dbConnect(RSQLite::SQLite(), maize_ftneg)
+maize_ftneg <- here("data", "maize_ftneg.sqlite")
+con_mftneg <- dbConnect(RSQLite::SQLite(), maize_ftneg)
 
 # maize_QTOFneg
 get_dynlib_zenodo(
@@ -123,7 +123,7 @@ get_dynlib_zenodo(
   file = "maize_qtof.sqlite",
   destdir = "data"
 )
-maize_qtofneg <- here("data", "maize_qtof.sqlite")
+maize_qtofneg <- here("data", "maize_qtofneg.sqlite")
 con_mqt <- dbConnect(RSQLite::SQLite(), maize_qtofneg)
 
 # flaxseed_FTneg
@@ -132,7 +132,7 @@ get_dynlib_zenodo(
   file = "flax_ftms.sqlite",
   destdir = "data"
 )
-flax_ftneg <- here("data", "flax_ftms.sqlite")
+flax_ftneg <- here("data", "flax_ftneg.sqlite")
 con_fft <- dbConnect(RSQLite::SQLite(), flax_ftneg)
 
 # flaxseed_QTOFneg
@@ -141,7 +141,7 @@ get_dynlib_zenodo(
   file = "flax_qtof.sqlite",
   destdir = "data"
 )
-flax_qtofneg <- here("data", "flax_qtof.sqlite")
+flax_qtofneg <- here("data", "flax_qtofneg.sqlite")
 con_fqt <- dbConnect(RSQLite::SQLite(), flax_qtofneg)
 
 # HDG_FTneg 
@@ -150,7 +150,7 @@ get_dynlib_zenodo(
   file = "hdg_ftms.sqlite",
   destdir = "data"
 )
-hdg_ftneg <- here("data", "hdg_ftms.sqlite")
+hdg_ftneg <- here("data", "hdg_ftneg.sqlite")
 con_hdgft <- dbConnect(RSQLite::SQLite(), hdg_ftneg)
 
 #Ahlam : we don't have hdg in qtof
