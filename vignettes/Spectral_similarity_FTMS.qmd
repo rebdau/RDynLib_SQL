@@ -94,10 +94,10 @@ ftms_flax <- filter_basepeak(ftms_all, threshold = 0.01)
 ```
 
 ```{r}
-cbind(
-  before = lengths(peaksData(ftms_all)),
-  after  = lengths(peaksData(ftms_flax))
-)
+# cbind(
+#   before = lengths(peaksData(ftms_all)),
+#   after  = lengths(peaksData(ftms_flax))
+# )
 ```
 
 
@@ -155,7 +155,7 @@ best_hits2 <- ftms_matches2_T %>%
     arrange(desc(matched_peaks_count)) %>%   
     slice_head(n = 10)                
 
-best_hits
+best_hits2
 ```
 
 ```{r}

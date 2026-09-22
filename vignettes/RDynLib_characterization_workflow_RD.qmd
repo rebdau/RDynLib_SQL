@@ -49,10 +49,16 @@ The DynLib SQLite databases used in this workflow are provided through Zenodo. E
 #| message: false
 #| results: "hide"
 #| warning: false
+
+#big ftmsneg
 ftneg_path <- here("data", "DYL_FLAX_herba_FTMSneg.sqlite")
 con_ftneg <- dbConnect(RSQLite::SQLite(), ftneg_path)
 
-# flax QTOFneg
+#big ftmspos
+ftpos_path <- here("data", "DyLib_FTMS_pos.sqlite")
+con_ftpos <- dbConnect(RSQLite::SQLite(), ftpos_path)
+
+# big QTOFneg
 qtofneg_path <- here("data", "DYL_FLAX_QTOFneg.sqlite")
 con_qtofneg <- dbConnect(RSQLite::SQLite(), qtofneg_path)
 
@@ -65,6 +71,15 @@ filterDynLibDB(
 )
 con_mftneg <- dbConnect(RSQLite::SQLite(), maize_ftneg)
 
+#maize FTpos
+maize_ftpos <- here("data", "maize_ftpos.sqlite")
+filterDynLibDB(
+  expid = 55:94,
+  input_db = ftpos_path,
+  output_db = maize_ftpos
+)
+con_mftpos <- dbConnect(RSQLite::SQLite(), maize_ftpos)
+
 # maize QTOFneg
 maize_qtofneg <- here("data", "maize_qtofneg.sqlite")
 filterDynLibDB(
@@ -73,6 +88,16 @@ filterDynLibDB(
   output_db = maize_qtofneg
 )
 con_mqt <- dbConnect(RSQLite::SQLite(), maize_qtofneg)
+
+#maize QTOFpos
+#TODO :add the experiment numbers
+maize_qtofpos <- here("data", "maize_qtofpos.sqlite")
+filterDynLibDB(
+  expid = ,
+  input_db = qtofpos_path,
+  output_db = maize_qtofpos
+)
+con_mqtpos <- dbConnect(RSQLite::SQLite(), maize_qtofpos)
 
 # flax FTneg
 flax_ftneg <- here("data", "flax_ftneg.sqlite")
@@ -111,20 +136,40 @@ con_hdgft <- dbConnect(RSQLite::SQLite(), hdg_ftneg)
 # maize_FTneg
 get_dynlib_zenodo(
   doi = ,
-  file = "maize_ftms.sqlite",
+  file = "maize_ftmsneg.sqlite",
   destdir = "data"
 )
 maize_ftneg <- here("data", "maize_ftneg.sqlite")
 con_mftneg <- dbConnect(RSQLite::SQLite(), maize_ftneg)
 
+#maize FTpos
+
+get_dynlib_zenodo(
+  doi = ,
+  file = "maize_ftmspos.sqlite",
+  destdir = "data"
+)
+maize_ftpos <- here("data", "maize_ftpos.sqlite")
+con_mftpos <- dbConnect(RSQLite::SQLite(), maize_ftpos)
+
+
 # maize_QTOFneg
 get_dynlib_zenodo(
   doi = ,
-  file = "maize_qtof.sqlite",
+  file = "maize_qtofneg.sqlite",
   destdir = "data"
 )
 maize_qtofneg <- here("data", "maize_qtofneg.sqlite")
 con_mqt <- dbConnect(RSQLite::SQLite(), maize_qtofneg)
+
+#maize QTOFpos
+get_dynlib_zenodo(
+  doi = ,
+  file = "maize_qtofpos.sqlite",
+  destdir = "data"
+)
+maize_qtofpos <- here("data", "maize_qtofpos.sqlite")
+con_mqtpos <- dbConnect(RSQLite::SQLite(), maize_qtofpos)
 
 # flaxseed_FTneg
 get_dynlib_zenodo(
@@ -525,3 +570,101 @@ qt_assembled <- here("data", "qt_assembled.mgf")
 sql_to_mgf(qt_path, expid = 52, spectrum_type = "intersect_single_energy", 
            output_file = qt_assembled) 
 ```
+
+
+#Alignment
+RDinlib offres tools for aliging two expriment acquired from th same/diffrent 
+platforms with the same/different ionization modes, as well as two different 
+experiments stored in the same database.
+The aligned **compound_ids** are then stored in a given .txt file.
+
+We start by aligning the flax_ftneg flax ftms negative data against the flax 
+qtof negative data:
+```{r}
+alignment_output <- here("data", "flax_qtn_ftn_align.txt")
+
+Assoc_SQL_flax <-Aligning_FT_QTOF_SQL(
+  FT_path = flax_ftneg,
+  QTOF_path = flax_qtofneg,
+  FT_expnr =  266,
+  QTOF_expnr = 52,
+  Assoc = alignment_output,
+  startpoint = 1,
+  save_assoc = TRUE,
+  spectrum_type_FT = "assembled", 
+  spectrum_type_QTOF = "merged_MSMS_all_energies",
+  minIon = 0.4,
+  minPeaks = 0.4,
+  lc.err = 1,
+  err = 0.02
+)
+nrow(Assoc_SQL_flax)
+```
+The following function extracts the aligned compound of a given compound_id:
+```{r}
+getAlignedCompids_SQL(
+  compound_id = 101085,
+  database_name = "flax_ftneg.sqlite",
+  alignment_file = alignment_output
+)
+```
+We can also print the corresponding row from the ms_compound table:
+```{r}
+cmp <- get_compound(qt_path = flax_ftneg, compound_id = 101085)
+cmp
+```
+Next we use the function to align compounds from the same instrument and with
+different polarities, as a use case here we perform this alignment between maize
+ftms positive and maize ftms positive:
+
+```{r}
+
+ft_maize_alignment <- Aligning_FTn_FTp_SQL(FTn_path = maize_ftneg,
+  FTp_path = maize_ftpos,
+  FTn_expnr =  192,
+  FTp_expnr = 56,
+  Assoc = NULL,
+  startpoint = 1,
+  save_assoc = FALSE,
+  spectrum_type_FTn = "not_assembled", 
+  spectrum_type_FTp = NULL,
+  minIon = 0.4,
+  minPeaks = 0.4,
+  lc.err = 1,
+  err = 0.02)
+nrow(ft_maize_alignment)
+```
+
+Now we align two experiment stored in the same database(acquired from the same 
+instrument and polarity), here we test the function on two experiments from the 
+maize ftms negative:
+```{r}
+align_2_exp <- Aligning_Exp_SQL(
+    db_path = maize_ftneg,
+    ref_expnr = 195,
+    target_expnr = 196,
+    Assoc = NULL,
+    err = 0.01,
+    t.ini = 5,
+    lc.err = 1,
+    rng = 2,
+    thr1 = 1,
+    thr2 = 0.9,
+    IntThres = 100,
+    startpoint = 1,
+    tol = 0.01,
+    save_assoc = TRUE,
+    spectrum_type_ref = "not_assembled", 
+    spectrum_type_target = "not_assembled"
+)
+nrow(align_2_exp)
+```
+
+After testing the different types of the alignement functions in RDynlib,
+now we can transfer the names of the aligned compounds between databases:
+We test the function on the flax ftms data
+```{r}
+dir <- here("data")
+SubDBNameTransfer_SQL(sqlite_dir = dir,  assoc_path = alignment_output )
+```
+

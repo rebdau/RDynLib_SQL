@@ -269,22 +269,7 @@ adding_Names_SQL <- function(
   
   
   # Create annotation description
-  candidates$annotation_description <- ifelse(
-    candidates$annotation_type == "name addition",
-    
-    paste0(
-      "Compound name added based on spectral match: ",
-      candidates$new_name
-    ),
-    
-    paste0(
-      "Compound name updated from '",
-      candidates$current_name,
-      "' to '",
-      candidates$new_name,
-      "' based on spectral match."
-    )
-  )
+  candidates$annotation_description <- candidates$new_name
   
   
   # Get accession of matched compounds
@@ -310,18 +295,18 @@ adding_Names_SQL <- function(
   
   # Create annotation_events
   candidates$annotation_events <- paste0(
-    "match_compound_accession=",
-    candidates$match_compound_accession,
-    "; match_spectrum_type=",
-    candidates$match_spectrum_type,
-    "; match_spectrum_id=",
-    candidates$match_spectrum_id,
+    "ms_level=",
+    candidates$ms_level,
     "; spectrum_type=",
     candidates$spectrum_type,
     "; match_mslevel=",
     candidates$match_mslevel,
-    "; mslevel=",
-    candidates$ms_level
+    "; match_spectrum_type=",
+    candidates$match_spectrum_type,
+    "; match_compound_accession=",
+    candidates$match_compound_accession,
+    "; match_spectrum_id=",
+    candidates$match_spectrum_id
   )
   
   

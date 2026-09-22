@@ -64,11 +64,13 @@
 #' @param save_assoc `logical(1)` If true we add the alignment result to the
 #'        Assoc text file.
 #'
-#' @param aggregated_Ft `logical(1)` If true the use of the aggregated ftms
-#'        spectra of all levels is involved.
+#' @param spectrum_type_FT `character(1)` Spectrum type to use for the FT-MS
+#'        spectra. If `NULL` and the database does not contain a `spectrum_type`
+#'        column, all spectra are used.
 #'
-#' @param aggregated_QTOF `logical(1)` If true the use of the aggregated QTOF
-#'        spectra of all collision energies is involved.
+#' @param spectrum_type_QTOF `character(1)` Spectrum type to use for the QTOF
+#'        spectra. If `NULL` and the database does not contain a `spectrum_type`
+#'        column, all spectra are used.
 #'
 #' @return A `data.frame` containing the matched FT–QTOF compounds with columns:
 #' - `ref_compid`: FTMS compound ID
@@ -94,20 +96,55 @@
 #'
 #' @export
 Aligning_FT_QTOF_SQL <- function(
-    FT_path, QTOF_path, FT_expnr, QTOF_expnr,
-    Assoc = NULL, err = 0.02, t.ini = 5,
-    lc.err = 1, rng = 2, minIon = 0.01, minPeaks = 0.6, startpoint = 1,
-    save_assoc = FALSE, aggregated_Ft = FALSE, aggregated_QTOF = FALSE
+    FT_path,
+    QTOF_path,
+    FT_expnr,
+    QTOF_expnr,
+    Assoc = NULL,
+    err = 0.02,
+    t.ini = 5,
+    lc.err = 1,
+    rng = 2,
+    minIon = 0.01,
+    minPeaks = 0.6,
+    startpoint = 1,
+    save_assoc = FALSE,
+    spectrum_type_FT = NULL,
+    spectrum_type_QTOF = NULL
 ) {
   
+  # Check experiment IDs
+  if (length(FT_expnr) != 1L || is.na(FT_expnr)) {
+    stop("`FT_expnr` must be a single experiment ID.")
+  }
+  
+  if (length(QTOF_expnr) != 1L || is.na(QTOF_expnr)) {
+    stop("`QTOF_expnr` must be a single experiment ID.")
+  }
+  
+  
+  # Load / initialize Assoc
   if (is.character(Assoc)) {
     
     assoc_file <- Assoc
     
     if (file.exists(Assoc)) {
-      Assoc_df <- read.table(Assoc, header = TRUE, sep = "\t")
+      
+      Assoc_df <- utils::read.table(
+        Assoc,
+        header = TRUE,
+        sep = "\t",
+        stringsAsFactors = FALSE
+      )
+      
     } else {
-      warning("File ", assoc_file, " not found. Proceeding without.")
+      
+      warning(
+        "File ",
+        assoc_file,
+        " not found. Proceeding without."
+      )
+      
       Assoc_df <- data.frame(
         ref_compid = integer(0),
         target_compid = integer(0),
@@ -131,65 +168,307 @@ Aligning_FT_QTOF_SQL <- function(
       target_database = character(0),
       stringsAsFactors = FALSE
     )
+    
     assoc_file <- NULL
   }
   
   
-  FT_con   <- dbConnect(SQLite(), FT_path)
-  QTOF_con <- dbConnect(SQLite(), QTOF_path)
-  on.exit(dbDisconnect(FT_con))
-  on.exit(dbDisconnect(QTOF_con))
+  # Database connections
+  FT_con <- DBI::dbConnect(
+    RSQLite::SQLite(),
+    FT_path
+  )
+  
+  QTOF_con <- DBI::dbConnect(
+    RSQLite::SQLite(),
+    QTOF_path
+  )
+  
+  on.exit({
+    DBI::dbDisconnect(FT_con)
+    DBI::dbDisconnect(QTOF_con)
+  }, add = TRUE)
+  
+  
+  # Check spectrum_type columns
+  has_type_FT <- "spectrum_type" %in%
+    DBI::dbListFields(
+      FT_con,
+      "msms_spectrum"
+    )
+  
+  has_type_QTOF <- "spectrum_type" %in%
+    DBI::dbListFields(
+      QTOF_con,
+      "msms_spectrum"
+    )
+  
+  
+  # Check FT spectrum type
+  if (has_type_FT) {
+    
+    available_types_FT <- DBI::dbGetQuery(
+      FT_con,
+      "
+      SELECT DISTINCT spectrum_type
+      FROM msms_spectrum
+      WHERE spectrum_type IS NOT NULL
+        AND spectrum_type != ''
+      "
+    )$spectrum_type
+    
+    
+    if (is.null(spectrum_type_FT)) {
+      
+      stop(
+        "`spectrum_type_FT` must be provided because ",
+        "the FT database contains a `spectrum_type` column. ",
+        "Available types: ",
+        paste(available_types_FT, collapse = ", ")
+      )
+    }
+    
+    
+    if (length(spectrum_type_FT) != 1L ||
+        is.na(spectrum_type_FT) ||
+        !nzchar(spectrum_type_FT)) {
+      
+      stop(
+        "`spectrum_type_FT` must be a single non-empty character value."
+      )
+    }
+    
+    
+    if (!spectrum_type_FT %in% available_types_FT) {
+      
+      stop(
+        "spectrum_type_FT = '",
+        spectrum_type_FT,
+        "' not found. Available types: ",
+        paste(available_types_FT, collapse = ", ")
+      )
+    }
+  }
+  
+  
+  # Check QTOF spectrum type
+  if (has_type_QTOF) {
+    
+    available_types_QTOF <- DBI::dbGetQuery(
+      QTOF_con,
+      "
+      SELECT DISTINCT spectrum_type
+      FROM msms_spectrum
+      WHERE spectrum_type IS NOT NULL
+        AND spectrum_type != ''
+      "
+    )$spectrum_type
+    
+    
+    if (is.null(spectrum_type_QTOF)) {
+      
+      stop(
+        "`spectrum_type_QTOF` must be provided because ",
+        "the QTOF database contains a `spectrum_type` column. ",
+        "Available types: ",
+        paste(available_types_QTOF, collapse = ", ")
+      )
+    }
+    
+    
+    if (length(spectrum_type_QTOF) != 1L ||
+        is.na(spectrum_type_QTOF) ||
+        !nzchar(spectrum_type_QTOF)) {
+      
+      stop(
+        "`spectrum_type_QTOF` must be a single non-empty character value."
+      )
+    }
+    
+    
+    if (!spectrum_type_QTOF %in% available_types_QTOF) {
+      
+      stop(
+        "spectrum_type_QTOF = '",
+        spectrum_type_QTOF,
+        "' not found. Available types: ",
+        paste(available_types_QTOF, collapse = ", ")
+      )
+    }
+  }
+  
   
   # Detect polarity
-  ft_mode  <- dbGetQuery(FT_con, sprintf("SELECT mode FROM experiment WHERE expid = %d", FT_expnr))$mode
-  qtof_mode <- dbGetQuery(QTOF_con, sprintf("SELECT mode FROM experiment WHERE expid = %d", QTOF_expnr))$mode
+  ft_mode <- DBI::dbGetQuery(
+    FT_con,
+    sprintf(
+      "SELECT mode
+       FROM experiment
+       WHERE expid = %d",
+      FT_expnr
+    )
+  )$mode
   
-  if (!length(ft_mode))
-    stop("Experiment '", FT_expnr,"' not found in ", FT_path)
-  if (!length(qtof_mode))
-    stop("Experiment '", QTOF_expnr,"' not found in ", QTOF_path)
   
-  ft_mode  <- tolower(ft_mode)
-  qtof_mode <- tolower(qtof_mode)
+  qtof_mode <- DBI::dbGetQuery(
+    QTOF_con,
+    sprintf(
+      "SELECT mode
+       FROM experiment
+       WHERE expid = %d",
+      QTOF_expnr
+    )
+  )$mode
   
-  negative_values <- c("neg", "negative", "-", "negativ")
   
-  polarity_ft  <- ifelse(ft_mode %in% negative_values, 0, 1)
-  polarity_qtof <- ifelse(qtof_mode %in% negative_values, 0, 1)
+  if (!length(ft_mode)) {
+    stop(
+      "Experiment '",
+      FT_expnr,
+      "' not found in ",
+      FT_path
+    )
+  }
   
-  # Local LCal
-  LCal <- Aligning_General_SQL(FT_con, QTOF_con, FT_expnr, QTOF_expnr, err, t.ini)
+  if (!length(qtof_mode)) {
+    stop(
+      "Experiment '",
+      QTOF_expnr,
+      "' not found in ",
+      QTOF_path
+    )
+  }
   
-  LCal <- matchFTSyn_SQL(
-    LCal, FT_con, QTOF_con, minPeaks = minPeaks,
-    polarity_ft = polarity_ft, polarity_qtof = polarity_qtof,
-    aggregated_Ft = aggregated_Ft, aggregated_QTOF = aggregated_QTOF
+  
+  ft_mode <- tolower(ft_mode[1])
+  qtof_mode <- tolower(qtof_mode[1])
+  
+  negative_values <- c(
+    "neg",
+    "negative",
+    "-",
+    "negativ"
   )
   
-  LCal <- RemoveOutliers(LCal, rng)
+  polarity_ft <- ifelse(
+    ft_mode %in% negative_values,
+    0,
+    1
+  )
+  
+  polarity_qtof <- ifelse(
+    qtof_mode %in% negative_values,
+    0,
+    1
+  )
+  
+  
+  # Initial LC alignment
+  LCal <- Aligning_General_SQL(
+    FT_con = FT_con,
+    QTOF_con = QTOF_con,
+    FT_expnr = FT_expnr,
+    QTOF_expnr = QTOF_expnr,
+    err = err,
+    t.ini = t.ini
+  )
+  
+  
+  if (is.null(LCal) || nrow(LCal) == 0) {
+    warning("No initial alignment candidates found.")
+    return(Assoc_df)
+  }
+  
+  
+  # MS2 matching
+  LCal <- matchFTSyn_SQL(
+    LCal = LCal,
+    FT_con = FT_con,
+    QTOF_con = QTOF_con,
+    FT_expnr = FT_expnr,
+    QTOF_expnr = QTOF_expnr,
+    polarity_ft = polarity_ft,
+    polarity_qtof = polarity_qtof,
+    minPeaks = minPeaks,
+    spectrum_type_FT = spectrum_type_FT,
+    spectrum_type_QTOF = spectrum_type_QTOF
+  )
+  
+  
+  if (is.null(LCal) || nrow(LCal) == 0) {
+    warning(
+      "No candidates remained after MS2 matching."
+    )
+    return(Assoc_df)
+  }
+  
+  
+  # Remove RT outliers
+  LCal <- RemoveOutliers(
+    LCal,
+    rng
+  )
+  
+  
+  if (is.null(LCal) || nrow(LCal) == 0) {
+    warning(
+      "No candidates remained after outlier removal."
+    )
+    return(Assoc_df)
+  }
+  
   
   # Regression
-  rg <- RegressionPie_LCalign_SQL(LCal, startpoint)
-
-  if (interactive() && capabilities("cairo")) {
-    try(PlotPie_LCalign(LCal, rg), silent = TRUE)
-  }
-  
-  # Fill assoc table
-  Assoc_df <- FillAssocFTnQTOFn_SQL(
-    FT_con = FT_con, QTOF_con = QTOF_con, Assoc = Assoc_df,
-    FT_expnr = FT_expnr, QTOF_expnr = QTOF_expnr,
-    cutoff = 1, rg = rg, lc.err = lc.err, err = err, minIon = minIon,
-    polarity_ft = polarity_ft, polarity_qtof = polarity_qtof,
-    FT_path = FT_path, QTOF_path = QTOF_path,
-    aggregated_Ft = aggregated_Ft, aggregated_QTOF = aggregated_QTOF
+  rg <- RegressionPie_LCalign_SQL(
+    LCal,
+    startpoint
   )
   
-  # Save assoc if requested
-  if (save_assoc && !is.null(assoc_file)) {
-    write.table(Assoc_df, file = assoc_file, sep = "\t",
-                row.names = FALSE, quote = FALSE)
+  
+  if (interactive() && capabilities("cairo")) {
+    try(
+      PlotPie_LCalign(
+        LCal,
+        rg
+      ),
+      silent = TRUE
+    )
   }
+  
+  
+  # Fill association table
+  Assoc_df <- FillAssocFTnQTOFn_SQL(
+    FT_con = FT_con,
+    QTOF_con = QTOF_con,
+    Assoc = Assoc_df,
+    FT_expnr = FT_expnr,
+    QTOF_expnr = QTOF_expnr,
+    cutoff = 1,
+    rg = rg,
+    lc.err = lc.err,
+    err = err,
+    minIon = minIon,
+    polarity_ft = polarity_ft,
+    polarity_qtof = polarity_qtof,
+    FT_path = FT_path,
+    QTOF_path = QTOF_path,
+    spectrum_type_FT = spectrum_type_FT,
+    spectrum_type_QTOF = spectrum_type_QTOF
+  )
+  
+  
+  # Save associations
+  if (save_assoc && !is.null(assoc_file)) {
+    
+    utils::write.table(
+      Assoc_df,
+      file = assoc_file,
+      sep = "\t",
+      row.names = FALSE,
+      quote = FALSE
+    )
+  }
+  
   
   return(Assoc_df)
 }
