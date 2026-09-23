@@ -18,11 +18,13 @@
 #' @param startpoint `numeric(1)` Minimum retention time for piecewise regression.
 #' @param tol `numeric(1)` m/z tolerance for matching MS2 fragment ions.
 #' @param save_assoc `logical(1)` Whether to save the associations to `Assoc`.
-#' @param aggregated_ref `logical(1)` Whether to use aggregated MS2 spectra
-#'        for the reference experiment.
+#' @param spectrum_type_ref `character(1)` Spectrum type to use for the experiment
+#'        to align. If `NULL` and the database does not contain a `spectrum_type`
+#'        column, all spectra are used.
 #'
-#' @param aggregated_target `logical(1)` Whether to use aggregated MS2 spectra
-#'        for the target experiment.
+#' @param spectrum_type_target `character(1)` Spectrum type to use for the 
+#'        experiment to align with. If `NULL` and the database does not contain
+#'        a `spectrum_type` column, all spectra are used.
 #'        
 #' @return A `data.frame` containing the aligned compound IDs and database names.
 #'

@@ -25,7 +25,7 @@ load_all()
 #FTMS
 
 ```{r}
-FT_path <- here("data", "DYL_flax_herba_FTMSneg.sqlite")
+FT_path <- "C:/Users/ament/Desktop/Github/RDynLib_SQL/data/DYL_flax_herba_FTMSneg.sqlite"
 
 FT_con <- DBI::dbConnect(RSQLite::SQLite(), FT_path)
 

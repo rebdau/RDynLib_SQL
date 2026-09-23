@@ -1,3 +1,46 @@
+#' @title Match two experiments from the same database.
+#'
+#' @description
+#' `match_FTexp_SQL()` filters locally aligned 2experiments candidate pairs in
+#' (`LCal`) by comparing MS2 peak lists stored in SQL databases.
+#'
+#' @details
+#' The function:
+#' - Loads the 2 experiments MS2 spectra from SQLite via DBI
+#' - Applies polarity and spectrum-type filtering
+#' - Computes MS2 peak overlap for each 2 experiments candidate pair
+#' - Removes pairs with less matched peaks based on a threshold
+#'
+#' @param LCal 
+#' `data.frame` A data.frame returned by `Aligning_General_SQL()` function.
+#' 
+#' @param con `character(1)` A DBI connection object 
+#' to the the database that contains the two experiments to align.
+#' 
+#' 
+#' @param spectrum_type_ref `character(1)` Spectrum type to use for the 
+#'        refernce experiment spectra. If `NULL` and the database does not
+#'         contain a `spectrum_type` column, all spectra are used.
+#'
+#' @param spectrum_type_target `character(1)` Spectrum type to use for the 
+#'        target experiment spectra. If `NULL` and the database does not contain 
+#'        a `spectrum_type` column, all spectra are used.
+#'
+#' @return A filtered version of `LCal`, keeping only MS2 supported matches.
+#'
+#' @importFrom DBI dbConnect
+#'
+#' @importFrom DBI dbDisconnect
+#'
+#' @importFrom RSQLite SQLite
+#' 
+#' @importFrom DBI dbGetQuery
+#' 
+#' @importMethodsFrom DBI dbListFields
+#' 
+#' @author Ahlam Mentag
+#'
+#' @export
 match_FTexp_SQL <- function(
     LCal,
     con,
@@ -44,9 +87,7 @@ match_FTexp_SQL <- function(
   }
   
   
-  # --------------------------------------------------
   # Reference MS2 query
-  # --------------------------------------------------
   
   query_ref <- "
     SELECT
@@ -90,9 +131,7 @@ match_FTexp_SQL <- function(
   )
   
   
-  # --------------------------------------------------
   # Target MS2 query
-  # --------------------------------------------------
   
   query_target <- "
     SELECT

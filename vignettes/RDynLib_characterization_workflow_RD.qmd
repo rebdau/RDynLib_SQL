@@ -32,7 +32,7 @@ library(RSQLite)
 library(here)
 library(CompoundDb)
 library(MsBackendMgf)
-
+library(scales)
 # TODO: Replace with library(RDynLib) once the package is finalized.
 load_all()
 ```
@@ -198,7 +198,6 @@ get_dynlib_zenodo(
 hdg_ftneg <- here("data", "hdg_ftneg.sqlite")
 con_hdgft <- dbConnect(RSQLite::SQLite(), hdg_ftneg)
 
-#Ahlam : we don't have hdg in qtof
 ```
 
 To create the target library for spectral matching, the maize FTneg DynLib database is merged with the HDG_FTneg DynLib database.
@@ -232,6 +231,7 @@ A DynLib database can store different types of spectra for each compound. The sp
 ```{r}
 available_spectrum_types(con_merged)
 available_spectrum_types(con_fft) 
+available_spectrum_types(con_qtofneg) 
 ```
 
 
@@ -521,7 +521,7 @@ The 45890 is the qtof compound_id that was aligned with 100988 ftms compound_id.
 The msms_spectrum table linked to that compound_id to select the spectrum_id:
 
 ```{r}
-list_spectrum <- get_spectrum_id(45890)
+list_spectrum <- get_spectrum_id(qt_path,45890)
 list_spectrum
 ```
 
@@ -537,16 +537,6 @@ We chose the 46001 spectrum_id to show the qtof based neutral loss analysis:
 MSMSspecplot_SQL(qt_path, 46001, 
                  prdion = prdion, neutloss = neutloss, err = NULL, 
                  minum = NULL, nr_col = NULL,   nr_col2 = NULL)
-```
-
-Now we enter the characterization of the compounds found to the database:
-
-```{r}
-#EnterName_SQL(ft_path, CoMPID = 101143)
-```
-
-```{r}
-#EnterName_SQL(ft_path, CoMPID = 100988)
 ```
 
 Next, we call the function to export the sql database to an mgf format that could be used for further analysis and comparisons with public databases available on public platforms like: GNPS... We start by converting ftms data
@@ -618,7 +608,6 @@ different polarities, as a use case here we perform this alignment between maize
 ftms positive and maize ftms positive:
 
 ```{r}
-
 ft_maize_alignment <- Aligning_FTn_FTp_SQL(FTn_path = maize_ftneg,
   FTp_path = maize_ftpos,
   FTn_expnr =  192,
@@ -667,4 +656,17 @@ We test the function on the flax ftms data
 dir <- here("data")
 SubDBNameTransfer_SQL(sqlite_dir = dir,  assoc_path = alignment_output )
 ```
+Now we enter the characterization of the compounds found to the database., 
+Using EnterName fucntion we are able to edit compound names and add additional 
+structural information, including molecular formula, adduct type, and SMILES 
+notation. Together, these functions provide a framework for progressive 
+annotation of DynLib databases, ranging from automated transfer of tentative 
+annotations to manual curation of fully characterized compounds:
 
+```{r}
+#EnterName_SQL(ft_path, CoMPID = 101143)
+```
+
+```{r}
+#EnterName_SQL(ft_path, CoMPID = 100988)
+```
