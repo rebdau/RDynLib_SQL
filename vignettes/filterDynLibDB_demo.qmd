@@ -81,7 +81,7 @@ SELECT COUNT(*) AS n_rows
 FROM msms_spectrum s
 JOIN ms_compound c
   ON s.compound_id = c.compound_id
-WHERE c.expid = 266 and s.ms_level = 4 and s.spectrum_type = 'not_assembled'
+WHERE c.expid = 266 and s.ms_level = 4 and s.spectrum_type = 'pseudo_MS2'
 ")
 ```
 ```{r}
@@ -143,7 +143,7 @@ WHERE c.expid = 52 and s.ms_level = 2
 dbGetQuery(qt_filter, "
 SELECT COUNT(*) AS n_rows
 FROM msms_spectrum
-WHERE spectrum_type = 'intersect_single_energy'
+WHERE spectrum_type = 'pseudo_MS2'
   AND dataOrigin LIKE '%DDA1%'
 ")
 ```
@@ -152,7 +152,7 @@ WHERE spectrum_type = 'intersect_single_energy'
 dbGetQuery(qt_filter, "
 SELECT COUNT(*) AS n_rows
 FROM msms_spectrum
-WHERE spectrum_type = 'merged_MSMS_all_energies'
+WHERE spectrum_type = 'all_energies'
 ")
 ```
 

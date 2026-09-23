@@ -255,8 +255,8 @@ ftms_matches2_T <- similarity_RDynLib_match(
   polarity_target = 0,
   msLevel_query = 2,
   msLevel_target = 2,
-  spectrum_type_query = "not_assembled",
-  spectrum_type_target = "not_assembled",
+  spectrum_type_query = "individual",
+  spectrum_type_target = "individual",
   requirePrecursor = TRUE,
   tolerance = 0,
   ppm = 5,
@@ -286,7 +286,7 @@ add_spectral_matches(con_fft, ftms_matches2_T)
 
 # Verify the addition
 
-# TODO : print only selected relevant columns
+# print only selected relevant columns
 
 dbGetQuery(con_fft, "Select spectrum_id, ms_level, compound_id, precursor_mz,
                      spectrum_type, matches, match_mslevel, match_common,
@@ -296,11 +296,11 @@ dbGetQuery(con_fft, "Select spectrum_id, ms_level, compound_id, precursor_mz,
 
 ```
 
-Based on the spectral matches, compound names can be automatically added to the `ms_compound` table using the `**TODO()**` function. The automatically generated name combines the name of the matched compound with the spectral similarity score and is prefixed with `!!` to distinguish it from manually assigned structural annotations. No confidence level is assigned at this stage.
+Based on the spectral matches, compound names can be automatically added to the `ms_compound` table using the `**adding_Names_SQL()**` function. The automatically generated name combines the name of the matched compound with the spectral similarity score and is prefixed with `!!` to distinguish it from manually assigned structural annotations. No confidence level is assigned at this stage.
 
 Each automatic annotation also creates an **annotation event** in the `annotation_history` table. The event records information supporting the match, including the spectral similarity score and the experiment accession of the matched compound. While the name stored in `ms_compound` can subsequently be replaced as the compound is further characterized, the annotation event is retained in the annotation history, providing a persistent record of the spectral match and the progression of the compound annotation.
 ```{r}
-adding_Names_SQL(con_fft,  spectrum_type = "not_assembled", msLevel = 2, compound_id = NULL,
+adding_Names_SQL(con_fft,  spectrum_type = "individual", msLevel = 2, compound_id = NULL,
     overwrite = FALSE )
 ```
 
@@ -333,8 +333,8 @@ qtof_matches2_T <- similarity_RDynLib_match(
   polarity_target = 0,
   msLevel_query = 2,
   msLevel_target = 2,
-  spectrum_type_query = "intersect_single_energy",
-  spectrum_type_target = "not_assembled",
+  spectrum_type_query = "same_energy",
+  spectrum_type_target = "individual",
   requirePrecursor = TRUE,
   tolerance = 0,
   ppm = 5,
@@ -373,9 +373,9 @@ dbGetQuery(con_fqt, "Select spectrum_id, ms_level, compound_id, precursor_mz,
            from msms_spectrum where match_name IS not null LIMIT 1")
 ```
 
-Adding names as ftms
+Adding names in ftms
 ```{r}
-adding_Names_SQL(con_fft,  spectrum_type = "not_assembled", msLevel = 2, compound_id = NULL,
+adding_Names_SQL(con_fft,  spectrum_type = "individual", msLevel = 2, compound_id = NULL,
     overwrite = FALSE )
 ```
 
@@ -399,8 +399,8 @@ dy_sps <- sql_to_spectra(ftneg_path)
 cmp <- MultMatchCID_Spectra(
   dy_sps,
   101280,
-   spectrum_type_query = "not_assembled",
-  spectrum_type_target = "not_assembled",
+   spectrum_type_query = "individual",
+  spectrum_type_target = "individual",
    ms_level_query = 2,
    ms_level_target = 2,
   polarity_query = 0,
@@ -422,7 +422,7 @@ Then we update the cspp table:
 #| warning: false
 cspp.tot_SQL(ftneg_path, 266, mzerr = 0.01,
                          cspp = cspp_ft, peakwidth = 0.1, IntThres  = 0, mz_tol = 0.5,
-                         dot_thresh = 0, spectrum_type = "assembled",  
+                         dot_thresh = 0, spectrum_type = "all_energies",  
                          min_common = 0, charge_file = charge_file)
 ```
 
@@ -434,7 +434,7 @@ Update the gnps table:
 #| warning: false
 conv.GNPS_SQL(sql_path= ftneg_path, expid = 266, peakwidth = 0.2, mzerr = 0.015,
               min = 5, adduct = 60.0211, thr1 = 2, thr2 = 0.1, thr3 = 0.3,
-              spectrum_type = "not_assembled", IntThres = 0)
+              spectrum_type = "individual", IntThres = 0)
 ```
 
 Next we visualize the CSPP and GNPS network of 101280 compound from ftms neg:
@@ -556,7 +556,7 @@ Next, we call the function to export the sql database to an mgf format that coul
 #| results: "hide"
 #| warning: false
 ft_assembled <- here("data", "ft_assembled.mgf")
-sql_to_mgf(ftneg_path, expid = 266, spectrum_type = "assembled", 
+sql_to_mgf(ftneg_path, expid = 266, spectrum_type = "pseudo_MS2", 
            output_file = ft_assembled) 
 ```
 
@@ -567,7 +567,7 @@ Then, we convert qtof data:
 #| results: "hide"
 #| warning: false
 qt_assembled <- here("data", "qt_assembled.mgf")
-sql_to_mgf(qt_path, expid = 52, spectrum_type = "intersect_single_energy", 
+sql_to_mgf(qt_path, expid = 52, spectrum_type = "same_energy", 
            output_file = qt_assembled) 
 ```
 
@@ -591,8 +591,8 @@ Assoc_SQL_flax <-Aligning_FT_QTOF_SQL(
   Assoc = alignment_output,
   startpoint = 1,
   save_assoc = TRUE,
-  spectrum_type_FT = "assembled", 
-  spectrum_type_QTOF = "merged_MSMS_all_energies",
+  spectrum_type_FT = "pseudo_MS2", 
+  spectrum_type_QTOF = "all_energies",
   minIon = 0.4,
   minPeaks = 0.4,
   lc.err = 1,
@@ -626,7 +626,7 @@ ft_maize_alignment <- Aligning_FTn_FTp_SQL(FTn_path = maize_ftneg,
   Assoc = NULL,
   startpoint = 1,
   save_assoc = FALSE,
-  spectrum_type_FTn = "not_assembled", 
+  spectrum_type_FTn = "individual", 
   spectrum_type_FTp = NULL,
   minIon = 0.4,
   minPeaks = 0.4,
@@ -654,8 +654,8 @@ align_2_exp <- Aligning_Exp_SQL(
     startpoint = 1,
     tol = 0.01,
     save_assoc = TRUE,
-    spectrum_type_ref = "not_assembled", 
-    spectrum_type_target = "not_assembled"
+    spectrum_type_ref = "individual", 
+    spectrum_type_target = "individual"
 )
 nrow(align_2_exp)
 ```

@@ -233,7 +233,7 @@ con_merged <- dbConnect(RSQLite::SQLite(), dbf)
 
 
 ```{r}
-adding_Names_SQL(db,  spectrum_type = "not_assembled", msLevel = 2, compound_id = NULL,
+adding_Names_SQL(db,  spectrum_type = "individual", msLevel = 2, compound_id = NULL,
     overwrite = FALSE )
 ```
 

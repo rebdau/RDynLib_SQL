@@ -27,6 +27,9 @@
 #' @param mzerr `Numeric(1)` mass tolerance (in Da) used to match precursor and
 #'   product ions. Default it is configured for ftms data
 #'   \code{0.01}, for qtof data the user could set it to \code{0.015}.
+#'   
+#' @param spectrum_type `Character(1)` string giving the spectrum type to use,
+#'  if NULL then the parameter is not taking into account.
 #'
 #' @param cspp `Character(1)` string giving the path to the CSPP configuration 
 #'   file. This file defines the conversion types, mass differences,
@@ -59,7 +62,7 @@ cspp.tot_SQL <- function(sql_path, expid,
                          mz_tol = 0.3,
                          dot_thresh = 0,
                          min_common = 0,
-                         spectrum_type = "assembled",
+                         spectrum_type = NULL,
                          charge_file = NULL,
                          reset = TRUE,
                          verbose = TRUE) {
@@ -114,12 +117,40 @@ cspp.tot_SQL <- function(sql_path, expid,
   
   conv[, col_name := type]
   
-  spec_df <- as.data.table(dbGetQuery(con, sprintf("
-    SELECT spectrum_id, compound_id, precursor_mz
-    FROM msms_spectrum
-    WHERE ms_level = 2
-      AND spectrum_type = '%s'
-  ", spectrum_type)))
+  if (is.null(spectrum_type)) {
+    
+    ## No filtering on spectrum_type
+    spec_df <- as.data.table(
+      dbGetQuery(
+        con,
+        "
+      SELECT spectrum_id, compound_id, precursor_mz
+      FROM msms_spectrum
+      WHERE ms_level = 2
+      "
+      )
+    )
+    
+    log("Spectrum type: all MS2 spectrum types")
+    
+  } else {
+    
+    ## Filter on the requested spectrum_type
+    spec_df <- as.data.table(
+      dbGetQuery(
+        con,
+        "
+      SELECT spectrum_id, compound_id, precursor_mz
+      FROM msms_spectrum
+      WHERE ms_level = 2
+        AND spectrum_type = ?
+      ",
+        params = list(spectrum_type)
+      )
+    )
+    
+    log("Spectrum type: %s", spectrum_type)
+  }
   
   peak_df <- as.data.table(dbGetQuery(con, sprintf("
     SELECT p.spectrum_id, p.mz, p.intensity, s.compound_id

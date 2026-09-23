@@ -63,7 +63,9 @@ By default, 60% of the MS2 peaks should be traced in the MS/MS spectrum as the M
 
 ```{r}
 library(DBI)
-match_sql_flax <- matchFTSyn_SQL(align_flax_SQL, FT_con, QTOF_con, minPeaks = 0.4 ,aggregated_Ft = TRUE, aggregated_QTOF = TRUE)
+match_sql_flax <- matchFTSyn_SQL(align_flax_SQL, FT_con, QTOF_con, 
+                                 minPeaks = 0.4 , spectrum_type_FT = "pseudo_MS2", 
+                                 spectrum_type_QTOF = "all_energies",)
 head(match_sql_flax)
 nrow(match_sql_flax)
 ```
@@ -106,9 +108,11 @@ PlotPie_LCalign(LCal_sql_flax,LCal_sql_flax_rg)
 
 ```{r}
 fill <- FillAssocFTnQTOFn_SQL(FT_con, QTOF_con,  FT_expnr =  266,
-  QTOF_expnr = 52, cutoff = 1, rg = LCal_sql_flax_rg, lc.err = 1, err  = 0.02, minIon = 0.2
-                                      ,FT_path = FT_path, QTOF_path = QTOF_path, polarity_ft = 0, polarity_qtof = 0,Assoc = NULL,aggregated_Ft = TRUE, 
-  aggregated_QTOF = TRUE)
+  QTOF_expnr = 52, cutoff = 1, rg = LCal_sql_flax_rg, lc.err = 1, err  = 0.02,
+  minIon = 0.2, FT_path = FT_path, QTOF_path = QTOF_path, polarity_ft = 0,
+  polarity_qtof = 0,Assoc = NULL, spectrum_type_FT = "pseudo_MS2", 
+  spectrum_type_QTOF = "all_energies")
+
 nrow(fill)
 fill
 ```
@@ -127,8 +131,8 @@ Assoc_SQL_flax <-Aligning_FT_QTOF_SQL(
   Assoc = assoc_path,
   startpoint = 1,
   save_assoc = TRUE,
-  aggregated_Ft = TRUE, 
-  aggregated_QTOF = TRUE,
+  spectrum_type_FT = "pseudo_MS2", 
+  spectrum_type_QTOF = "all_energies",
   minIon = 0.4,
   minPeaks = 0.4,
   lc.err = 1

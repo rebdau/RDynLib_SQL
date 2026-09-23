@@ -130,10 +130,22 @@ nrow(ftms_matches2_T)
 Adding names of the new matches:
 ```{r}
 add_spectral_matches(db, ftms_matches2_T)
+
+# print only selected relevant columns
+
+dbGetQuery(db, "Select spectrum_id, ms_level, compound_id, precursor_mz,
+                     spectrum_type, matches, match_mslevel, match_common,
+                     match_precursor_mz, match_compound_id, match_spectrum_type,
+                     match_spectrum_id
+           from msms_spectrum where match_name IS not null LIMIT 1")
 ```
 
+Based on the spectral matches, compound names can be automatically added to the `ms_compound` table using the `**adding_Names_SQL()**` function. The automatically generated name combines the name of the matched compound with the spectral similarity score and is prefixed with `!!` to distinguish it from manually assigned structural annotations. No confidence level is assigned at this stage.
+
+Each automatic annotation also creates an **annotation event** in the `annotation_history` table. The event records information supporting the match, including the spectral similarity score and the experiment accession of the matched compound. While the name stored in `ms_compound` can subsequently be replaced as the compound is further characterized, the annotation event is retained in the annotation history, providing a persistent record of the spectral match and the progression of the compound annotation.
 ```{r}
-dbGetQuery(db, "Select * from msms_spectrum where match_name IS not null LIMIT 1")
+adding_Names_SQL(db,  spectrum_type = "individual", msLevel = 2, compound_id = NULL,
+    overwrite = FALSE )
 ```
 
 look for a given name
@@ -203,6 +215,14 @@ ftms_matches3_T %>%
 Adding names of the new matches:
 ```{r}
 add_spectral_matches(db, ftms_matches3_T)
+
+# print only selected relevant columns
+
+dbGetQuery(db, "Select spectrum_id, ms_level, compound_id, precursor_mz,
+                     spectrum_type, matches, match_mslevel, match_common,
+                     match_precursor_mz, match_compound_id, match_spectrum_type,
+                     match_spectrum_id
+           from msms_spectrum where match_name IS not null LIMIT 1")
 ```
 
 ```{r}
