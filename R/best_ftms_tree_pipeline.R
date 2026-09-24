@@ -238,91 +238,281 @@ add_ms3_ms4_candidates <- function(sd_best, sd_filtered, ms4_map) {
   dplyr::bind_rows(out_list)
 }
 
-#' Enrich FTMS trees with MS3/MS4 spectra
+#' Enrich FTMS trees with additional MS3/MS4 spectra
 #'
 #' @description
-#' Rebuilds Spectra object with MS3/MS4 enrichment.
+#' Enriches the selected representative MSn trees with complementary
+#' MS3 and MS4 spectra from other fragmentation trees associated with
+#' the same chromatographic feature.
 #'
-#' @param ftms_best Spectra object
-#' @param sd_filtered data.frame filtered spectra
+#' @param ftms_best Spectra object containing the selected best trees.
+#' @param sd_filtered data.frame containing filtered spectra metadata.
+#' @param ftms_msn_tree Original Spectra object containing all spectra.
 #'
-#' @return Spectra object enriched
+#' @return Spectra object containing the enriched fragmentation trees.
+#'
 #' @author Ahlam Mentag, Rebecca Dauwe
-enrich_ms3_ms4 <- function(ftms_best, sd_filtered) {
+
+enrich_ms3_ms4 <- function(
+    ftms_best,
+    sd_filtered,
+    ftms_msn_tree
+) {
   
-  library(dplyr)
+  # Extract metadata
   
-  sd_best <- as.data.frame(spectraData(ftms_best))
+  sd_best <- as.data.frame(
+    Spectra::spectraData(ftms_best)
+  )
   
-  # keys
-  sd_best$.key <- paste(sd_best$dataOrigin, sd_best$scanIndex, sep = "_")
-  sd_filtered$.key <- paste(sd_filtered$dataOrigin, sd_filtered$scanIndex, sep = "_")
+  sd_original <- as.data.frame(
+    Spectra::spectraData(ftms_msn_tree)
+  )
   
-  #helper column
-  sd_best$precMzRound <- round(sd_best$precursorMz)
-  sd_filtered$precMzRound <- round(sd_filtered$precursorMz)
   
-  # MS4 map 
+  # Create unique spectrum keys
+  
+  make_key <- function(x) {
+    
+    paste(
+      x$dataOrigin,
+      x$scanIndex,
+      sep = "_"
+    )
+    
+  }
+  
+  sd_best$.key <- make_key(sd_best)
+  
+  sd_filtered$.key <- make_key(sd_filtered)
+  
+  sd_original$.key <- make_key(sd_original)
+  
+  
+  # Helper columns
+  
+  sd_best$precMzRound <- round(
+    sd_best$precursorMz
+  )
+  
+  sd_filtered$precMzRound <- round(
+    sd_filtered$precursorMz
+  )
+  
+  
+  # Build MS4 mapping table
+  
   ms4_map <- sd_filtered |>
     dplyr::filter(msLevel == 4)
   
-  # detect column names
+  
+  # Check precursor scan column
+  
   if (!"precScanNum" %in% names(ms4_map)) {
+    
     if ("precursorScanNum" %in% names(ms4_map)) {
-      ms4_map$precScanNum <- ms4_map$precursorScanNum
+      
+      ms4_map$precScanNum <-
+        ms4_map$precursorScanNum
+      
     } else {
-      ms4_map$precScanNum <- NA
+      
+      stop(
+        "Missing MS4 precursor scan information."
+      )
+      
     }
+    
   }
   
-  if (!"peaksCount" %in% names(ms4_map)) {
-    ms4_map$peaksCount <- NA
-  }
+  
+  # Create MS3-MS4 mapping
   
   ms4_map <- ms4_map |>
-    dplyr::select(MSntreeID, precScanNum, acquisitionNum, peaksCount) |>
+    dplyr::select(
+      MSntreeID,
+      precScanNum,
+      acquisitionNum
+    ) |>
     dplyr::rename(
       ms3_acq = precScanNum,
       ms4_acq = acquisitionNum
     )
-  #enrichment 
-  additional_ms3 <- add_ms3_ms4_candidates(
-    sd_best,
-    sd_filtered,
-    ms4_map
+  
+  
+  # Identify additional MS3/MS4 spectra
+  
+  additional <- add_ms3_ms4_candidates(
+    sd_best = sd_best,
+    sd_filtered = sd_filtered,
+    ms4_map = ms4_map
   )
   
-  # if nothing
-  if (is.null(additional_ms3) || nrow(additional_ms3) == 0) {
-    message("No enrichment found")
+  
+  # Helper to assign merged tree IDs
+  assign_merged_ids <- function(sps) {
     
-    spectraData(ftms_best)$MergedMSntreeID <- as.integer(
-      factor(spectraData(ftms_best)$feature_id)
+    # Convert to memory backend
+    sps <- Spectra::setBackend(
+      sps,
+      Spectra::MsBackendMemory()
     )
     
-    return(ftms_best)
+    # Extract feature IDs
+    feature_ids <- sps$feature_id
+    
+    # Assign one merged tree ID per feature
+    sps$MergedMSntreeID <- as.integer(
+      factor(feature_ids)
+    )
+    
+    sps
   }
   
- 
-  # keep only real spectral rows
-  valid_keys <- sd_best$.key
   
-  all_df <- bind_rows(sd_best, additional_ms3)
-  all_df <- all_df[all_df$.key %in% valid_keys, ]
+  # No enrichment found
   
-  # reorder
-  all_df <- all_df[match(valid_keys, all_df$.key), ]
+  if (is.null(additional) ||
+      nrow(additional) == 0) {
+    
+    message(
+      "No additional MS3/MS4 spectra found."
+    )
+    
+    return(
+      assign_merged_ids(ftms_best)
+    )
+    
+  }
   
-  # rebuild
-  spectraData(ftms_best) <- S4Vectors::DataFrame(all_df)
   
-  # final feature ID 
-  spectraData(ftms_best)$MergedMSntreeID <- as.integer(
-    factor(spectraData(ftms_best)$feature_id)
+  # Remove spectra already present in best trees
+  
+  additional <- additional |>
+    dplyr::filter(
+      !.key %in% sd_best$.key
+    ) |>
+    dplyr::distinct(
+      .key,
+      .keep_all = TRUE
+    )
+  
+  
+  # Check whether additional spectra remain
+  
+  if (nrow(additional) == 0) {
+    
+    message(
+      "All candidate spectra are already present ",
+      "in the selected trees."
+    )
+    
+    return(
+      assign_merged_ids(ftms_best)
+    )
+    
+  }
+  
+  
+  # Match additional spectra to original Spectra object
+  
+  idx <- match(
+    additional$.key,
+    sd_original$.key
   )
   
-  ftms_best
+  
+  # Remove unmatched spectra
+  
+  valid <- !is.na(idx)
+  
+  if (any(!valid)) {
+    
+    warning(
+      sum(!valid),
+      " additional spectra could not be found ",
+      "in the original Spectra object."
+    )
+    
+  }
+  
+  idx <- idx[valid]
+  
+  
+  # Check whether spectra were retrieved
+  
+  if (length(idx) == 0) {
+    
+    message(
+      "No additional spectra could be retrieved."
+    )
+    
+    return(
+      assign_merged_ids(ftms_best)
+    )
+    
+  }
+  
+  
+  # Retrieve actual spectra, including fragment peaks
+  
+  additional_spectra <- ftms_msn_tree[idx]
+  
+  
+  # Combine original and additional spectra
+  
+  ftms_enriched <- c(
+    ftms_best,
+    additional_spectra
+  )
+  
+  
+  # Convert to memory backend before updating metadata
+  
+  ftms_enriched <- Spectra::setBackend(
+    ftms_enriched,
+    Spectra::MsBackendMemory()
+  )
+  
+  
+  # Assign one merged tree ID per feature
+  ftms_enriched <- assign_merged_ids(
+    ftms_enriched
+  )
+  
+  
+  # Summary
+  
+  message(
+    "Original spectra: ",
+    length(ftms_best)
+  )
+  
+  message(
+    "Additional spectra: ",
+    length(additional_spectra)
+  )
+  
+  message(
+    "Final spectra: ",
+    length(ftms_enriched)
+  )
+  
+  message(
+    "Enriched features: ",
+    length(
+      unique(
+        Spectra::spectraData(
+          additional_spectra,
+          "feature_id"
+        )[["feature_id"]]
+      )
+    )
+  )
+  
+  
+  # Return enriched Spectra object
+  
+  ftms_enriched
+  
 }
-
-
-
