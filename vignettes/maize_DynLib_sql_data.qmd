@@ -1,0 +1,200 @@
+---
+title: "workflow for downloading and querying the maize DynLib sql data"
+format:
+  html:
+    toc: true
+    self-contained: true
+author: "Ahlam Mentag, Rebecca Dauwe"
+---
+
+# Overview
+
+This Quarto document demonstarate how to download the maize DynLib databases  
+from zenodo, and how to query the database using SQL commands.
+The downloaded databases are acquiered from ftms negative and positive, 
+and qtof negative and positive.
+
+## Imprort libraries
+
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+#| 
+library(devtools)
+library(DBI)
+library(RSQLite)
+library(here)
+# TODO: Replace with library(RDynLib) once the package is finalized.
+load_all()
+```
+
+#this part just before putting the data on zenodo (we have to remove it afterwards)
+```{r}
+# maize FTneg
+maize_ftneg <- here("data", "maize_ftneg.sqlite")
+
+con_mftneg <- dbConnect(RSQLite::SQLite(), maize_ftneg)
+
+#maize FTpos
+maize_ftpos <- here("data", "maize_ftpos.sqlite")
+
+con_mftpos <- dbConnect(RSQLite::SQLite(), maize_ftpos)
+
+# maize QTOFneg
+maize_qtofneg <- here("data", "maize_qtofneg.sqlite")
+
+con_mqt <- dbConnect(RSQLite::SQLite(), maize_qtofneg)
+
+#maize QTOFpos
+#TODO :add the experiment numbers
+maize_qtofpos <- here("data", "maize_qtofpos.sqlite")
+
+con_mqtpos <- dbConnect(RSQLite::SQLite(), maize_qtofpos)
+
+```
+
+
+## Download the databases from zenodo
+```{r}
+# maize_FTneg
+get_dynlib_zenodo(
+  doi = ,
+  file = "maize_ftmsneg.sqlite",
+  destdir = "data"
+)
+maize_ftneg <- here("data", "maize_ftneg.sqlite")
+con_mftneg <- dbConnect(RSQLite::SQLite(), maize_ftneg)
+
+#maize FTpos
+
+get_dynlib_zenodo(
+  doi = ,
+  file = "maize_ftmspos.sqlite",
+  destdir = "data"
+)
+maize_ftpos <- here("data", "maize_ftpos.sqlite")
+con_mftpos <- dbConnect(RSQLite::SQLite(), maize_ftpos)
+
+
+# maize_QTOFneg
+get_dynlib_zenodo(
+  doi = ,
+  file = "maize_qtofneg.sqlite",
+  destdir = "data"
+)
+maize_qtofneg <- here("data", "maize_qtofneg.sqlite")
+con_mqt <- dbConnect(RSQLite::SQLite(), maize_qtofneg)
+
+#maize QTOFpos
+get_dynlib_zenodo(
+  doi = ,
+  file = "maize_qtofpos.sqlite",
+  destdir = "data"
+)
+maize_qtofpos <- here("data", "maize_qtofpos.sqlite")
+con_mqtpos <- dbConnect(RSQLite::SQLite(), maize_qtofpos)
+
+```
+
+## Querying the databases
+
+#Number of experiments in each database:
+
+```{r}
+#maize ft neg
+dbGetQuery(con_mftneg, "select count(*) from experiment")
+
+```
+
+
+```{r}
+#maize ft pos
+dbGetQuery(con_mftpos, "select count(*) from experiment")
+```
+
+
+```{r}
+#maize qt neg
+dbGetQuery(con_mqt, "select count(*) from experiment")
+```
+
+```{r}
+#maize qt pos
+dbGetQuery(con_mqtpos, "select count(*) from experiment")
+```
+
+
+#compounds number in each database
+In maize data each feature has a unique compound_id, so the number of compounds
+reported below corresponds to the number of features.
+
+```{r}
+#maize ft neg
+dbGetQuery(con_mftneg, "select count(*) from ms_compound")
+
+```
+```{r}
+#maize ft pos
+dbGetQuery(con_mftpos, "select count(*) from ms_compound")
+```
+```{r}
+#maize qt neg
+dbGetQuery(con_mqt, "select count(*) from ms_compound")
+```
+
+```{r}
+#maize qt pos
+dbGetQuery(con_mqtpos, "select count(*) from ms_compound")
+```
+#Counting the spectra numbers in each database
+
+```{r}
+#maize ft neg
+dbGetQuery(con_mftneg, "select count(*) from msms_spectrum")
+
+```
+
+
+```{r}
+#maize ft pos
+dbGetQuery(con_mftpos, "select count(*) from msms_spectrum")
+```
+
+
+```{r}
+#maize qt neg
+dbGetQuery(con_mqt, "select count(*) from msms_spectrum")
+```
+
+```{r}
+#maize qt pos
+dbGetQuery(con_mqtpos, "select count(*) from msms_spectrum")
+```
+
+#The corresponding rows of a given experiment
+
+```{r}
+dbGetQuery(con_mqtpos, "select * from ms_compound where expid = 3")
+```
+
+```{r}
+dbGetQuery(con_mftneg, "select * from experiment where expid IN (199, 230);")
+```
+#The corresponding row of a given compound
+
+```{r}
+dbGetQuery(con_mftneg, "select * from ms_compound where compound_id = 63668")
+```
+#The corresponding spectrum(s) of a given compound
+
+```{r}
+dbGetQuery(con_mftneg, "select * from msms_spectrum where compound_id = 63668")
+```
+
+#the corresponding peaks of  a given spectum
+
+```{r}
+dbGetQuery(con_mftneg, "select * from msms_spectrum_peak where spectrum_id = 157135")
+```
+

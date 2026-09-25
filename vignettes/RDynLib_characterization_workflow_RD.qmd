@@ -62,6 +62,10 @@ con_ftpos <- dbConnect(RSQLite::SQLite(), ftpos_path)
 qtofneg_path <- here("data", "DYL_FLAX_QTOFneg.sqlite")
 con_qtofneg <- dbConnect(RSQLite::SQLite(), qtofneg_path)
 
+#big qtof pos
+
+qtofpos_path <- here("data", "DyLib_QTOF_pos.sqlite")
+
 # maize FTneg
 maize_ftneg <- here("data", "maize_ftneg.sqlite")
 filterDynLibDB(
@@ -93,7 +97,7 @@ con_mqt <- dbConnect(RSQLite::SQLite(), maize_qtofneg)
 #TODO :add the experiment numbers
 maize_qtofpos <- here("data", "maize_qtofpos.sqlite")
 filterDynLibDB(
-  expid = ,
+  expid = 3,
   input_db = qtofpos_path,
   output_db = maize_qtofpos
 )
@@ -422,7 +426,7 @@ Then we update the cspp table:
 #| warning: false
 cspp.tot_SQL(ftneg_path, 266, mzerr = 0.01,
                          cspp = cspp_ft, peakwidth = 0.1, IntThres  = 0, mz_tol = 0.5,
-                         dot_thresh = 0, spectrum_type = "all_energies",  
+                         dot_thresh = 0, spectrum_type = "individual",  
                          min_common = 0, charge_file = charge_file)
 ```
 
@@ -434,7 +438,7 @@ Update the gnps table:
 #| warning: false
 conv.GNPS_SQL(sql_path= ftneg_path, expid = 266, peakwidth = 0.2, mzerr = 0.015,
               min = 5, adduct = 60.0211, thr1 = 2, thr2 = 0.1, thr3 = 0.3,
-              spectrum_type = "individual", IntThres = 0)
+              spectrum_type = "all_energies", IntThres = 0)
 ```
 
 Next we visualize the CSPP and GNPS network of 101280 compound from ftms neg:
