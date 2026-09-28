@@ -94,8 +94,8 @@ We start by matching the 101280 compound with the database:
 mt_3_3 <- MultMatchCID_Spectra(
   dy_sps,
   101280,
-  spectrum_type_query = "not_assembled",
-  spectrum_type_target = "not_assembled",
+  spectrum_type_query = "individual",
+  spectrum_type_target = "individual",
   ms_level_query = 3,
   ms_level_target = 3,
   polarity_query = 0,
@@ -116,8 +116,8 @@ The MS3 vs MS3 returns 71 match in the database.
 mt_2_2 <- MultMatchCID_Spectra(
   dy_sps,
   101280,
-  spectrum_type_query = "not_assembled",
-  spectrum_type_target = "not_assembled",
+  spectrum_type_query = "individual",
+  spectrum_type_target = "individual",
   ms_level_query = 2,
   ms_level_target = 2,
   polarity_query = 0,
@@ -138,8 +138,8 @@ The MS2 vs MS2 returns 28 match in the database.
 mt_4_3 <- MultMatchCID_Spectra(
   dy_sps,
   101280,
-  spectrum_type_query = "not_assembled",
-  spectrum_type_target = "not_assembled",
+  spectrum_type_query = "individual",
+  spectrum_type_target = "individual",
   ms_level_query = 4,
   ms_level_target = 3,
   polarity_query = 0,
@@ -160,8 +160,8 @@ The MS4 vs MS3 returns 13 match in the database.
 mt_4_4 <- MultMatchCID_Spectra(
   dy_sps,
   101280,
-  spectrum_type_query = "not_assembled",
-  spectrum_type_target = "not_assembled",
+  spectrum_type_query = "individual",
+  spectrum_type_target = "individual",
   ms_level_query = 4,
   ms_level_target = 4,
   polarity_query = 0,
@@ -202,7 +202,7 @@ charge_file <- here("data", "ftms_all_compounds_RD.xlsx")
 ```{r}
 cspp.tot_SQL(ft_path, 266, mzerr = 0.01,
                          cspp = cspp_ft, peakwidth = 0.1, IntThres  = 0, mz_tol = 0.5,
-                         dot_thresh = 0, spectrum_type = "assembled",  
+                         dot_thresh = 0, spectrum_type = "pseudo_MS2",  
                          min_common = 0, charge_file = charge_file)
 ```
 
@@ -228,14 +228,14 @@ fill in the gnps_add table
 ```{r}
 conv.GNPS_SQL(sql_path = qt_path, expid= 52, mzerr = 0.015,
               min = 5, adduct = 60.0211, thr1 = 3, thr2 = 0.1, thr3 = 0.4,
-              spectrum_type = "merged_MSMS_all_energies", IntThres = 5)
+              spectrum_type = "all_energies", IntThres = 5)
 ```
 
 fill in the cspp_add table
 ```{r}
 cspp.tot_SQL(qt_path, 52, mzerr = 0.01,
                          cspp = cspp_flax, peakwidth = 0.2, IntThres  = 0, mz_tol = 0.5,
-                         dot_thresh = 0.7, spectrum_type = "intersect_single_energy",  
+                         dot_thresh = 0.7, spectrum_type = "same_energy",  
                          min_common = 3, charge_file = charge_file)
 ```
 
@@ -262,7 +262,7 @@ We start by converting ftms data
 #| results: "hide"
 #| warning: false
 ft_assembled <- here("data", "ft_assembled.mgf")
-sql_to_mgf(ft_path, expid = 266, spectrum_type = "assembled", 
+sql_to_mgf(ft_path, expid = 266, spectrum_type = "pseudo_MS2", 
            output_file = ft_assembled) 
 ```
 
@@ -271,7 +271,7 @@ sql_to_mgf(ft_path, expid = 266, spectrum_type = "assembled",
 #| results: "hide"
 #| warning: false
 ft_assembled <- here("data", "ft_MS2.mgf")
-sql_to_mgf(ft_path, expid = 266, spectrum_type = "not_assembled", 
+sql_to_mgf(ft_path, expid = 266, spectrum_type = "individual", 
            msLevel = 2, output_file = ft_assembled) 
 ```
 
@@ -281,7 +281,7 @@ Then, we convert qtof data:
 #| results: "hide"
 #| warning: false
 qt_assembled <- here("data", "qt_assembled.mgf")
-sql_to_mgf(qt_path, expid = 52, spectrum_type = "intersect_single_energy", 
+sql_to_mgf(qt_path, expid = 52, spectrum_type = "same_energy", 
            output_file = qt_assembled) 
 ```
 
@@ -291,7 +291,7 @@ sql_to_mgf(qt_path, expid = 52, spectrum_type = "intersect_single_energy",
 #| results: "hide"
 #| warning: false
 qt_assembled <- here("data", "qt_merged.mgf")
-sql_to_mgf(qt_path, expid = 52, spectrum_type = "merged_MSMS_all_energies", 
+sql_to_mgf(qt_path, expid = 52, spectrum_type = "all_energies", 
            output_file = qt_assembled)
 ```
 

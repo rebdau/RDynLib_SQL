@@ -1,16 +1,17 @@
 ---
-title: "Untitled"
-format: html
-server: shiny
+title: "workflow to update the spectrum types"
+format:
+  html:
+    toc: true
+    self-contained: true
+author: "Ahlam Mentag"
 ---
 
 ## Shiny Documents
 
-This Quarto document is made interactive using Shiny. Interactive documents allow readers to modify parameters and see the results immediately. Learn more about Shiny interactive documents at <https://quarto.org/docs/interactive/shiny/>.
-
-## Inputs and Outputs
-
-You can embed Shiny inputs and outputs in your document. Outputs are automatically updated whenever inputs change. This demonstrates how a standard R plot can be made interactive:
+If you want to change the spectrum type names in your sql database, then this 
+workflow is for you. This Quarto document represent the SQL commands to use 
+in case of updating the spectrum types : 
 
 ```{r}
 library(DBI)
@@ -25,7 +26,7 @@ load_all()
 #FTMS
 
 ```{r}
-FT_path <- "C:/Users/ament/Desktop/Github/RDynLib_SQL/data/DYL_flax_herba_FTMSneg.sqlite"
+FT_path <- here("data","DYL_flax_herba_FTMSneg.sqlite")
 
 FT_con <- DBI::dbConnect(RSQLite::SQLite(), FT_path)
 
@@ -59,7 +60,7 @@ dbGetQuery(FT_con, "Select * from msms_spectrum where spectrum_type = 'individua
 #QTOF
 
 ```{r}
-QTOF_path <- "C:/Users/ament/Desktop/Github/RDynLib_SQL/data/DYL_FLAX_QTOFneg.sqlite"
+QTOF_path <- here("data","DYL_FLAX_QTOFneg.sqlite")
 QTOF_con <- DBI::dbConnect(RSQLite::SQLite(), QTOF_path)
   
 ```

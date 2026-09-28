@@ -57,23 +57,28 @@ con_mqtpos <- dbConnect(RSQLite::SQLite(), maize_qtofpos)
 
 ## Download the databases from zenodo
 ```{r}
-# maize_FTneg
+# maize_FTneg 
+#RDynlib function to download the database from zenodo
 get_dynlib_zenodo(
   doi = ,
   file = "maize_ftmsneg.sqlite",
   destdir = "data"
 )
+#path of the output database
 maize_ftneg <- here("data", "maize_ftneg.sqlite")
+#SQL connection to the database
 con_mftneg <- dbConnect(RSQLite::SQLite(), maize_ftneg)
 
 #maize FTpos
-
+#RDynlib function to download the database from zenodo
 get_dynlib_zenodo(
   doi = ,
   file = "maize_ftmspos.sqlite",
   destdir = "data"
 )
+#path of the output database
 maize_ftpos <- here("data", "maize_ftpos.sqlite")
+#SQL connection to the database
 con_mftpos <- dbConnect(RSQLite::SQLite(), maize_ftpos)
 
 
@@ -83,7 +88,9 @@ get_dynlib_zenodo(
   file = "maize_qtofneg.sqlite",
   destdir = "data"
 )
+#path of the output database
 maize_qtofneg <- here("data", "maize_qtofneg.sqlite")
+#SQL connection to the database
 con_mqt <- dbConnect(RSQLite::SQLite(), maize_qtofneg)
 
 #maize QTOFpos
@@ -92,7 +99,9 @@ get_dynlib_zenodo(
   file = "maize_qtofpos.sqlite",
   destdir = "data"
 )
+#path of the output database
 maize_qtofpos <- here("data", "maize_qtofpos.sqlite")
+#SQL connection to the database
 con_mqtpos <- dbConnect(RSQLite::SQLite(), maize_qtofpos)
 
 ```

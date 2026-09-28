@@ -1,4 +1,5 @@
-#' @title Aligning compounds from the same instrument 
+#' @title Aligning compounds from the same instrument with different ionization
+#'        mode
 #'
 #' @description
 #'
@@ -64,6 +65,14 @@
 #'
 #' @param save_assoc `logical(1)` If true we add the alignment result to the
 #'        Assoc text file.
+#'        
+#' @param spectrum_type_FTn `character(1)` Spectrum type to use for the reference
+#'        instrument. If `NULL` and the database does not contain a `spectrum_type`
+#'        column, all spectra are used.
+#'
+#' @param spectrum_type_FTp `character(1)` Spectrum type to use for the second
+#'        instrument. If `NULL` and the database does not contain a `spectrum_type`
+#'        column, all spectra are used.
 #'
 #' @return A `data.frame` containing the matched FTMSn-FTMSp or QTOFn-QTOFp 
 #'         compounds with columns:
