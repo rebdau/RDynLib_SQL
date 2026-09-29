@@ -24,6 +24,12 @@
 #' @param requirePrecursor 'logical(1)' by default true, it allows to pre-filter
 #'        the target spectra prior to the actual similarity calculation for 
 #'        each individual query spectrum. 
+#'
+#' @param spectrum_type_query 'character(1)' the spectrum type of the query 
+#'        spectra.        
+#'        
+#' @param spectrum_type_target 'character(1)' the spectrum type of the target 
+#'        spectra.
 #'        
 #' @param threshold 'numeric(1)' the score threshold to select a best match, by 
 #'        default it is 0.8.
@@ -148,7 +154,6 @@ similarity_RDynLib_match <- function(
         )
       )
       
-      
       if (length(available_types) > 0) {
         
         if (is.null(spectrum_type)) {
@@ -244,7 +249,6 @@ similarity_RDynLib_match <- function(
           stats::na.omit(ms_data)
         )
       )
-      
       
       if (length(available_ms) > 0) {
         
@@ -392,7 +396,10 @@ similarity_RDynLib_match <- function(
     "precursorMz",
     "acquisitionNum",
     "scanIndex",
-    "dataOrigin"
+    "dataOrigin",
+    "compound_id",
+    "compound_accession",
+    "spectrum_id"
   )
   
   if (!is.null(query_type_col)) {
@@ -457,6 +464,38 @@ similarity_RDynLib_match <- function(
   target_peaks <- Spectra::peaksData(
     dy_filtered
   )
+  
+  
+  # Add missing query identifiers as NA
+  
+  query_identifier_vars <- c(
+    "compound_id",
+    "compound_accession",
+    "spectrum_id"
+  )
+  
+  for (v in query_identifier_vars) {
+    
+    if (!v %in% names(query_data)) {
+      query_data[[v]] <- NA
+    }
+  }
+  
+  
+  # Add missing target identifiers as NA
+  
+  target_identifier_vars <- c(
+    "compound_id",
+    "compound_accession",
+    "spectrum_id"
+  )
+  
+  for (v in target_identifier_vars) {
+    
+    if (!v %in% names(target_data)) {
+      target_data[[v]] <- NA
+    }
+  }
   
   
   # Store query peaks as mz and intensity list-columns
@@ -606,38 +645,68 @@ similarity_RDynLib_match <- function(
   }
   
   
-  # Rename target identifiers if necessary
+  # Rename query identifiers
   
   if (
     "compound_id" %in% names(df) &&
-    !"target_compound_id" %in% names(df)
+    !"query_compound_id" %in% names(df)
   ) {
     
     names(df)[
       names(df) == "compound_id"
-    ] <- "target_compound_id"
+    ] <- "query_compound_id"
   }
   
   
   if (
     "compound_accession" %in% names(df) &&
-    !"target_compound_accession" %in% names(df)
+    !"query_compound_accession" %in% names(df)
   ) {
     
     names(df)[
       names(df) == "compound_accession"
-    ] <- "target_compound_accession"
+    ] <- "query_compound_accession"
   }
   
   
   if (
     "spectrum_id" %in% names(df) &&
-    !"target_spectrum_id" %in% names(df)
+    !"query_spectrum_id" %in% names(df)
   ) {
     
     names(df)[
       names(df) == "spectrum_id"
-    ] <- "target_spectrum_id"
+    ] <- "query_spectrum_id"
+  }
+  
+  
+  # Ensure query identifiers are always present
+  
+  if (!"query_compound_id" %in% names(df)) {
+    df$query_compound_id <- NA
+  }
+  
+  if (!"query_compound_accession" %in% names(df)) {
+    df$query_compound_accession <- NA
+  }
+  
+  if (!"query_spectrum_id" %in% names(df)) {
+    df$query_spectrum_id <- NA
+  }
+  
+  
+  # Ensure target identifiers are always present
+  
+  if (!"target_compound_id" %in% names(df)) {
+    df$target_compound_id <- NA
+  }
+  
+  if (!"target_compound_accession" %in% names(df)) {
+    df$target_compound_accession <- NA
+  }
+  
+  if (!"target_spectrum_id" %in% names(df)) {
+    df$target_spectrum_id <- NA
   }
   
   
@@ -653,11 +722,14 @@ similarity_RDynLib_match <- function(
     ]
   }
   
+  
   # Round similarity score to 3 decimal places
   
   if ("score" %in% names(df)) {
     df$score <- round(df$score, 3)
   }
+  
+  
   if (nrow(df) == 0) {
     return(df)
   }
@@ -680,25 +752,6 @@ similarity_RDynLib_match <- function(
           msLevel,
           target_msLevel
         )
-    )
-  }
-  
-  
-  # Count Herbacetin matches before best-match filtering
-  
-  if ("target_name" %in% names(df)) {
-    
-    cat(
-      "Number of Herbacetin matches before filtering:",
-      sum(
-        grepl(
-          "herbac",
-          df$target_name,
-          ignore.case = TRUE
-        ),
-        na.rm = TRUE
-      ),
-      "\n"
     )
   }
   
