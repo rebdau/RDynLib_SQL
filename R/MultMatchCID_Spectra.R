@@ -13,7 +13,7 @@
 #' @param polarity_query 'numeric' the query polarity, 0  if negative,
 #'         and 1 for positive polarity.
 #'        
-#' @param polarity_target 'numeric' the target polarity, 0  if negative,
+#' @param polarity_target 'numeric' the target polarity, 0 if negative,
 #'         and 1 for positive polarity.
 #'        
 #'        

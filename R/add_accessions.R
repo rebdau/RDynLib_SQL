@@ -10,9 +10,9 @@
 #' to keep track of the original compound_ids.
 #' 
 #' @param  dbfile path to the sql database file
-#' @param expid experiment id, if NULL the accessors will be created for the 
+#' @param expid experiment id. If NULL, the accessors will be created for the 
 #' whole database
-#' @param initials_overrides initials of the user if Null, the first two letters
+#' @param initials_overrides initials of the user. If NULL, the first two letters
 #'        from the user column will be used as initials
 #' @example 
 #' add_accessions(dbfile, 
