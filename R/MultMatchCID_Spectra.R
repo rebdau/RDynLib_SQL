@@ -25,6 +25,12 @@
 #'        the target spectra prior to the actual similarity calculation for 
 #'        each individual query spectrum. 
 #'        
+#' @param spectrum_type_query 'character(1)' the spectrum type of the query 
+#'        spectra.        
+#'        
+#' @param spectrum_type_target 'character(1)' the spectrum type of the target 
+#'        spectra.
+#'        
 #' @param threshold 'numeric(1)' the score threshold to select a best match, by 
 #'        default it is 0.8.
 #'       

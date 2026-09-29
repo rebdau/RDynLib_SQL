@@ -276,6 +276,13 @@ print(ftms_matches2_T)
 nrow(ftms_matches2_T) 
 ```
 
+```{r}
+ftms_matches2_T |>
+   dplyr::slice_head(n = 2) |>
+     print(width = Inf)
+```
+
+
 Store the first 20 matches based on the matched_peaks_count:
 ```{r}
 ft_20_matches <- ftms_matches2_T %>%
@@ -668,7 +675,7 @@ annotation of DynLib databases, ranging from automated transfer of tentative
 annotations to manual curation of fully characterized compounds:
 
 ```{r}
-#EnterName_SQL(ft_path, CoMPID = 101143)
+EnterName_SQL(maize_qtofpos, CoMPID = 1144)
 ```
 
 ```{r}

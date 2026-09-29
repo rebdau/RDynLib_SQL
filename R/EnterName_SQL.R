@@ -21,12 +21,14 @@
 #'   \item buffer adducts and isotopic labeling,
 #'   \item in-source fragments and odd-electron ions,
 #'   \item ion–neutral complexes (dimers or heteromers),
-#'   \item indication whether the name refers to a molecular substructure.
+#'   \item indication whether the name refers to a molecular substructure,
+#'   \item formula corresponds to the detected ion(feature).
 #' }
 #'
 #' Optionally, the user may also update additional metadata such as the molecular
-#' formula, SMILES string, and ppm mass deviation. After user confirmation, the
-#' function updates the database directly using SQL queries.
+#' formula of the detected ion, the SMILES representation of the neutral compound
+#' assigned to the feature, and ppm mass deviation. After user confirmation, 
+#' the function updates the database directly using SQL queries.
 #' Only fields explicitly provided by the user are modified.
 #'
 #' @param data_path `character(1)`
