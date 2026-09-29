@@ -60,8 +60,8 @@ dy_sps <- sql_to_spectra(ft_path)
 cmp <- MultMatchCID_Spectra(
   dy_sps,
   101280,
-   spectrum_type_query = "not_assembled",
-  spectrum_type_target = "not_assembled",
+   spectrum_type_query = "individual",
+  spectrum_type_target = "individual",
    ms_level_query = 2,
    ms_level_target = 2,
   polarity_query = 0,
@@ -82,7 +82,7 @@ Then we update the cspp table:
 #| warning: false
 cspp.tot_SQL(ft_path, 266, mzerr = 0.01,
                          cspp = cspp_ft, peakwidth = 0.1, IntThres  = 0, mz_tol = 0.5,
-                         dot_thresh = 0, spectrum_type = "assembled",  
+                         dot_thresh = 0, spectrum_type = "pseudo_MS2",  
                          min_common = 0, charge_file = charge_file)
 ```
 
@@ -93,7 +93,7 @@ Update the gnps table:
 #| warning: false
 conv.GNPS_SQL(sql_path= ft_path, expid = 266, peakwidth = 0.2, mzerr = 0.015,
               min = 5, adduct = 60.0211, thr1 = 2, thr2 = 0.1, thr3 = 0.3,
-              spectrum_type = "not_assembled", IntThres = 0)
+              spectrum_type = "individual", IntThres = 0)
 ```
 
 Next we visualize the CSPP and GNPS network of 101280 compound from ftms neg:
@@ -215,7 +215,7 @@ We start by converting ftms data
 #| results: "hide"
 #| warning: false
 ft_assembled <- here("data", "ft_assembled.mgf")
-sql_to_mgf(ft_path, expid = 266, spectrum_type = "assembled", 
+sql_to_mgf(ft_path, expid = 266, spectrum_type = "pseudo_MS2", 
            output_file = ft_assembled) 
 ```
 
@@ -225,7 +225,7 @@ Then, we convert qtof data:
 #| results: "hide"
 #| warning: false
 qt_assembled <- here("data", "qt_assembled.mgf")
-sql_to_mgf(qt_path, expid = 52, spectrum_type = "intersect_single_energy", 
+sql_to_mgf(qt_path, expid = 52, spectrum_type = "same_energy", 
            output_file = qt_assembled) 
 ```
 

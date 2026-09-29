@@ -11,9 +11,9 @@
 #'        an mgf file.
 #' 
 #' @param spectrum_type 'character()' For flax ftms data it could be 
-#'       "not_assembled" or "assembled".
-#'       For Qtof flax data it could be "intersect_single_energy" 
-#'       or "merged_MSMS_all_energies".
+#'       "pseudo_MS2" or "individual".
+#'       For Qtof flax data it could be "same_energy" 
+#'       or "all_energies".
 #'       
 #' @param msLevel 'numeric()' msLevel number of the data to convert to  
 #'        an mgf file.

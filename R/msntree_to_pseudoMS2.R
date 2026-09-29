@@ -93,7 +93,7 @@ msntree_to_pseudoMS2 <- function(sps) {
     
     ms2_meta <- meta[ms2_rows[1], , drop = FALSE]
     
-    ms2_meta$spectrum.type <- "assembled"
+    ms2_meta$spectrum.type <- "pseudo_MS2"
     ms2_meta$MSntreeID <- tree_id
     
     ms2_meta$mz <- list(merged_spec[, "mz"])
@@ -108,7 +108,7 @@ msntree_to_pseudoMS2 <- function(sps) {
   assembled_list <- assembled_list[seq_len(n_out)]
   
   if (length(assembled_list) == 0) {
-    warning("No assembled spectra could be created.")
+    warning("No pseudo_MS2 spectra could be created.")
     return(NULL)
   }
   

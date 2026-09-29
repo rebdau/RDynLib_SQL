@@ -19,6 +19,7 @@
 #' 
 #' @import RColorBrewer
 #' @import igraph
+#' @import scales
 #' 
 #' @author Ahlam Mentag
 #' @export
@@ -29,11 +30,7 @@ Local.net_SQL <- function(net.lst,
                           png_width = 6000,
                           png_height = 3000,
                           png_res = 200) {
-  
-  library(igraph)
-  library(data.table)
-  library(scales)
-  
+
 
   ## SAVE BOTH NETWORKS IN SAME PNG
 

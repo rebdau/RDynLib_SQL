@@ -56,12 +56,12 @@ spec_df <- dbGetQuery(
          s.precursor_mz
   FROM msms_spectrum s
   WHERE s.ms_level = 2
-    AND s.spectrum_type = 'assembled'
+    AND s.spectrum_type = 'pseudo_MS2'
     AND s.spectrum_id IN (
       SELECT MIN(spectrum_id)
       FROM msms_spectrum
       WHERE ms_level = 2
-        AND spectrum_type = 'assembled'
+        AND spectrum_type = 'pseudo_MS2'
       GROUP BY compound_id
     )
   "
@@ -127,7 +127,7 @@ cspp_ft <- here("data","cspp_flax.txt")
 cspp_ft_2ch <- here("data","cspp_flax_2ch.txt")
 cspp.tot_SQL(ft_path, 266, mzerr = 0.01,
                          cspp = cspp_ft, peakwidth = NULL, IntThres  = 0, mz_tol = 0.5,
-                         dot_thresh = 0.7, spectrum_type = "assembled",  
+                         dot_thresh = 0.7, spectrum_type = "pseudo_MS2",  
                          min_common = 3)
 ```
 test
@@ -236,7 +236,7 @@ cspp.tot_SQL(
   IntThres = 0,
   mz_tol = 0.5,  #mz tolerance is high?  
   dot_thresh = 0.7, 
-  spectrum_type = "assembled", 
+  spectrum_type = "pseudo_MS2", 
   min_common = 3
 )
 ```
@@ -407,7 +407,7 @@ conv.GNPS_SQL(sql_path= ft_path, expid = 266,
                           thr1 = 3,
                           thr2 = 0.1,
                           thr3 = 0.4,
-                          spectrum_type = "assembled", 
+                          spectrum_type = "pseudo_MS2", 
                           IntThres = 0)
 ```
 

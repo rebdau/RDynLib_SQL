@@ -1,0 +1,102 @@
+---
+title: "workflow to update the spectrum types"
+format:
+  html:
+    toc: true
+    self-contained: true
+author: "Ahlam Mentag"
+---
+
+## Shiny Documents
+
+If you want to change the spectrum type names in your sql database, then this 
+workflow is for you. This Quarto document represent the SQL commands to use 
+in case of updating the spectrum types : 
+
+```{r}
+library(DBI)
+library(RSQLite)
+library(dplyr)
+library(devtools)
+library(here)
+#library(RDynlib)
+load_all()
+```
+
+#FTMS
+
+```{r}
+FT_path <- here("data","DYL_flax_herba_FTMSneg.sqlite")
+
+FT_con <- DBI::dbConnect(RSQLite::SQLite(), FT_path)
+
+
+```
+
+```{r}
+DBI::dbExecute(
+  FT_con,
+  "UPDATE msms_spectrum
+   SET spectrum_type = 'individual'
+   WHERE spectrum_type IS 'not_assembled'"
+)
+
+```
+
+```{r}
+DBI::dbExecute(
+  FT_con,
+  "UPDATE msms_spectrum
+   SET spectrum_type = 'pseudo_MS2'
+   WHERE spectrum_type IS 'assembled'"
+)
+```
+```{r}
+dbGetQuery(FT_con, "Select * from msms_spectrum where spectrum_type = 'pseudo_MS2' limit 5" )
+```
+```{r}
+dbGetQuery(FT_con, "Select * from msms_spectrum where spectrum_type = 'individual' limit 5" )
+```
+#QTOF
+
+```{r}
+QTOF_path <- here("data","DYL_FLAX_QTOFneg.sqlite")
+QTOF_con <- DBI::dbConnect(RSQLite::SQLite(), QTOF_path)
+  
+```
+
+```{r}
+DBI::dbExecute(
+  QTOF_con,
+  "UPDATE msms_spectrum
+   SET spectrum_type = 'individual'
+   WHERE spectrum_type IS 'not_assembled'"
+)
+
+```
+```{r}
+DBI::dbExecute(
+  QTOF_con,
+  "UPDATE msms_spectrum
+   SET spectrum_type = 'same_energy'
+   WHERE spectrum_type IS 'intersect_single_energy'"
+)
+```
+
+```{r}
+DBI::dbExecute(
+  QTOF_con,
+  "UPDATE msms_spectrum
+   SET spectrum_type = 'all_energies'
+   WHERE spectrum_type IS 'merged_MSMS_all_energies'"
+)
+```
+
+```{r}
+available_spectrum_types(QTOF_con)
+```
+
+```{r}
+available_spectrum_types(FT_con)
+```
+

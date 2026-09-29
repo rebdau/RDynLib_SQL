@@ -32,7 +32,7 @@ library(RSQLite)
 library(here)
 library(CompoundDb)
 library(MsBackendMgf)
-
+library(scales)
 # TODO: Replace with library(RDynLib) once the package is finalized.
 load_all()
 ```
@@ -49,12 +49,22 @@ The DynLib SQLite databases used in this workflow are provided through Zenodo. E
 #| message: false
 #| results: "hide"
 #| warning: false
+
+#big ftmsneg
 ftneg_path <- here("data", "DYL_FLAX_herba_FTMSneg.sqlite")
 con_ftneg <- dbConnect(RSQLite::SQLite(), ftneg_path)
 
-# flax QTOFneg
+#big ftmspos
+ftpos_path <- here("data", "DyLib_FTMS_pos.sqlite")
+con_ftpos <- dbConnect(RSQLite::SQLite(), ftpos_path)
+
+# big QTOFneg
 qtofneg_path <- here("data", "DYL_FLAX_QTOFneg.sqlite")
 con_qtofneg <- dbConnect(RSQLite::SQLite(), qtofneg_path)
+
+#big qtof pos
+
+qtofpos_path <- here("data", "DyLib_QTOF_pos.sqlite")
 
 # maize FTneg
 maize_ftneg <- here("data", "maize_ftneg.sqlite")
@@ -65,6 +75,15 @@ filterDynLibDB(
 )
 con_mftneg <- dbConnect(RSQLite::SQLite(), maize_ftneg)
 
+#maize FTpos
+maize_ftpos <- here("data", "maize_ftpos.sqlite")
+filterDynLibDB(
+  expid = 55:94,
+  input_db = ftpos_path,
+  output_db = maize_ftpos
+)
+con_mftpos <- dbConnect(RSQLite::SQLite(), maize_ftpos)
+
 # maize QTOFneg
 maize_qtofneg <- here("data", "maize_qtofneg.sqlite")
 filterDynLibDB(
@@ -73,6 +92,16 @@ filterDynLibDB(
   output_db = maize_qtofneg
 )
 con_mqt <- dbConnect(RSQLite::SQLite(), maize_qtofneg)
+
+#maize QTOFpos
+#TODO :add the experiment numbers
+maize_qtofpos <- here("data", "maize_qtofpos.sqlite")
+filterDynLibDB(
+  expid = 3,
+  input_db = qtofpos_path,
+  output_db = maize_qtofpos
+)
+con_mqtpos <- dbConnect(RSQLite::SQLite(), maize_qtofpos)
 
 # flax FTneg
 flax_ftneg <- here("data", "flax_ftneg.sqlite")
@@ -90,7 +119,7 @@ filterDynLibDB(
   input_db = qtofneg_path,
   output_db = here("data", "flax_qtofneg.sqlite")
 )
-con_fqt <- dbConnect(RSQLite::SQLite(), flax_qtof)
+con_fqt <- dbConnect(RSQLite::SQLite(), flax_qtofneg)
 
 # HDG FTneg 
 hdg_ftneg <- here("data", "hdg_ftneg.sqlite")
@@ -111,20 +140,40 @@ con_hdgft <- dbConnect(RSQLite::SQLite(), hdg_ftneg)
 # maize_FTneg
 get_dynlib_zenodo(
   doi = ,
-  file = "maize_ftms.sqlite",
+  file = "maize_ftmsneg.sqlite",
   destdir = "data"
 )
-maize_ftneg <- here("data", "maize_ftms.sqlite")
-con_mft <- dbConnect(RSQLite::SQLite(), maize_ftneg)
+maize_ftneg <- here("data", "maize_ftneg.sqlite")
+con_mftneg <- dbConnect(RSQLite::SQLite(), maize_ftneg)
+
+#maize FTpos
+
+get_dynlib_zenodo(
+  doi = ,
+  file = "maize_ftmspos.sqlite",
+  destdir = "data"
+)
+maize_ftpos <- here("data", "maize_ftpos.sqlite")
+con_mftpos <- dbConnect(RSQLite::SQLite(), maize_ftpos)
+
 
 # maize_QTOFneg
 get_dynlib_zenodo(
   doi = ,
-  file = "maize_qtof.sqlite",
+  file = "maize_qtofneg.sqlite",
   destdir = "data"
 )
-maize_qtofneg <- here("data", "maize_qtof.sqlite")
+maize_qtofneg <- here("data", "maize_qtofneg.sqlite")
 con_mqt <- dbConnect(RSQLite::SQLite(), maize_qtofneg)
+
+#maize QTOFpos
+get_dynlib_zenodo(
+  doi = ,
+  file = "maize_qtofpos.sqlite",
+  destdir = "data"
+)
+maize_qtofpos <- here("data", "maize_qtofpos.sqlite")
+con_mqtpos <- dbConnect(RSQLite::SQLite(), maize_qtofpos)
 
 # flaxseed_FTneg
 get_dynlib_zenodo(
@@ -132,7 +181,7 @@ get_dynlib_zenodo(
   file = "flax_ftms.sqlite",
   destdir = "data"
 )
-flax_ftneg <- here("data", "flax_ftms.sqlite")
+flax_ftneg <- here("data", "flax_ftneg.sqlite")
 con_fft <- dbConnect(RSQLite::SQLite(), flax_ftneg)
 
 # flaxseed_QTOFneg
@@ -141,7 +190,7 @@ get_dynlib_zenodo(
   file = "flax_qtof.sqlite",
   destdir = "data"
 )
-flax_qtofneg <- here("data", "flax_qtof.sqlite")
+flax_qtofneg <- here("data", "flax_qtofneg.sqlite")
 con_fqt <- dbConnect(RSQLite::SQLite(), flax_qtofneg)
 
 # HDG_FTneg 
@@ -150,10 +199,9 @@ get_dynlib_zenodo(
   file = "hdg_ftms.sqlite",
   destdir = "data"
 )
-hdg_ftneg <- here("data", "hdg_ftms.sqlite")
+hdg_ftneg <- here("data", "hdg_ftneg.sqlite")
 con_hdgft <- dbConnect(RSQLite::SQLite(), hdg_ftneg)
 
-#Ahlam : we don't have hdg in qtof
 ```
 
 To create the target library for spectral matching, the maize FTneg DynLib database is merged with the HDG_FTneg DynLib database.
@@ -161,8 +209,9 @@ To create the target library for spectral matching, the maize FTneg DynLib datab
 ```{r}
 target_DL_FTneg <- here("data", "FTneg_maize_hdg.sqlite")
 
+#convert_add_rt is False because both databases are already in minutes so no need for conversion
 merge_databases(main_db  = maize_ftneg, add_db = hdg_ftneg,
-                output_db = target_DL_FTneg)
+                output_db = target_DL_FTneg, convert_add_rt = FALSE)
 
 con_merged <- dbConnect(RSQLite::SQLite(), target_DL_FTneg)
 
@@ -186,6 +235,7 @@ A DynLib database can store different types of spectra for each compound. The sp
 ```{r}
 available_spectrum_types(con_merged)
 available_spectrum_types(con_fft) 
+available_spectrum_types(con_qtofneg) 
 ```
 
 
@@ -209,8 +259,8 @@ ftms_matches2_T <- similarity_RDynLib_match(
   polarity_target = 0,
   msLevel_query = 2,
   msLevel_target = 2,
-  spectrum_type_query = "not_assembled",
-  spectrum_type_target = "not_assembled",
+  spectrum_type_query = "individual",
+  spectrum_type_target = "individual",
   requirePrecursor = TRUE,
   tolerance = 0,
   ppm = 5,
@@ -226,6 +276,13 @@ print(ftms_matches2_T)
 nrow(ftms_matches2_T) 
 ```
 
+Store the first 20 matches based on the matched_peaks_count:
+```{r}
+ft_20_matches <- ftms_matches2_T %>%
+  arrange(desc(matched_peaks_count)) %>%
+  slice_head(n = 20)
+```
+
 The spectral matches can be added to the `msms_spectrum` table of the sql database.
 
 ```{r}
@@ -233,17 +290,22 @@ add_spectral_matches(con_fft, ftms_matches2_T)
 
 # Verify the addition
 
-# TODO : print only selected relevant columns
+# print only selected relevant columns
 
-dbGetQuery(con_fft, "Select * from msms_spectrum where match_name IS not null LIMIT 1")
+dbGetQuery(con_fft, "Select spectrum_id, ms_level, compound_id, precursor_mz,
+                     spectrum_type, matches, match_mslevel, match_common,
+                     match_precursor_mz, match_compound_id, match_spectrum_type,
+                     match_spectrum_id
+           from msms_spectrum where match_name IS not null LIMIT 1")
 
 ```
 
-Based on the spectral matches, compound names can be automatically added to the `ms_compound` table using the `**TODO()**` function. The automatically generated name combines the name of the matched compound with the spectral similarity score and is prefixed with `!!` to distinguish it from manually assigned structural annotations. No confidence level is assigned at this stage.
+Based on the spectral matches, compound names can be automatically added to the `ms_compound` table using the `**adding_Names_SQL()**` function. The automatically generated name combines the name of the matched compound with the spectral similarity score and is prefixed with `!!` to distinguish it from manually assigned structural annotations. No confidence level is assigned at this stage.
 
 Each automatic annotation also creates an **annotation event** in the `annotation_history` table. The event records information supporting the match, including the spectral similarity score and the experiment accession of the matched compound. While the name stored in `ms_compound` can subsequently be replaced as the compound is further characterized, the annotation event is retained in the annotation history, providing a persistent record of the spectral match and the progression of the compound annotation.
 ```{r}
-TODO
+adding_Names_SQL(con_fft,  spectrum_type = "individual", msLevel = 2, compound_id = NULL,
+    overwrite = FALSE )
 ```
 
 ## QTOF spectral similarity (maize vs flax)
@@ -251,14 +313,14 @@ TODO
 First we convert both sql databases to a spectra object:
 
 ```{r}
-sp_qtmaize <- sql_to_spectra(maize_qtof)
-sp_qtflax <- sql_to_spectra(flax_qtof)
+sp_qtmaize <- sql_to_spectra(maize_qtofneg)
+sp_qtflax <- sql_to_spectra(flax_qtofneg)
 ```
 
 Next we extract the available spectrum types in both databases:
 
 ```{r}
-available_spectrum_types(con_mqt)
+available_spectrum_types(con_mqt) 
 ```
 
 ```{r}
@@ -275,8 +337,8 @@ qtof_matches2_T <- similarity_RDynLib_match(
   polarity_target = 0,
   msLevel_query = 2,
   msLevel_target = 2,
-  spectrum_type_query = "Intersect_single_energy",
-  spectrum_type_target = "Intersect_single_energy",
+  spectrum_type_query = "same_energy",
+  spectrum_type_target = "individual",
   requirePrecursor = TRUE,
   tolerance = 0,
   ppm = 5,
@@ -285,14 +347,21 @@ qtof_matches2_T <- similarity_RDynLib_match(
  )
 ```
 
-Show the number of the found matches
 
+Show the matches:
 ```{r}
 print(qtof_matches2_T)
 nrow(qtof_matches2_T) 
 ```
 
-Adding names of the new matches to flax qtof sql database:
+Store the first 20 matches based on the matched_peaks_count:
+```{r}
+qt_20_matches <- qtof_matches2_T %>%
+  arrange(desc(matched_peaks_count)) %>%
+  slice_head(n = 20)
+```
+
+The spectral matches can be added to the `msms_spectrum` table of the sql database.
 
 ```{r}
 add_spectral_matches(con_fqt, qtof_matches2_T)
@@ -301,7 +370,17 @@ add_spectral_matches(con_fqt, qtof_matches2_T)
 In case of matches, verify if they are well added to the database:
 
 ```{r}
-dbGetQuery(con_fqt, "Select * from msms_spectrum where match_name IS not null LIMIT 1")
+dbGetQuery(con_fqt, "Select spectrum_id, ms_level, compound_id, precursor_mz,
+                     spectrum_type, matches, match_mslevel, match_common,
+                     match_precursor_mz, match_compound_id, match_spectrum_type,
+                     match_spectrum_id
+           from msms_spectrum where match_name IS not null LIMIT 1")
+```
+
+Adding names in ftms
+```{r}
+adding_Names_SQL(con_fft,  spectrum_type = "individual", msLevel = 2, compound_id = NULL,
+    overwrite = FALSE )
 ```
 
 # Spectral similarity searching against a public spectral database
@@ -317,15 +396,15 @@ The following example illustrates the selection of an experiment, spectrum type,
 We start by the CID spectral matching of 101280 compound from ftms negative database, To do that we need to convert tha database to a spectra object:
 
 ```{r}
-dy_sps <- sql_to_spectra(ft_path)
+dy_sps <- sql_to_spectra(ftneg_path)
 ```
 
 ```{r}
 cmp <- MultMatchCID_Spectra(
   dy_sps,
   101280,
-   spectrum_type_query = "not_assembled",
-  spectrum_type_target = "not_assembled",
+   spectrum_type_query = "individual",
+  spectrum_type_target = "individual",
    ms_level_query = 2,
    ms_level_target = 2,
   polarity_query = 0,
@@ -345,9 +424,9 @@ Then we update the cspp table:
 #| message: false
 #| results: "hide"
 #| warning: false
-cspp.tot_SQL(ft_path, 266, mzerr = 0.01,
+cspp.tot_SQL(ftneg_path, 266, mzerr = 0.01,
                          cspp = cspp_ft, peakwidth = 0.1, IntThres  = 0, mz_tol = 0.5,
-                         dot_thresh = 0, spectrum_type = "assembled",  
+                         dot_thresh = 0, spectrum_type = "individual",  
                          min_common = 0, charge_file = charge_file)
 ```
 
@@ -357,9 +436,9 @@ Update the gnps table:
 #| message: false
 #| results: "hide"
 #| warning: false
-conv.GNPS_SQL(sql_path= ft_path, expid = 266, peakwidth = 0.2, mzerr = 0.015,
+conv.GNPS_SQL(sql_path= ftneg_path, expid = 266, peakwidth = 0.2, mzerr = 0.015,
               min = 5, adduct = 60.0211, thr1 = 2, thr2 = 0.1, thr3 = 0.3,
-              spectrum_type = "not_assembled", IntThres = 0)
+              spectrum_type = "all_energies", IntThres = 0)
 ```
 
 Next we visualize the CSPP and GNPS network of 101280 compound from ftms neg:
@@ -371,7 +450,7 @@ Next we visualize the CSPP and GNPS network of 101280 compound from ftms neg:
 #| #| dev: svg
 #| fig-width: 20
 #| fig-height: 15
-Overall.net_SQL(sql_path = ft_path, exp.id = 266, dbkey = 101280, min = 0,
+Overall.net_SQL(sql_path = ftneg_path, exp.id = 266, dbkey = 101280, min = 0,
                 nr_of_seq = 3, thr1 = 0.1, thr2 = 0.2, thr3 = 0.3)
 ```
 
@@ -384,13 +463,13 @@ Now we show the ion trap based analysis of 100988 compound:
 #| #| dev: svg
 #| fig-width: 14
 #| fig-height: 8
-MSnplot_SQL(ft_path, 100988, thr_int = 100)
+MSnplot_SQL(ftneg_path, 100988, thr_int = 100)
 ```
 
 ```{r}
 #| fig-width: 14
 #| fig-height: 4
-MSnplot_SQL(ft_path, 101155, thr_int = 100)
+MSnplot_SQL(ftneg_path, 101155, thr_int = 100)
 ```
 
 ```{r}
@@ -400,7 +479,7 @@ MSnplot_SQL(ft_path, 101155, thr_int = 100)
 #| #| dev: svg
 #| fig-width: 14
 #| fig-height: 8
-MSnplot_SQL(ft_path, 101283, thr_int = 100)
+MSnplot_SQL(ftneg_path, 101283, thr_int = 100)
 ```
 
 #Qtof flax analysis
@@ -446,7 +525,7 @@ The 45890 is the qtof compound_id that was aligned with 100988 ftms compound_id.
 The msms_spectrum table linked to that compound_id to select the spectrum_id:
 
 ```{r}
-list_spectrum <- get_spectrum_id(45890)
+list_spectrum <- get_spectrum_id(qt_path,45890)
 list_spectrum
 ```
 
@@ -464,16 +543,6 @@ MSMSspecplot_SQL(qt_path, 46001,
                  minum = NULL, nr_col = NULL,   nr_col2 = NULL)
 ```
 
-Now we enter the characterization of the compounds found to the database:
-
-```{r}
-#EnterName_SQL(ft_path, CoMPID = 101143)
-```
-
-```{r}
-#EnterName_SQL(ft_path, CoMPID = 100988)
-```
-
 Next, we call the function to export the sql database to an mgf format that could be used for further analysis and comparisons with public databases available on public platforms like: GNPS... We start by converting ftms data
 
 ```{r}
@@ -481,7 +550,7 @@ Next, we call the function to export the sql database to an mgf format that coul
 #| results: "hide"
 #| warning: false
 ft_assembled <- here("data", "ft_assembled.mgf")
-sql_to_mgf(ft_path, expid = 266, spectrum_type = "assembled", 
+sql_to_mgf(ftneg_path, expid = 266, spectrum_type = "pseudo_MS2", 
            output_file = ft_assembled) 
 ```
 
@@ -492,6 +561,116 @@ Then, we convert qtof data:
 #| results: "hide"
 #| warning: false
 qt_assembled <- here("data", "qt_assembled.mgf")
-sql_to_mgf(qt_path, expid = 52, spectrum_type = "intersect_single_energy", 
+sql_to_mgf(qt_path, expid = 52, spectrum_type = "same_energy", 
            output_file = qt_assembled) 
+```
+
+
+#Alignment
+RDinlib offres tools for aliging two expriment acquired from th same/diffrent 
+platforms with the same/different ionization modes, as well as two different 
+experiments stored in the same database.
+The aligned **compound_ids** are then stored in a given .txt file.
+
+We start by aligning the flax_ftneg flax ftms negative data against the flax 
+qtof negative data:
+```{r}
+alignment_output <- here("data", "flax_qtn_ftn_align.txt")
+
+Assoc_SQL_flax <-Aligning_FT_QTOF_SQL(
+  FT_path = flax_ftneg,
+  QTOF_path = flax_qtofneg,
+  FT_expnr =  266,
+  QTOF_expnr = 52,
+  Assoc = alignment_output,
+  startpoint = 1,
+  save_assoc = TRUE,
+  spectrum_type_FT = "pseudo_MS2", 
+  spectrum_type_QTOF = "all_energies",
+  minIon = 0.4,
+  minPeaks = 0.4,
+  lc.err = 1,
+  err = 0.02
+)
+nrow(Assoc_SQL_flax)
+```
+The following function extracts the aligned compound of a given compound_id:
+```{r}
+getAlignedCompids_SQL(
+  compound_id = 101085,
+  database_name = "flax_ftneg.sqlite",
+  alignment_file = alignment_output
+)
+```
+We can also print the corresponding row from the ms_compound table:
+```{r}
+cmp <- get_compound(qt_path = flax_ftneg, compound_id = 101085)
+cmp
+```
+Next we use the function to align compounds from the same instrument and with
+different polarities, as a use case here we perform this alignment between maize
+ftms positive and maize ftms positive:
+
+```{r}
+ft_maize_alignment <- Aligning_FTn_FTp_SQL(FTn_path = maize_ftneg,
+  FTp_path = maize_ftpos,
+  FTn_expnr =  192,
+  FTp_expnr = 56,
+  Assoc = NULL,
+  startpoint = 1,
+  save_assoc = FALSE,
+  spectrum_type_FTn = "individual", 
+  spectrum_type_FTp = NULL,
+  minIon = 0.4,
+  minPeaks = 0.4,
+  lc.err = 1,
+  err = 0.02)
+nrow(ft_maize_alignment)
+```
+
+Now we align two experiment stored in the same database(acquired from the same 
+instrument and polarity), here we test the function on two experiments from the 
+maize ftms negative:
+```{r}
+align_2_exp <- Aligning_Exp_SQL(
+    db_path = maize_ftneg,
+    ref_expnr = 195,
+    target_expnr = 196,
+    Assoc = NULL,
+    err = 0.01,
+    t.ini = 5,
+    lc.err = 1,
+    rng = 2,
+    thr1 = 1,
+    thr2 = 0.9,
+    IntThres = 100,
+    startpoint = 1,
+    tol = 0.01,
+    save_assoc = TRUE,
+    spectrum_type_ref = "individual", 
+    spectrum_type_target = "individual"
+)
+nrow(align_2_exp)
+```
+
+After testing the different types of the alignement functions in RDynlib,
+now we can transfer the names of the aligned compounds between databases:
+We test the function on the flax ftms data
+```{r}
+dir <- here("data")
+SubDBNameTransfer_SQL(sqlite_dir = dir,  assoc_path = alignment_output )
+```
+Now we enter the characterization of the compounds found to the database., 
+Using EnterName fucntion we are able to edit compound names and add additional 
+structural information, including molecular formula, adduct type, and SMILES 
+notation. Together, these functions provide a framework for progressive 
+annotation of DynLib databases, ranging from automated transfer of tentative 
+annotations to manual curation of fully characterized compounds:
+
+```{r}
+#EnterName_SQL(ft_path, CoMPID = 101143)
+```
+
+```{r}
+#EnterName_SQL(ft_path, CoMPID = 100988)
 ```

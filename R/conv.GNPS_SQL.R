@@ -16,6 +16,9 @@
 #' 
 #' @param expid Integer. Experiment ID used to select compounds from the database.
 #' 
+#' @param spectrum_type `Character(1)` string giving the spectrum type to use,
+#'  if NULL then the parameter is not taking into account.
+#' 
 #' @param peakwidth `Numeric(1)` half of the retention time window that is 
 #' defined for the CSPP ‘substrate’ feature allowing
 #' a minimum retention time difference with the CSPP ‘product’ feature,
@@ -61,20 +64,24 @@ conv.GNPS_SQL <- function(sql_path, expid,
                           thr1 = 3,
                           thr2 = 0.1,
                           thr3 = 0.4,
-                          spectrum_type = "assembled",
+                          spectrum_type = NULL,
                           IntThres = 5) {
   
   con <- DBI::dbConnect(RSQLite::SQLite(), sql_path)
   on.exit(DBI::dbDisconnect(con), add = TRUE)
   
-
+  
   # Load compounds
-
-  inp.x <- DBI::dbGetQuery(con, sprintf("
-      SELECT compound_id, mass_measured, retention_time
-      FROM ms_compound
-      WHERE expid = %d
-  ", expid))
+  
+  inp.x <- DBI::dbGetQuery(
+    con,
+    "
+    SELECT compound_id, mass_measured, retention_time
+    FROM ms_compound
+    WHERE expid = ?
+    ",
+    params = list(expid)
+  )
   
   if (nrow(inp.x) == 0)
     stop("No compounds found for expid = ", expid)
@@ -85,80 +92,123 @@ conv.GNPS_SQL <- function(sql_path, expid,
   
   inp.x <- inp.x[order(inp.x$retention_time), ]
   
-
-  # Load MS2 spectra metadata
-
-  spec_df <- DBI::dbGetQuery(con, sprintf("
+  
+  # Load MS2 spectra + peaks
+  
+  if (is.null(spectrum_type)) {
+    
+    # No filtering on spectrum_type
+    ms2_df <- DBI::dbGetQuery(
+      con,
+      "
       SELECT s.spectrum_id,
              s.compound_id,
-             s.precursor_mz
+             s.precursor_mz,
+             p.mz,
+             p.intensity
       FROM msms_spectrum s
       INNER JOIN ms_compound c
           ON s.compound_id = c.compound_id
+      INNER JOIN msms_spectrum_peak p
+          ON s.spectrum_id = p.spectrum_id
       WHERE s.ms_level = 2
-        AND c.expid = %d
-        AND s.spectrum_type = '%s'
-  ", expid, spectrum_type))
-  
-
-  # Load peaks
-
-  peak_df <- DBI::dbGetQuery(con, sprintf("
-      SELECT p.spectrum_id,
+        AND c.expid = ?
+        AND p.intensity >= ?
+      ",
+      params = list(expid, IntThres)
+    )
+    
+  } else {
+    
+    # Filter on requested spectrum_type
+    ms2_df <- DBI::dbGetQuery(
+      con,
+      "
+      SELECT s.spectrum_id,
+             s.compound_id,
+             s.precursor_mz,
              p.mz,
              p.intensity
-      FROM msms_spectrum_peak p
-      INNER JOIN msms_spectrum s
-          ON p.spectrum_id = s.spectrum_id
+      FROM msms_spectrum s
       INNER JOIN ms_compound c
           ON s.compound_id = c.compound_id
-      WHERE c.expid = %d
-        AND s.spectrum_type = '%s'
-  ", expid, spectrum_type))
+      INNER JOIN msms_spectrum_peak p
+          ON s.spectrum_id = p.spectrum_id
+      WHERE s.ms_level = 2
+        AND c.expid = ?
+        AND s.spectrum_type = ?
+        AND p.intensity >= ?
+      ",
+      params = list(expid, spectrum_type, IntThres)
+    )
+  }
   
-  if (nrow(spec_df) == 0 || nrow(peak_df) == 0) {
-    warning("No MS2 spectra found.")
+  
+  # Check MS2 data
+  
+  if (nrow(ms2_df) == 0) {
+    
+    if (is.null(spectrum_type)) {
+      warning("No MS2 spectra found.")
+    } else {
+      warning(
+        "No MS2 spectra found for spectrum_type = ",
+        spectrum_type
+      )
+    }
+    
     return(NULL)
   }
   
-
-  # Merge spectra + peaks
-
-  ms2_df <- merge(peak_df, spec_df, by = "spectrum_id")
+  
+  # Convert columns
   
   ms2_df$compound_id  <- as.integer(ms2_df$compound_id)
   ms2_df$mz           <- as.numeric(ms2_df$mz)
   ms2_df$intensity    <- as.numeric(ms2_df$intensity)
   ms2_df$precursor_mz <- as.numeric(ms2_df$precursor_mz)
   
+  
   # Remove invalid rows
+  
   ms2_df <- ms2_df[
-    !is.na(ms2_df$intensity) &
-      ms2_df$intensity >= IntThres,
+    !is.na(ms2_df$intensity),
     ,
     drop = FALSE
   ]
   
   if (nrow(ms2_df) == 0) {
-    warning("No peaks remaining after intensity filtering.")
+    warning("No valid MS2 peaks remaining.")
     return(NULL)
   }
   
-
+  
   # Split by compound
-
-  ms2_split <- split(ms2_df, ms2_df$compound_id)
   
-  ms2_split <- lapply(ms2_split, function(x) {
-    if (is.null(x) || nrow(x) == 0) NULL else x
-  })
+  ms2_split <- split(
+    ms2_df,
+    ms2_df$compound_id
+  )
   
-
+  ms2_split <- lapply(
+    ms2_split,
+    function(x) {
+      if (is.null(x) || nrow(x) == 0)
+        NULL
+      else
+        x
+    }
+  )
+  
+  
   # Load/create GNPS table
-
+  
   gnps_add <- tryCatch({
     
-    DBI::dbReadTable(con, "gnps_add")
+    DBI::dbReadTable(
+      con,
+      "gnps_add"
+    )
     
   }, error = function(e) {
     
@@ -173,9 +223,20 @@ conv.GNPS_SQL <- function(sql_path, expid,
     )
   })
   
+  
+  # Make sure compound_id has the same type
+  
+  gnps_add$compound_id <- as.integer(
+    gnps_add$compound_id
+  )
+  
+  
   # Add missing compound IDs
-  missing_ids <- setdiff(inp.x$compound_id,
-                         gnps_add$compound_id)
+  
+  missing_ids <- setdiff(
+    inp.x$compound_id,
+    gnps_add$compound_id
+  )
   
   if (length(missing_ids) > 0) {
     
@@ -193,48 +254,69 @@ conv.GNPS_SQL <- function(sql_path, expid,
     )
   }
   
-
+  
   # Main GNPS loop
-
+  
   for (i in seq_len(nrow(inp.x))) {
     
     sub_id <- inp.x$compound_id[i]
     sub_mz <- inp.x$mass_measured[i]
     sub_rt <- inp.x$retention_time[i] + peakwidth
     
-    sub_lowmz   <- sub_mz - mzerr
-    sub_highmz  <- sub_mz + 1.0034 + mzerr
+    sub_lowmz  <- sub_mz - mzerr
+    sub_highmz <- sub_mz + 1.0034 + mzerr
     
     forb_lowmz  <- sub_mz + adduct - mzerr
     forb_highmz <- sub_mz + adduct + 1.0034 + mzerr
     
+    
     # Candidates with larger RT
-    valid_j <- which(inp.x$retention_time > sub_rt)
+    
+    valid_j <- which(
+      inp.x$retention_time > sub_rt
+    )
     
     if (length(valid_j) == 0)
       next
     
+    
     gnps_list <- list()
     k <- 1
+    
     
     for (j in valid_j) {
       
       prod_id <- inp.x$compound_id[j]
       mzj     <- inp.x$mass_measured[j]
       
+      
       # Exclude isotopes/adducts
-      isotope_ok <- (mzj < sub_lowmz || mzj > sub_highmz)
-      adduct_ok  <- (mzj < forb_lowmz || mzj > forb_highmz)
+      
+      isotope_ok <- (
+        mzj < sub_lowmz ||
+          mzj > sub_highmz
+      )
+      
+      adduct_ok <- (
+        mzj < forb_lowmz ||
+          mzj > forb_highmz
+      )
       
       if (!(isotope_ok && adduct_ok))
         next
       
+      
       # Check spectra existence
-      if (is.null(ms2_split[[as.character(sub_id)]]) ||
-          is.null(ms2_split[[as.character(prod_id)]]))
+      
+      if (
+        is.null(ms2_split[[as.character(sub_id)]]) ||
+        is.null(ms2_split[[as.character(prod_id)]])
+      )
         next
       
+      
       # Compare spectra
+      
       out <- targMS2comp_SQL(
         sub_id,
         prod_id,
@@ -245,12 +327,14 @@ conv.GNPS_SQL <- function(sql_path, expid,
       if (is.null(out) || nrow(out) == 0)
         next
       
-
-      # Threshold calculations
-
       
-      thresh1 <- (out$COMMON_IONS +
-                    out$COMMON_LOSS) / 2
+      # Threshold calculations
+      
+      thresh1 <- (
+        out$COMMON_IONS +
+          out$COMMON_LOSS
+      ) / 2
+      
       
       min_ions <- min(
         out$COMMON_IONS,
@@ -258,41 +342,66 @@ conv.GNPS_SQL <- function(sql_path, expid,
         na.rm = TRUE
       )
       
-      if (is.na(min_ions) || min_ions == 0)
+      if (
+        is.na(min_ions) ||
+        min_ions == 0
+      )
         next
+      
       
       thresh2 <- thresh1 / min_ions
       
-      thresh3 <- (out$DOT_IONS +
-                    out$DOT_LOSS) / 2
+      
+      thresh3 <- (
+        out$DOT_IONS +
+          out$DOT_LOSS
+      ) / 2
+      
       
       # Optional debug
-      cat("Comparing:", sub_id,
-          "vs", prod_id, "\n")
       
-      print(c(
-        thresh1 = thresh1,
-        thresh2 = thresh2,
-        thresh3 = thresh3
-      ))
+      cat(
+        "Comparing:",
+        sub_id,
+        "vs",
+        prod_id,
+        "\n"
+      )
+      
+      print(
+        c(
+          thresh1 = thresh1,
+          thresh2 = thresh2,
+          thresh3 = thresh3
+        )
+      )
+      
       
       # Apply thresholds
-      if (!is.na(thresh1) &&
-          !is.na(thresh2) &&
-          !is.na(thresh3) &&
-          thresh1 > thr1 &&
-          thresh2 > thr2 &&
-          thresh3 > thr3) {
+      
+      if (
+        !is.na(thresh1) &&
+        !is.na(thresh2) &&
+        !is.na(thresh3) &&
+        thresh1 > thr1 &&
+        thresh2 > thr2 &&
+        thresh3 > thr3
+      ) {
         
         gnps_list[[k]] <- out
         k <- k + 1
       }
     }
     
+    
     # Rank GNPS hits
+    
     if (length(gnps_list) > 0) {
       
-      gnps.df <- do.call(rbind, gnps_list)
+      gnps.df <- do.call(
+        rbind,
+        gnps_list
+      )
       
       gnps_add <- rank.GNPS_SQL(
         gnps.df,
@@ -302,19 +411,30 @@ conv.GNPS_SQL <- function(sql_path, expid,
     }
   }
   
-
-  DBI::dbExecute(con,
-                 "DROP TABLE IF EXISTS gnps_add_new")
   
-  DBI::dbWriteTable(con,
-                    "gnps_add_new",
-                    gnps_add)
+  # Write GNPS table
   
-  DBI::dbExecute(con,
-                 "DROP TABLE IF EXISTS gnps_add")
+  DBI::dbExecute(
+    con,
+    "DROP TABLE IF EXISTS gnps_add_new"
+  )
   
-  DBI::dbExecute(con,
-                 "ALTER TABLE gnps_add_new RENAME TO gnps_add")
+  DBI::dbWriteTable(
+    con,
+    "gnps_add_new",
+    gnps_add
+  )
+  
+  DBI::dbExecute(
+    con,
+    "DROP TABLE IF EXISTS gnps_add"
+  )
+  
+  DBI::dbExecute(
+    con,
+    "ALTER TABLE gnps_add_new RENAME TO gnps_add"
+  )
+  
   
   return(gnps_add)
 }

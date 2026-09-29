@@ -43,7 +43,7 @@ con <- dbConnect(SQLite(), pth)
 dbExecute(
   con,
   "UPDATE msms_spectrum
-   SET spectrum_type = 'not_assembled'
+   SET spectrum_type = 'individual'
    WHERE spectrum_type IS NULL"
 )
 
@@ -96,6 +96,12 @@ add_spectral_matches(qt_con, qtof_matchesF)
 ```{r}
 dbGetQuery(qt_con, "Select * from msms_spectrum where match_name IS not null LIMIT 1")
 ```
+Adding names in ftms
+```{r}
+adding_Names_SQL(qt_con,  spectrum_type = "same_energy", msLevel = 2, compound_id = NULL,
+    overwrite = FALSE )
+```
+
 
 look for a given name
 ```{r}
