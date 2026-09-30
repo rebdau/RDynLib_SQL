@@ -13,7 +13,7 @@
 #' @param polarity_query 'numeric' the query polarity, 0  if negative,
 #'         and 1 for positive polarity.
 #'        
-#' @param polarity_target 'numeric' the target polarity, 0  if negative,
+#' @param polarity_target 'numeric' the target polarity, 0 if negative,
 #'         and 1 for positive polarity.
 #'        
 #'        
@@ -42,6 +42,18 @@
 #'        
 #' @param tolerance 'numeric(1)' the acceptable difference between m/z values
 #'         of the compared peaks.
+#'         
+#' @param spectrum_type_query Optional character vector specifying the
+#'   spectrum types to use as query spectra. Spectrum types present
+#'   in a `Spectra` object can be retrieved using
+#'   [available_spectrum_types()]. If NULL, no filtering by
+#'   spectrum type is applied.
+#'   
+#' @param spectrum_type_target Optional character vector specifying the
+#'   spectrum types to use as target spectra. See `spectrum_type_query`
+#'   for available values. If NULL, no filtering by spectrum type
+#'   is applied.
+#'   
 #' @return
 #'
 #' a matrix with the target and the query matches spectraData, the score, and 

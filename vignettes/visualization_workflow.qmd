@@ -42,7 +42,7 @@ load_all()
 #| message: false
 #| results: "hide"
 #| warning: false
-ft_path <- here("data", "DYL_FLAX_FTMSneg.sqlite")
+ft_path <- here("data", "DYL_FLAX_herba_FTMSneg.sqlite")
 con <- dbConnect(RSQLite::SQLite(), ft_path)
 cspp_ft <- here("data","cspp_flax.txt")
 charge_file <- here("data", "ftms_all_compounds_RD.xlsx")
