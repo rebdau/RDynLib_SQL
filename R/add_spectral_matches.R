@@ -28,7 +28,7 @@ add_spectral_matches <- function(con_merged, sim_table) {
       msLevel,
       spectrum_type = query_spectrum_type,
       
-      matches = paste0(
+      match = paste0(
         "!",
         matched_peaks_count,
         "!",
@@ -61,7 +61,7 @@ add_spectral_matches <- function(con_merged, sim_table) {
   
   # Columns to create
   new_columns <- c(
-    matches = "TEXT",
+    matche = "TEXT",
     match_name = "TEXT",
     match_compound_id = "INTEGER",
     match_spectrum_id = "INTEGER",
@@ -121,8 +121,8 @@ add_spectral_matches <- function(con_merged, sim_table) {
 
       SET
 
-      matches = (
-        SELECT matches
+      matche = (
+        SELECT matche
         FROM tmp_matches t
         WHERE t.dataOrigin = msms_spectrum.dataOrigin
         AND t.acquisitionNum = msms_spectrum.acquisitionNum
