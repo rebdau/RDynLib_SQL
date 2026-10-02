@@ -1,3 +1,22 @@
+#' @title Compute spectral similarity from common peaks
+#'
+#' @description
+#' Helper function that matches peaks between two spectra within a specified
+#' m/z tolerance and calculates their cosine similarity based on relative
+#' intensities.
+#'
+#' @param ac A two-column object containing m/z (or neutral loss) values and
+#'   relative intensities.
+#' @param bd A two-column object with the same structure as `ac`.
+#' @param tol Numeric. Maximum m/z difference allowed for matching peaks.
+#'   Default is `0.01`.
+#'
+#' @return A list containing the number of matched peaks and the cosine
+#'   similarity (`theta`) between their relative intensities.
+#'
+#' @author Ahlam Mentag
+#'
+#' @noRd
 CommonDotProd <- function(ac, bd, tol = 0.01) {
   
   # ac, bd must have columns: mz (or nloss), rint

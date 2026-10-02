@@ -244,11 +244,47 @@ Definitions of the different spectrum types are provided in the documentation of
 ?MultMatchCID_Spectra
 ```
 
-We then use `similarity_RDynLib_match()` to perform spectral similarity searching between the query (new flaxseed experiment) and target DynLib spectra (maize and HDG). The fragmentation level and spectrum type can be specified independently for the query and target using the `msLevel_query`, `msLevel_target`, `spectrum_type_query`, and `spectrum_type_target` arguments. Other important arguments control the matching criteria. `fragments_resolution` determines the type of spectral similarity scoring calculation used. In this example, the fragmentation spectra in both the query and the target databases were acquired at unit resolution in the ion trap of a hybrid FT mass spectrometer. Therefore, we set `fragments_resolution = "unit.resolution"`. The available options and the corresponding scoring procedures are described in the documentation of `similarity_RDynLib_match()`.
+We then use `similarity_RDynLib_match()` to perform spectral similarity searching between the query (new flaxseed experiment) and target DynLib spectra (maize and HDG). The fragmentation level and spectrum type can be specified independently for the query and target using the `msLevel_query`, `msLevel_target`, `spectrum_type_query`, and `spectrum_type_target` arguments. Other important arguments control the matching criteria. `fragments_resolution` determines the type of spectral similarity scoring calculation used. In this example, the fragmentation spectra in both the query and the target databases were acquired at unit resolution in the ion trap of a hybrid FT mass spectrometer. Therefore, we set `fragments_resolution = "unit.resolution"`. 
+
+When `requirePrecursor = TRUE`, the `ppm` and `tolerance` arguments define the precursor m/z matching criteria that are applied before the spectral similarity calculation. The two tolerances are combined, such that precursor masses are considered matching when their absolute m/z difference is within tolerance + ppm(m/z). These parameters can therefore be adjusted according to the mass accuracy of the precursor ions being compared. For example, in our FT-MSⁿ data, MS2 precursor masses are measured at high resolution, whereas the precursor masses recorded for MS3 and MS4 spectra have unit resolution. Consequently, when comparing an MS3 flax spectrum with an MS2 spectrum from the maize-HDG DynLib, a larger absolute tolerance can be used to accommodate the lower mass accuracy of the MS3 precursor.
+
+The available options and the corresponding scoring procedures are described in the documentation of `similarity_RDynLib_match()`.
 
 ```{r}
 ?similarity_RDynLib_match()
 ```
+
+As an example of a comparison involving different MS levels, we first search the MS3 flax spectra against the MS2 spectra from the maize-HDG DynLib. Because the precursor m/z values associated with the MS3 spectra are recorded at unit resolution, we use a larger absolute precursor mass tolerance.
+
+```{r}
+ftms_matches3_T <- similarity_RDynLib_match(
+  sp_ftflax,
+  sp_maize_hdg,
+  polarity_query = 0,
+  polarity_target = 0,
+  msLevel_query = 3,
+  msLevel_target = 2,
+  spectrum_type_query = "individual",
+  spectrum_type_target = "individual",
+  requirePrecursor = TRUE,
+  tolerance = 0.5,
+  ppm = 5,
+  threshold = 0.7,
+  fragments_resolution = "unit.resolution"
+)
+```
+
+We have a quick look at the MS3-MS2 matches and order them according to decreasing similarity score and number of matched peaks.
+
+```{r}
+ftms_matches3_T |>
+  dplyr::arrange(
+    dplyr::desc(score),
+    dplyr::desc(matched_peaks_count)
+  )
+```
+
+This search illustrates how the precursor mass tolerance can be adapted when spectra from different MS levels are compared. For the remainder of this workflow, however, we focus on matching MS2 spectra from the flax experiment against MS2 spectra in the maize-HDG DynLib. Since the precursor m/z values of these spectra were measured at high resolution, a stricter precursor mass tolerance can be applied.
 
 ```{r}
 ftms_matches2_T <- similarity_RDynLib_match(

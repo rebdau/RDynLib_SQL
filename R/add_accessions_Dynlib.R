@@ -1,3 +1,18 @@
+#' @title add accessions columns 
+#' 
+#' @description 
+#' The add_accessions_to_db() function adds new accessions in case the SQL 
+#' database has not been created using the 'createSpectraSQLite()' function
+#' from the RDynLib package.
+#' the 'experiment_accession' column to the experiment table, and fill it with
+#' the date and the user initials.
+#' The 'compound_accession' column contains the the corresponding 
+#' 'experiment_accession' content plus the compound_id.
+#' 
+#' @param dbfile 'character(1)' file path to the sqlite function.
+#' 
+#' @author Ahlam Mentag
+#' @export
 add_accessions_to_db <- function(dbfile) {
   
   con <- DBI::dbConnect(RSQLite::SQLite(), dbfile)

@@ -24,6 +24,9 @@
 #' levels.
 #'
 #' @param con_merged A `DBIConnection` to the SQLite DynLib database.
+#' 
+#' @param spectrum_type `character` the spectrum type of the compounds where 
+#'   the names will be added.
 #'
 #' @param msLevel `integer(1)`. MS level of the query spectra to consider when
 #'   selecting spectral matches. The default is `2`, corresponding to MS2

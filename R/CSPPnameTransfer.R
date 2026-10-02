@@ -1,3 +1,20 @@
+#' @title Transfer compound names between CSPP-associated features
+#'
+#' @description
+#' Helper function that propagates compound annotations between substrate and
+#' product features linked by CSPP relationships. When the substrate is
+#' annotated, its name is transferred to an unannotated product feature using
+#' a `CSPP` prefix. Conversely, when the product is annotated, its name is
+#' transferred to an unannotated substrate feature using a `CSPPr` prefix.
+#'
+#' @param msdet A data frame containing compound information, including
+#'   compound names and CSPP relationships between substrate and product
+#'   features.
+#'
+#' @return The updated `msdet` data frame with compound names propagated
+#'   between CSPP-associated substrate and product features where applicable.
+#'
+#' @noRd
 CSPPnameTransfer<-function(msdet){
 	i=1
 	# When CSPP 'substrate' m/z feature is known

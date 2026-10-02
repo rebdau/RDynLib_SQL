@@ -1,3 +1,19 @@
+#' @title Check XCMS subset sizes
+#'
+#' @description
+#' Helper function that checks the number of rows in consecutive XCMS subsets.
+#' If a subset contains more than 3000 rows, the user is warned and prompted
+#' to choose whether to continue the analysis.
+#'
+#' @param stp A numeric vector defining the row boundaries of the XCMS subsets.
+#'
+#' @return If at least one subset contains more than 3000 rows, returns the
+#'   user's response (`"1"` or `"0"`) indicating whether to continue.
+#'   Otherwise, the function prints a message and returns `NULL`.
+#'
+#' @author Ahlam Mentag
+#'
+#' @noRd
 CheckBreakRows<-function(stp){
 	stpm<-outer(stp,stp,"-")
 	stp.l<-as.integer(rep(NA,length(stp)))

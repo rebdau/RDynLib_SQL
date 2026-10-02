@@ -1,3 +1,22 @@
+#' @title Select matches based on retention-time difference consistency
+#'
+#' @description
+#' Helper function that evaluates all possible combinations of candidate
+#' FT-QTOF feature matches and selects the combination with the most consistent
+#' retention-time differences. Consistency is assessed using the standard
+#' deviation of the retention-time differences across the candidate matches.
+#'
+#' @param Lst A list of candidate FT-QTOF feature matches. Each list element
+#'   corresponds to an FT feature and contains one or more candidate QTOF
+#'   matches. The sixth column contains the retention-time difference used
+#'   to evaluate each combination.
+#' @param res.F An object to which the selected FT-QTOF matches are appended.
+#'
+#' @return The updated `res.F` object containing, for each element of `Lst`,
+#'   the candidate belonging to the combination with the lowest standard
+#'   deviation of retention-time differences.
+#'
+#' @noRd
 Differ_of_retdif<-function(Lst,res.F){
 	lv<-c()
 	sd.vector<-c()

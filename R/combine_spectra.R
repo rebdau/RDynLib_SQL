@@ -1,5 +1,6 @@
-#' Combine spectra across a tree
+#' @title Combine spectra across a tree
 #'
+#' @description 
 #' Given a list of spectra (matrices with columns `mz` and `intensity`), 
 #' this function sums the intensities of matching m/z values across all spectra
 #' and returns a single merged spectrum matrix.

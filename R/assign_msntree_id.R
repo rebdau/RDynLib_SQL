@@ -1,38 +1,34 @@
-#' Assign fragmentation tree IDs to MSn spectra
+#' @title Assign fragmentation tree IDs to MSn spectra
 #'
+#' @description
 #' This function assigns a fragmentation tree ID (`MSntreeID`) to each spectrum
-#' in a \linkS4class{Spectra} object based on precursor relationships within
+#' in a `Spectra` object based on precursor relationships within
 #' each sample (`dataOrigin`). MS2 spectra always start a new tree, and downstream
 #' MS3/MS4 spectra inherit the tree ID from their parent.
-#'
 #' Additionally, the MS2-level precursor m/z is propagated to all downstream
-#' spectra (MS3, MS4, …) via the `precursorMz.MS2` variable, with `NA` for MS2 spectra.
+#' spectra (MS3, MS4, …) via the `precursorMz.MS2` variable, with `NA` for
+#' MS2 spectra.
 #'
-#' @param x A \linkS4class{Spectra} object containing MS2–MSn spectra.
+#' @param x `Spectra` object containing MS2–MSn spectra.
 #'
-#' @return A \linkS4class{Spectra} object with two additional columns:
+#' @return A `Spectra` object with two additional columns:
 #'   \itemize{
-#'     \item \code{MSntreeID} — integer ID of the fragmentation tree each spectrum belongs to
-#'     \item \code{precursorMz.MS2} — MS2-level precursor m/z propagated to MS3/MS4 (and beyond), \code{NA} for MS2
+#'     \item `MSntreeID` — integer ID of the fragmentation tree each
+#'      spectrum belongs to.
+#'     \item `precursorMz.MS2` — MS2-level precursor m/z propagated 
+#'      to MS3/MS4 (and beyond), `NA` for MS2.
 #'   }
 #'
 #' @details
 #' The function iterates over each sample (dataOrigin) and assigns tree IDs
 #' hierarchically: MS2 spectra start new trees, and higher-level spectra
 #' (MS3, MS4, etc.) inherit the tree ID from their parent MS level using the
-#' \code{precScanNum} field. Precursor m/z at MS2 level is propagated to all
+#' `precScanNum` field. Precursor m/z at MS2 level is propagated to all
 #' descendant spectra for easier feature linking.
 #'
-#' @examples
-#' \dontrun{
-#' ## Assume 'msn' is a Spectra object containing MS2–MSn spectra
-#' msn <- assign_msntree_id(msn)
-#' msn$MSntreeID
-#' msn$precursorMz.MS2
-#' }
-#'
-#' @export
 #' @importFrom Spectra msLevel scanIndex precScanNum dataOrigin precursorMz
+#' @author Ahlam Mentag
+#' @export
 assign_msntree_id <- function(x) {
   ## Order x by MS level: ensures we first assign an ID to the MS2.
   o <- order(msLevel(x))

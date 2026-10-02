@@ -1,3 +1,25 @@
+#' @title Integrate CSPP results into a DynLib compound table
+#'
+#' @description
+#' Helper function that filters CSPP matches based on spectral similarity
+#' criteria and integrates the best retained conversion into the corresponding
+#' compound entry of a DynLib database table.
+#'
+#' @param inp.x A data frame containing the DynLib compound information to be
+#'   updated with CSPP conversion annotations.
+#' @param comp_add A data frame containing CSPP results for the compounds and
+#'   the different biotransformations or conversions evaluated.
+#' @param thr1 Numeric. Minimum spectral similarity score required to retain
+#'   a CSPP match.
+#' @param thr2 Numeric. Minimum combined score, calculated from the number of
+#'   matched ions, the proportion of shared ions, and the spectral similarity
+#'   score, required to retain a CSPP match.
+#'
+#' @return The updated `inp.x` data frame, with the best retained CSPP
+#'   conversion annotation added to the corresponding compound entries.
+#'
+#'
+#' @noRd
 CSPPintoDynLib<-function(inp.x,comp_add,thr1,thr2){
 	biotr<-colnames(comp_add)
 	i=1
