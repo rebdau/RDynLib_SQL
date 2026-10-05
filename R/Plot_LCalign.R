@@ -1,4 +1,26 @@
-Plot_LCalign<-function(LCal.FT,LCal.Syn,startpoint){
+#' @title Plot retention-time alignment between two experiments
+#'
+#' @description
+#' Helper function that calculates and visualizes the retention-time alignment
+#' between two experiments. A piecewise regression model is fitted using
+#' `Regression_LCalign()`, and the resulting regression curve is added to a
+#' scatter plot of the retention times from the two experiments. The fitted
+#' regression equation is displayed below the plot.
+#'
+#' @param LCal.FT A numeric vector containing retention times from the first
+#'   experiment.
+#' @param LCal.Syn A numeric vector containing the corresponding retention
+#'   times from the second experiment.
+#' @param startpoint Numeric. Starting point used by `Regression_LCalign()`
+#'   for fitting the retention-time regression model.
+#'
+#' @return A numeric vector containing the regression parameters returned by
+#'   `Regression_LCalign()`.
+#'
+#' @author Ahlam Mentag
+#'
+#' @noRd
+Plot_LCalign <- function(LCal.FT, LCal.Syn, startpoint) {
 	rg<-Regression_LCalign(LCal.FT,LCal.Syn,startpoint)
 	plot(LCal.FT~LCal.Syn,xlab="First Exp",ylab="Second Exp",mgp=c(2,0.5,0),col=5,cex.axis=0.8)
 	min.FT=max(LCal.FT)/1000

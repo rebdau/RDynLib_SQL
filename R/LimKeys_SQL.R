@@ -1,3 +1,25 @@
+#' @title Filter retention-time alignment keys
+#'
+#' @description
+#' Helper function that refines retention-time alignment keys using a
+#' piecewise regression model. Predicted retention times are calculated from
+#' the supplied regression parameters, and alignment pairs with large
+#' deviations from the predicted retention times are removed. Duplicated
+#' reference and target matches are subsequently resolved by retaining the
+#' match with the smallest absolute deviation from the regression prediction.
+#'
+#' @param LCal.lst A list containing two elements. The first element is the
+#'   LC alignment table (`LCal`) and the second contains the regression
+#'   parameters (`Reg`) used to predict retention times.
+#'
+#' @return A list containing:
+#' \describe{
+#'   \item{Key}{The filtered LC alignment table, including the regression-
+#'   predicted retention time (`RegRT`).}
+#'   \item{Reg}{The original regression parameters supplied in `LCal.lst`.}
+#' }
+#'
+#' @noRd
 LimKeys_SQL <- function(LCal.lst) {
   
   LCal <- LCal.lst[[1]]

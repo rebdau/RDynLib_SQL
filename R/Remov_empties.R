@@ -1,4 +1,27 @@
-Remov_empties<-function(err,syn.exp,ft.sh,reg){
+#' @title Remove unmatched compounds based on m/z
+#'
+#' @description
+#' Helper function that filters compounds from one experiment by retaining
+#' only entries for which a corresponding m/z value is found in a second
+#' experiment within a specified mass tolerance. Both datasets are first
+#' ordered by m/z to enable sequential matching. If fewer than 30 percent
+#' of the expected entries are retained, a warning message is printed.
+#'
+#' @param err Numeric. Mass tolerance used to define the m/z matching window.
+#' @param syn.exp A matrix or data frame containing compounds from the
+#'   comparison experiment. The second column contains the m/z values used
+#'   for matching.
+#' @param ft.sh A matrix or data frame containing compounds to be filtered.
+#'   The second column contains the m/z values used for matching.
+#' @param reg Numeric. Reference number of entries used to evaluate whether
+#'   at least 30 percent of the entries are retained after filtering.
+#'
+#' @return The filtered `ft.sh` object containing only entries with a
+#'   corresponding m/z value in `syn.exp` within the specified mass
+#'   tolerance. The returned object is ordered by its first column.
+#'
+#' @noRd
+Remov_empties <- function(err, syn.exp, ft.sh, reg) {
 	ft.sh<-ft.sh[order(ft.sh[,2]),] #order on m/z value
 	syn.o<-syn.exp[order(syn.exp[,2]),] #order on m/z value
 	i=1

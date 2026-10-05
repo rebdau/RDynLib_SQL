@@ -1,4 +1,28 @@
-Regression_LCalign<-function(LCal.FT,LCal.Syn,startpoint){
+#' @title Fit a piecewise retention-time regression model
+#'
+#' @description
+#' Helper function that models the relationship between retention times from
+#' two experiments using linear and piecewise linear regression. Models with
+#' zero, one, or two knot points are evaluated, and the model with the highest
+#' adjusted R-squared is selected. The selected model is then refitted using
+#' robust linear regression with `MASS::rlm()`.
+#'
+#' @param LCal.FT A numeric vector containing retention times from the first
+#'   experiment.
+#' @param LCal.Syn A numeric vector containing the corresponding retention
+#'   times from the second experiment.
+#' @param startpoint Numeric. Starting retention-time value used when
+#'   evaluating candidate positions for the first knot of the piecewise
+#'   regression model.
+#'
+#' @return A numeric vector containing six parameters of the selected
+#'   retention-time regression model: the intercept, initial slope, first
+#'   knot position, slope change after the first knot, second knot position,
+#'   and slope change after the second knot.
+#'
+#'
+#' @noRd
+Regression_LCalign <- function(LCal.FT, LCal.Syn, startpoint) {
 	knottime1<-c()
 	knottime2<-c()
 	VarExp<-c()

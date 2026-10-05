@@ -1,4 +1,32 @@
-Find_pos_compound<-function(mass.ftng,time.ftng,ftps.o,err,lc.err,rg){
+#' @title Find matching compounds based on mass and retention time
+#'
+#' @description
+#' Helper function that searches for candidate compounds matching a reference
+#' compound based on mass and retention-time criteria. The expected target
+#' mass is calculated by adding 2.01456 Da to the reference mass, while the
+#' expected retention time is calculated using a linear regression model.
+#' Candidates falling within the specified mass and retention-time tolerances
+#' are retained.
+#'
+#' @param mass.ftng Numeric. Measured mass of the reference compound.
+#' @param time.ftng Numeric. Retention time of the reference compound.
+#' @param ftps.o A matrix or data frame containing candidate target compounds,
+#'   ordered by measured mass. The first and second columns contain retention
+#'   time and measured mass, respectively.
+#' @param err Numeric. Mass tolerance used to define the matching mass window.
+#' @param lc.err Numeric. Retention-time tolerance used to define the matching
+#'   retention-time window.
+#' @param rg Numeric vector containing the intercept and slope of the
+#'   retention-time regression model, respectively.
+#'
+#' @return A matrix containing the candidate compounds that satisfy both the
+#'   mass and retention-time matching criteria. If no candidates are found,
+#'   an empty matrix is returned.
+#'
+#'
+#' @noRd
+Find_pos_compound <- function(mass.ftng, time.ftng, ftps.o,
+                              err, lc.err, rg) {
 	mass.sel<-mass.ftng+2.01456
 	mass.lb=mass.sel-err
 	mass.ub=mass.sel+err

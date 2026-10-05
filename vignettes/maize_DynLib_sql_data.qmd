@@ -56,6 +56,9 @@ con_mqtpos <- dbConnect(RSQLite::SQLite(), maize_qtofpos)
 
 
 ## Download the databases from zenodo
+Using `get_dynlib_zenodo()` function from the `RDynLib` package to dowload 
+maize and flax DynLib databases acquired from LC-Synapt QTOF and LC-Ion Trap-Ftms
+instruments with positive and negative ionization modes.
 ```{r}
 # maize_FTneg 
 #RDynlib function to download the database from zenodo
@@ -107,6 +110,7 @@ con_mqtpos <- dbConnect(RSQLite::SQLite(), maize_qtofpos)
 ```
 
 ## Querying the databases
+Using SQL commands we have the possibility to query the Downloaded sql databases.
 
 #Number of experiments in each database:
 

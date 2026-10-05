@@ -1,4 +1,32 @@
-Real_Name<-function(HasName,sel,Assoc_line,Names_lst,SBDB){
+#' @title Transfer compound annotations between aligned sub-databases
+#'
+#' @description
+#' Helper function that evaluates compound names across aligned entries from
+#' different sub-databases. When exactly one aligned compound has a valid
+#' name, its name, annotation history, and SMILES are transferred to the
+#' corresponding compounds in the other sub-databases. When this condition
+#' is not met, the names associated with the aligned compounds are collected
+#' for further evaluation.
+#'
+#' @param HasName A vector indicating which aligned entries have valid compound
+#'   names and identifying the corresponding sub-databases.
+#' @param sel A vector containing the sub-database indices considered for the
+#'   current association.
+#' @param Assoc_line A vector containing the row indices of the aligned
+#'   compounds in each sub-database.
+#' @param Names_lst A list containing compound annotation tables for the
+#'   different sub-databases. These tables contain compound identifiers,
+#'   names, annotation history, and SMILES information.
+#' @param SBDB A vector containing the names or identifiers of the
+#'   sub-databases.
+#'
+#' @return A list containing the updated `Names_lst` and `Mult.names`.
+#'   `Names_lst` contains the compound annotations after name transfer, while
+#'   `Mult.names` contains the aligned compound identifier and associated
+#'   names when a unique source annotation cannot be identified.
+#'
+#' @noRd
+Real_Name <- function(HasName, sel, Assoc_line, Names_lst, SBDB) {
 	Nr.Name<-length(which(HasName%in%sel))
 	Mult.names<-as.character(Assoc_line[1])
 	if (Nr.Name==1) {

@@ -1,3 +1,37 @@
+#' @title Associate compounds between experiments in a DynLib database
+#'
+#' @description
+#' Identifies and records associations between compounds from two experiments
+#' stored in the same DynLib SQL database. For each compound in the reference
+#' experiment, candidate compounds from the target experiment are searched
+#' based on measured mass and retention-time criteria using
+#' `Find_pos_compound()`. Retained associations are added to an association
+#' table together with the corresponding database information.
+#'
+#' @param con A DBI connection to the DynLib SQLite database containing the
+#'   reference and target experiments.
+#' @param Assoc An optional data frame containing existing compound
+#'   associations. If `NULL`, a new association table is initialized.
+#' @param ref_expnr Integer. Experiment identifier (`expid`) of the reference
+#'   experiment.
+#' @param target_expnr Integer. Experiment identifier (`expid`) of the target
+#'   experiment.
+#' @param rg Numeric. Retention-time range parameter passed to
+#'   `Find_pos_compound()`.
+#' @param lc.err Numeric. Retention-time tolerance used for matching compounds
+#'   between experiments.
+#' @param err Numeric. Mass tolerance used for matching compounds between
+#'   experiments.
+#' @param db_path Character. Path to the SQLite database. The database file
+#'   name is stored in the resulting association table.
+#'
+#' @return A data frame containing the compound associations with the columns
+#'   `ref_compid`, `target_compid`, `ref_database`, and `target_database`.
+#'   Duplicate associations are removed.
+#'
+#' @author Ahlam Mentag
+#'
+#' @export
 FillAssocExp_SQL <- function(
     con,
     Assoc = NULL,

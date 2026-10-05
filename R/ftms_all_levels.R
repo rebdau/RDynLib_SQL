@@ -1,5 +1,4 @@
-
-#' Extract full MSn fragmentation trees for features
+#' @title Extract full MSn fragmentation trees for features
 #'
 #' This function extracts complete MSn fragmentation trees (MS2, MS3 and
 #' MS4 spectra) associated with features from an `XcmsExperiment` object.
@@ -9,17 +8,17 @@
 #' All spectra belonging to the same fragmentation tree are linked to the
 #' originating feature through a propagated `feature_id`.
 #'
-#' @param ftms An \linkS4class{XcmsExperiment} object containing detected
+#' @param ftms An `XcmsExperiment` object containing detected
 #'   features and multi-level MSn data of a metabolomics experiment. 
 #'   The data is expected to include at least MS2 and MS3 spectra and optionally 
 #'   higher-order fragmentation levels (e.g. MS4 and above).
 #'
-#' @param ms2 A \linkS4class{Spectra} object containing all MS2 spectra whose
+#' @param ms2 A `Spectra` object containing all MS2 spectra whose
 #'   retention time and precursor m/z fall within the ranges of any
 #'   chromatographic peak of a feature in `ftms`, as returned for example by
 #'   \code{xcms::featureSpectra(ftms, msLevel = 2L)}.
 #'   
-#' @return A \linkS4class{Spectra} object containing all MS2, MS3 and MS4
+#' @return A `Spectra` object containing all MS2, MS3 and MS4
 #'   spectra associated with the input features. Each spectrum includes a
 #'   `feature_id` spectra variable identifying the originating feature.
 #'
@@ -35,7 +34,7 @@
 #' tree can be traced back to the originating feature.
 #'
 #' Spectra are processed independently for each `dataOrigin` and subsequently
-#' combined into a single \linkS4class{Spectra} object.
+#' combined into a single `Spectra` object.
 #'
 #' @section Processing steps:
 #' \enumerate{
@@ -51,18 +50,6 @@
 #'   \item Combine MS2, MS3, and MS4 spectra for each `dataOrigin`.
 #'   \item Concatenate results across all data origins into a single object.
 #' }
-#'
-#' @examples
-#' \dontrun{
-#' ## Assume 'ftms' is an XcmsExperiment object
-#' ## Extract MS2 spectra associated with features
-#' ms2 <- xcms::featureSpectra(ftms, msLevel = 2L)
-#'
-#' ## Retrieve full MSn trees
-#' msn <- ftms_all_levels(ftms, ms2)
-#'
-#' length(msn)
-#'}
 #'
 #' @importFrom xcms featureSpectra
 #' @import Spectra

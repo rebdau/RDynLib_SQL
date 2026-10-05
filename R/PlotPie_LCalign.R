@@ -1,4 +1,24 @@
-PlotPie_LCalign<-function(LCal,rg){
+#' @title Plot FTMS-Synapt retention-time alignment
+#'
+#' @description
+#' Helper function that visualizes the retention-time alignment between FTMS
+#' and Synapt data using a previously fitted piecewise regression model.
+#' FTMS and Synapt retention times are extracted from the alignment table and
+#' displayed as a scatter plot. The regression curve defined by `rg` is added
+#' to the plot, together with the corresponding regression equation.
+#'
+#' @param LCal A matrix or data frame containing the LC alignment results.
+#'   The second column contains FTMS retention times and the fourth column
+#'   contains Synapt retention times.
+#' @param rg A numeric vector containing the parameters of the piecewise
+#'   retention-time regression model.
+#'
+#' @return This function is called for its side effect of generating a
+#'   retention-time alignment plot. It does not explicitly return a value.
+#'
+#'
+#' @noRd
+PlotPie_LCalign <- function(LCal, rg) {
 	LCal.FT<-as.numeric(LCal[,2]) # FT retention times
 	LCal.Syn<-as.numeric(LCal[,4]) # Synapt retention times
 	plot(LCal.FT~LCal.Syn,xlab="Synapt",ylab="FTMS",mgp=c(2,0.5,0),col=5,cex.axis=0.8)

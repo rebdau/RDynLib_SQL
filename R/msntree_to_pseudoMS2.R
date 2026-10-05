@@ -1,5 +1,33 @@
-msntree_to_pseudoMS2 <- function(sps) {
-  
+#' @title Convert MSn trees to pseudo-MS2 spectra
+#'
+#' @description
+#' Converts MSn spectral trees into pseudo-MS2 spectra by combining the
+#' fragment ions from all spectra belonging to the same MSn tree. Fragment
+#' m/z values are first rounded to unit mass independently for each spectrum,
+#' and duplicated rounded m/z values are resolved by retaining the most
+#' intense peak. The processed spectra belonging to the same `MSntreeID` are
+#' then merged, with intensities of identical m/z values summed. One
+#' pseudo-MS2 spectrum is generated for each MSn tree containing an MS2
+#' spectrum.
+#'
+#' Metadata for each resulting pseudo-MS2 spectrum are inherited from the
+#' first MS2 spectrum of the corresponding MSn tree, and the spectrum type
+#' is set to `"pseudo_MS2"`.
+#'
+#' @param sps A `Spectra` object containing MSn spectra. The object must
+#'   contain an `MSntreeID` variable identifying spectra belonging to the
+#'   same MSn tree and an `msLevel` variable identifying the fragmentation
+#'   level.
+#'
+#' @return A `Spectra` object containing one pseudo-MS2 spectrum per MSn tree.
+#'   The resulting spectra contain the combined fragment ions from all
+#'   available fragmentation levels of the corresponding tree. If no
+#'   pseudo-MS2 spectra can be generated, `NULL` is returned with a warning.
+#'
+#' @author Ahlam Mentag
+#'
+#' @noRd
+msntree_to_pseudoMS2 <- function(sps) {  
   # Ensure memory backend
   sps <- setBackend(sps, MsBackendMemory())
   

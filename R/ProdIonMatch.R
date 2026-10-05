@@ -1,4 +1,26 @@
-ProdIonMatch<-function(prod_ion.num,prdion,err){
+#' @title Match product ions
+#'
+#' @description
+#' Helper function that compares observed product-ion m/z values with a
+#' reference list of product ions within a specified mass tolerance. For each
+#' match, the observed m/z value and the corresponding reference annotation
+#' information are printed.
+#'
+#' @param prod_ion.num A numeric vector containing the observed product-ion
+#'   m/z values to be matched.
+#' @param prdion A matrix or data frame containing reference product-ion
+#'   information. The first column contains the reference m/z values, while
+#'   the second and third columns contain the corresponding annotation
+#'   information.
+#' @param err Numeric. Mass tolerance used to define the matching window
+#'   around each reference product-ion m/z value.
+#'
+#' @return This function is called for its side effect of printing matching
+#'   product ions and their associated annotation information. It does not
+#'   explicitly return a value.
+#'
+#' @noRd
+ProdIonMatch <- function(prod_ion.num, prdion, err) {
 	i=1
 	repeat{
 	 lowmz<-prdion[i,1]-err
