@@ -1,4 +1,4 @@
-#' Search a DynLib spectral database for matches to query spectra
+#' @title Search a DynLib spectral database for matches to query spectra
 #'
 #' Compares spectra from a query `Spectra` object, typically representing a
 #' newly acquired experiment, against a target `Spectra` object derived from
@@ -17,13 +17,17 @@
 #' @param polarity_target 'numeric' the target polarity, 0  if negative,
 #'         and 1 for positive polarity.
 #'        
-#' @param fragments_resolution 'character(1)' the resolution type of the fragments  
-#'        masses, it is used to define the rounding type of the fragments,
-#'        it could be either "unit.resolution" or "high.resolution".
+#' @param fragments_resolution character(1) resolution used for fragment
+#'   ion matching. Must be either "unit.resolution" or "high.resolution".
+#'   For "unit.resolution", fragment and neutral-loss m/z values are rounded
+#'   to integer masses and matched exactly. In this case, ppm and tolerance
+#'   are not used for fragment matching. For "high.resolution", fragment
+#'   peaks are matched using the ppm and tolerance criteria.
 #'        
-#' @param requirePrecursor 'logical(1)' by default true, it allows to pre-filter
-#'        the target spectra prior to the actual similarity calculation for 
-#'        each individual query spectrum. 
+#' @param requirePrecursor logical(1) whether precursor m/z matching is
+#'   required before calculating spectral similarity. If TRUE, target
+#'   spectra are pre-filtered according to precursor m/z using ppm and
+#'   tolerance. If FALSE, no precursor m/z pre-filtering is required. 
 #'
 #' @param spectrum_type_query 'character(1)' the spectrum type of the query 
 #'        spectra.        
@@ -34,14 +38,19 @@
 #' @param threshold 'numeric(1)' the score threshold to select a best match, by 
 #'        default it is 0.8.
 #'        
-#' @param ppm 'numeric(1)' the acceptable difference between m/z values of the
-#'        compared peaks:
-#'        - For high resolution : ppm is applied for matching the product ions 
-#'          and match precursorMz if requirePrecursor is TRUE.
-#'        - For unit resolution : ppm is used for matching precursorMz. 
-#'        
-#' @param tolerance 'numeric(1)' the acceptable difference between m/z values
-#'         of the compared peaks.
+#' @param ppm numeric(1) relative m/z tolerance, in parts per million (ppm).
+#'   When requirePrecursor = TRUE, it contributes to the precursor m/z
+#'   matching tolerance. For "high.resolution" fragment matching, it is
+#'   also used for matching fragment peaks. For "unit.resolution" fragment
+#'   matching, it does not affect fragment matching because fragment m/z
+#'   values are rounded to integer masses before matching.
+#'
+#' @param tolerance numeric(1) absolute m/z tolerance, in Da. It is combined
+#'   with ppm when evaluating m/z differences. When
+#'   requirePrecursor = TRUE, it contributes to the precursor m/z matching
+#'   tolerance. For "high.resolution" fragment matching, it is also used
+#'   for matching fragment peaks. For "unit.resolution" fragment matching,
+#'   it does not affect fragment matching.
 #' 
 #' @param spectrum_type_query Optional character vector specifying the
 #'   spectrum types to use as query spectra. Spectrum types present
@@ -53,6 +62,25 @@
 #'   spectrum types to use as target spectra. See `spectrum_type_query`
 #'   for available values. If NULL, no filtering by spectrum type
 #'   is applied.
+#'   
+#' @details
+#' The roles of ppm and tolerance depend on requirePrecursor and
+#' fragments_resolution.
+#'
+#' When requirePrecursor = TRUE, ppm and tolerance are used to
+#' pre-filter target spectra according to precursor m/z before spectral
+#' similarity is calculated. The relative and absolute tolerances are
+#' combined when determining the acceptable m/z difference.
+#'
+#' For fragments_resolution = "unit.resolution", fragment and neutral-loss
+#' m/z values are rounded to integer masses and matched exactly. Therefore,
+#' ppm and tolerance affect precursor matching, when requested, but do
+#' not affect fragment matching.
+#'
+#' For fragments_resolution = "high.resolution", ppm and tolerance
+#' are used for fragment peak matching. If requirePrecursor = TRUE, the
+#' same ppm and tolerance values are also used for precursor m/z
+#' matching.
 #'   
 #' @return
 #'
@@ -105,8 +133,8 @@ similarity_RDynLib_match <- function(
   keep_dy <- !is.na(dy_meta$polarity) &
     dy_meta$polarity == polarity_target &
     !is.na(dy_meta$name) &
-    dy_meta$name != "" &
-    !grepl("^!", dy_meta$name)
+    !toupper(trimws(dy_meta$name)) %in% c("", "NULL", "NA", "N/A") &
+    !grepl("^!", trimws(dy_meta$name))
   
   dy_filtered <- dy_sps[
     keep_dy

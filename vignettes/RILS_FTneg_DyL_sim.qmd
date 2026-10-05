@@ -51,171 +51,64 @@ The DynLib SQLite databases used in this workflow are provided through Zenodo. E
 #| warning: false
 
 #big ftmsneg
-ftneg_path <- here("data", "DYL_FLAX_herba_FTMSneg.sqlite")
-con_ftneg <- dbConnect(RSQLite::SQLite(), ftneg_path)
+ftneg_path <- "C:/Users/ament/Desktop/Github/RDynLib_SQL/data/DYL_FLAX_herba_FTMSneg.sqlite"
+con_DyL_ftneg <- dbConnect(RSQLite::SQLite(), ftneg_path)
 
-#big ftmspos
-ftpos_path <- here("data", "DyLib_FTMS_pos.sqlite")
-con_ftpos <- dbConnect(RSQLite::SQLite(), ftpos_path)
+Ril_path <- here("data", "RILs_ftneg_AM.sqlite")
+con_RIL_ftneg <- dbConnect(RSQLite::SQLite(), Ril_path)
 
-# big QTOFneg
-qtofneg_path <- here("data", "DYL_FLAX_QTOFneg.sqlite")
-con_qtofneg <- dbConnect(RSQLite::SQLite(), qtofneg_path)
-
-#big qtof pos
-
-qtofpos_path <- here("data", "DyLib_QTOF_pos.sqlite")
-
-# maize FTneg
-maize_ftneg <- here("data", "maize_ftneg.sqlite")
-filterDynLibDB(
-  expid = 191:231,
-  input_db = ftneg_path,
-  output_db = maize_ftneg
-)
-con_mftneg <- dbConnect(RSQLite::SQLite(), maize_ftneg)
-
-#maize FTpos
-maize_ftpos <- here("data", "maize_ftpos.sqlite")
-filterDynLibDB(
-  expid = 55:94,
-  input_db = ftpos_path,
-  output_db = maize_ftpos
-)
-con_mftpos <- dbConnect(RSQLite::SQLite(), maize_ftpos)
-
-# maize QTOFneg
-maize_qtofneg <- here("data", "maize_qtofneg.sqlite")
-filterDynLibDB(
-  expid = 38,
-  input_db = qtofneg_path,
-  output_db = maize_qtofneg
-)
-con_mqt <- dbConnect(RSQLite::SQLite(), maize_qtofneg)
-
-#maize QTOFpos
-#TODO :add the experiment numbers
-maize_qtofpos <- here("data", "maize_qtofpos.sqlite")
-filterDynLibDB(
-  expid = 3,
-  input_db = qtofpos_path,
-  output_db = maize_qtofpos
-)
-con_mqtpos <- dbConnect(RSQLite::SQLite(), maize_qtofpos)
-
-# flax FTneg
-flax_ftneg <- here("data", "flax_ftneg.sqlite")
-filterDynLibDB(
-  expid = 266,
-  input_db = ftneg_path,
-  output_db = here("data", "flax_ftneg.sqlite")
-)
-con_fft <- dbConnect(RSQLite::SQLite(), flax_ftneg)
-
-# flax QTOFneg
-flax_qtofneg <- here("data", "flax_qtofneg.sqlite")
-filterDynLibDB(
-  expid = 52,
-  input_db = qtofneg_path,
-  output_db = here("data", "flax_qtofneg.sqlite")
-)
-con_fqt <- dbConnect(RSQLite::SQLite(), flax_qtofneg)
-
-# HDG FTneg 
-hdg_ftneg <- here("data", "hdg_ftneg.sqlite")
-filterDynLibDB(
-  expid = 267,
-  input_db = ftneg_path,
-  output_db = here("data", "hdg_ftneg.sqlite"))
-con_hdgft <- dbConnect(RSQLite::SQLite(), hdg_ftneg)
 
 ```
+
 
 ```{r}
-# TODO: this chunk downloads from ZENODO and will replace the above chunk when we will have deposited the databases.
-#| message: false
-#| results: "hide"
-#| warning: false
-# Import the data from zenodo and create the connections
-# maize_FTneg
-get_dynlib_zenodo(
-  doi = ,
-  file = "maize_ftmsneg.sqlite",
-  destdir = "data"
+library(DBI)
+library(RSQLite)
+
+# Check that the metadata table does not already exist
+dbExistsTable(con_RIL_ftneg, "metadata")
+
+# Create metadata table
+dbExecute(
+    con_RIL_ftneg,
+    "
+    CREATE TABLE metadata (
+        name TEXT,
+        value TEXT
+    )
+    "
 )
-maize_ftneg <- here("data", "maize_ftneg.sqlite")
-con_mftneg <- dbConnect(RSQLite::SQLite(), maize_ftneg)
 
-#maize FTpos
-
-get_dynlib_zenodo(
-  doi = ,
-  file = "maize_ftmspos.sqlite",
-  destdir = "data"
+# Add metadata
+metadata <- data.frame(
+    name = c(
+        "source",
+        "url",
+        "source_version",
+        "source_date",
+        "organism"
+    ),
+    value = c(
+        "FTMS neg RIL",
+        NA,
+        "1.0.0",
+        "2026-10-02",
+        NA
+    )
 )
-maize_ftpos <- here("data", "maize_ftpos.sqlite")
-con_mftpos <- dbConnect(RSQLite::SQLite(), maize_ftpos)
 
-
-# maize_QTOFneg
-get_dynlib_zenodo(
-  doi = ,
-  file = "maize_qtofneg.sqlite",
-  destdir = "data"
+dbWriteTable(
+    con_RIL_ftneg,
+    "metadata",
+    metadata,
+    append = TRUE,
+    row.names = FALSE
 )
-maize_qtofneg <- here("data", "maize_qtofneg.sqlite")
-con_mqt <- dbConnect(RSQLite::SQLite(), maize_qtofneg)
 
-#maize QTOFpos
-get_dynlib_zenodo(
-  doi = ,
-  file = "maize_qtofpos.sqlite",
-  destdir = "data"
-)
-maize_qtofpos <- here("data", "maize_qtofpos.sqlite")
-con_mqtpos <- dbConnect(RSQLite::SQLite(), maize_qtofpos)
-
-# flaxseed_FTneg
-get_dynlib_zenodo(
-  doi = ,
-  file = "flax_ftms.sqlite",
-  destdir = "data"
-)
-flax_ftneg <- here("data", "flax_ftneg.sqlite")
-con_fft <- dbConnect(RSQLite::SQLite(), flax_ftneg)
-
-# flaxseed_QTOFneg
-get_dynlib_zenodo(
-  doi = ,
-  file = "flax_qtof.sqlite",
-  destdir = "data"
-)
-flax_qtofneg <- here("data", "flax_qtofneg.sqlite")
-con_fqt <- dbConnect(RSQLite::SQLite(), flax_qtofneg)
-
-# HDG_FTneg 
-get_dynlib_zenodo(
-  doi = ,
-  file = "hdg_ftms.sqlite",
-  destdir = "data"
-)
-hdg_ftneg <- here("data", "hdg_ftneg.sqlite")
-con_hdgft <- dbConnect(RSQLite::SQLite(), hdg_ftneg)
-
+# Check
+dbGetQuery(con_RIL_ftneg, "SELECT * FROM metadata")
 ```
 
-To create the target library for spectral matching, the maize FTneg DynLib database is merged with the HDG_FTneg DynLib database.
-
-```{r}
-target_DL_FTneg <- here("data", "FTneg_maize_hdg.sqlite")
-
-#convert_add_rt is False because both databases are already in minutes so no need for conversion
-merge_databases(main_db  = maize_ftneg, add_db = hdg_ftneg,
-                output_db = target_DL_FTneg, convert_add_rt = FALSE)
-
-con_merged <- dbConnect(RSQLite::SQLite(), target_DL_FTneg)
-
-```
 
 # Batch spectral similarity searching against a reference DynLib database
 
@@ -226,85 +119,30 @@ We start by MS2-MS2 similarity search of flax FTneg against maize+HDG FTneg (tar
 First we convert both sql databases to a spectra object:
 
 ```{r}
-sp_maize_hdg <- sql_to_spectra(target_DL_FTneg)
-sp_ftflax <- sql_to_spectra(flax_ftneg)
+DyL_ftneg <- sql_to_spectra(ftneg_path)
+RIL_ftneg <- sql_to_spectra(Ril_path)
 ```
 
 A DynLib database can store different types of spectra for each compound. The spectrum types available in a given database can be inspected with `available_spectrum_types()`:
 
 ```{r}
-available_spectrum_types(con_merged)
-available_spectrum_types(con_fft) 
-available_spectrum_types(con_qtofneg) 
+available_spectrum_types(con_DyL_ftneg)
+available_spectrum_types(con_RIL_ftneg) 
 ```
 
-Definitions of the different spectrum types are provided in the documentation of MultMatchCID_Spectra():
 
-```{r}
-?MultMatchCID_Spectra
-```
-
-We then use `similarity_RDynLib_match()` to perform spectral similarity searching between the query (new flaxseed experiment) and target DynLib spectra (maize and HDG). The fragmentation level and spectrum type can be specified independently for the query and target using the `msLevel_query`, `msLevel_target`, `spectrum_type_query`, and `spectrum_type_target` arguments. Other arguments control the spectral matching criteria.
-
-The `fragments_resolution` argument determines how fragment ions are matched and which spectral similarity scoring procedure is used. For high-resolution fragment matching (`fragments_resolution = "high.resolution"`), the `ppm` and `tolerance` arguments define the *m/z* tolerance used to match fragment peaks. The accepted *m/z* difference combines the absolute and relative tolerances (`tolerance + ppm(m/z)`). For unit-resolution fragment matching (`fragments_resolution = "unit.resolution"`), fragment and neutral-loss masses are instead rounded to integer masses and matched exactly by the RDynLib mapping function; therefore, `ppm` and `tolerance` are not used for fragment matching.
-
-When `requirePrecursor = TRUE`, `ppm` and `tolerance` are additionally used to pre-filter target spectra based on their precursor *m/z*, irrespective of the fragment mass resolution. Thus, these parameters can be adjusted according to the mass accuracy of the precursor ions being compared. In our FT-MSⁿ data, MS2 precursor masses are measured at high resolution, whereas the precursor masses recorded for MS3 and MS4 spectra have unit resolution. Consequently, when comparing an MS3 flax spectrum with an MS2 spectrum from the maize-HDG DynLib, a larger absolute `tolerance` can be used to accommodate the lower mass accuracy of the MS3 precursor. In contrast, when comparing MS2 spectra from both datasets, a stricter precursor mass tolerance can be used because both precursor masses were measured at high resolution.
-
-In this example, the fragment ions in both the query and target spectra were acquired at unit resolution in the ion trap of a hybrid FT mass spectrometer. Therefore, we set `fragments_resolution = "unit.resolution"`.
-
-The available options and corresponding matching and scoring procedures are described in the documentation of `similarity_RDynLib_match()`.
+The available options and the corresponding scoring procedures are described in the documentation of `similarity_RDynLib_match()`.
 
 ```{r}
 ?similarity_RDynLib_match()
-```
-
-Total MS2 spectra number in flax ftms data:
-```{r}
-DBI::dbGetQuery(con_fft, "Select count(*) from msms_spectrum where ms_level = 2 and spectrum_type = 'individual'")
-```
-Total MS3 spectra number in maize ftms data where the name is not null:
-```{r}
-DBI::dbGetQuery(
-    con_mftneg,
-    "
-    SELECT COUNT(*) AS n_spectra
-    FROM msms_spectrum AS s
-    INNER JOIN ms_compound AS c
-        ON s.compound_id = c.compound_id
-    WHERE s.ms_level = 3
-      AND s.spectrum_type = 'individual'
-      AND c.name IS NOT NULL
-      AND TRIM(c.name) != ''
-      AND UPPER(TRIM(c.name)) != 'NULL'
-      AND TRIM(c.name) NOT LIKE '!%'
-    "
-)
-```
-Total MS2 spectra number in maize ftms data where the name is not null:
-```{r}
-DBI::dbGetQuery(
-    con_mftneg,
-    "
-    SELECT COUNT(*) AS n_spectra
-    FROM msms_spectrum AS s
-    INNER JOIN ms_compound AS c
-        ON s.compound_id = c.compound_id
-    WHERE s.ms_level = 2
-      AND s.spectrum_type = 'individual'
-      AND c.name IS NOT NULL
-      AND TRIM(c.name) != ''
-      AND UPPER(TRIM(c.name)) != 'NULL'
-      AND TRIM(c.name) NOT LIKE '!%'
-    "
-)
 ```
 
 As an example of a comparison involving different MS levels, we first search the MS3 flax spectra against the MS2 spectra from the maize-HDG DynLib. Because the precursor m/z values associated with the MS3 spectra are recorded at unit resolution, we use a larger absolute precursor mass tolerance.
 
 ```{r}
 ftms_matches3_T <- similarity_RDynLib_match(
-  sp_ftflax,
-  sp_maize_hdg,
+  RIL_ftneg,
+  DyL_ftneg,
   polarity_query = 0,
   polarity_target = 0,
   msLevel_query = 3,
@@ -333,8 +171,8 @@ This search illustrates how the precursor mass tolerance can be adapted when spe
 
 ```{r}
 ftms_matches2_T <- similarity_RDynLib_match(
-  sp_ftflax,
-  sp_maize_hdg,
+  RIL_ftneg,
+  DyL_ftneg,
   polarity_query = 0,
   polarity_target = 0,
   msLevel_query = 2,
@@ -358,6 +196,133 @@ o <- order(ftms_matches2_T$matched_peaks_count, decreasing =T)
 print(ftms_matches2_T[o,c("query_compound_id", "query_spectrum_id", "msLevel","precursorMz","target_name","target_msLevel","target_precursorMz","target_compound_id","score", "matched_peaks_count")])
  
 ```
+
+```{r}
+ms_levels <- 2:4
+
+ftms_matches_all <- list()
+
+for (ms_query in ms_levels) {
+  
+  for (ms_target in ms_levels) {
+    
+    # MS2 precursors are high resolution.
+    # MS3/MS4 precursors are unit resolution.
+    precursor_tolerance <- if (
+      ms_query >= 3 || ms_target >= 3
+    ) {
+      0.5
+    } else {
+      0
+    }
+    
+    comparison_name <- paste0(
+      "MS", ms_query, "_MS", ms_target
+    )
+    
+    message(
+      "Comparing MS", ms_query,
+      " vs MS", ms_target,
+      " (tolerance = ", precursor_tolerance, " Da)"
+    )
+    
+    res <- similarity_RDynLib_match(
+      RIL_ftneg,
+      DyL_ftneg,
+      polarity_query = 0,
+      polarity_target = 0,
+      msLevel_query = ms_query,
+      msLevel_target = ms_target,
+      spectrum_type_query = "individual",
+      spectrum_type_target = "individual",
+      requirePrecursor = TRUE,
+      tolerance = precursor_tolerance,
+      ppm = 5,
+      threshold = 0.7,
+      fragments_resolution = "unit.resolution"
+    )
+    
+    if (nrow(res) > 0) {
+      
+      res$query_msLevel_search <- ms_query
+      res$target_msLevel_search <- ms_target
+      res$tolerance_search <- precursor_tolerance
+      
+      ftms_matches_all[[comparison_name]] <- res
+      
+    } else {
+      
+      message("  -> No matches found")
+      ftms_matches_all[[comparison_name]] <- res
+    }
+  }
+}
+```
+
+```{r}
+data.frame(
+  comparison = names(ftms_matches_all),
+  n_matches = vapply(
+    ftms_matches_all,
+    nrow,
+    integer(1)
+  )
+)
+```
+
+```{r}
+ftms_matches_all_df <- dplyr::bind_rows(
+  ftms_matches_all,
+  .id = "comparison"
+)
+
+matches_table <- ftms_matches_all_df |>
+  dplyr::select(
+    comparison,
+    query_msLevel_search,
+    target_msLevel_search,
+    query_compound_id,
+    query_compound_accession,
+    query_spectrum_id,
+    msLevel,
+    precursorMz,
+    target_name,
+    target_msLevel,
+    target_precursorMz,
+    target_compound_id,
+    target_compound_accession,
+    target_spectrum_id,
+    score,
+    matched_peaks_count,
+    tolerance_search
+  )
+
+matches_table_assembled <- matches_table |>
+  dplyr::mutate(
+    queryDate = as.character(Sys.Date()),
+    queryDB = "RIL_FTneg",
+    targetDB = "DyL_FTneg",
+    polarity_query = 0,
+    polarity_target = 0,
+    spectrum_type_query = "individual",
+    spectrum_type_target = "individual",
+    requirePrecursor = TRUE,
+    ppm = 5,
+    threshold = 0.7,
+    fragments_resolution = "unit.resolution"
+  )
+
+write.csv2(
+  matches_table_assembled,
+  here::here(
+    "data",
+    "matches_RIL_FTneg_vs_DyL_FTneg_all_MSlevels.csv"
+  ),
+  row.names = FALSE
+)
+```
+
+
 
 We can save the spectral matching results as .csv file for later consultation. To do so, we select the relevant columns from the similarity search output and optionally add metadata, such as the query date, the databases used, and the matching parameters. Recording this information allows us to subsequently combine results from different similarity searches, potentially involving different databases, spectrum types, MS levels, or matching parameters. This facilitates the comparison, interpretation, and integration of results across multiple searches.
 
@@ -454,30 +419,7 @@ available_spectrum_types(con_mqt)
 available_spectrum_types(con_fqt) 
 ```
 
-Total MS2 spectra number in flax qtof negative data:
-```{r}
-DBI::dbGetQuery(con_fqt, "Select count(*) from msms_spectrum where ms_level = 2 and spectrum_type = 'same_energy'")
-```
-Total MS2 spectra number in maize qtof negative data where the name is not null:
-```{r}
-DBI::dbGetQuery(
-    con_mqt,
-    "
-    SELECT COUNT(*) AS n_spectra
-    FROM msms_spectrum AS s
-    INNER JOIN ms_compound AS c
-        ON s.compound_id = c.compound_id
-    WHERE s.ms_level = 2
-      AND s.spectrum_type = 'individual'
-      AND c.name IS NOT NULL
-      AND TRIM(c.name) != ''
-      AND UPPER(TRIM(c.name)) != 'NULL'
-      AND TRIM(c.name) NOT LIKE '!%'
-    "
-)
-```
-
-We then use 'similarity_RDynLib_match()' to search the QTOF spectra from the flax experiment against the maize DynLib spectra. Since both datasets contain high-resolution fragment ions, we set 'fragments_resolution = "high.resolution"'. In this case, 'ppm' and 'tolerance' define the m/z tolerance used for fragment peak matching. With 'requirePrecursor = TRUE', these parameters are also used to pre-filter target spectra based on precursor m/z. Here, we use a tolerance of 20 ppm and no additional absolute tolerance (tolerance = 0).
+Then we call the similarity_RDynLib_match() function :
 
 ```{r}
 qtof_matches2_T <- similarity_RDynLib_match(
