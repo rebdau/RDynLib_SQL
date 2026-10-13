@@ -75,42 +75,60 @@ register(SerialParam())
 
 ```
 
-# Load databases
-Loading the sql database of flax ftms negative
+#Import data from zenodo
 
+Loading the sql database of flax ftms negative from zenodo and create an sql
+connection to the database:
 ```{r}
-dbf <- here("data", "ftms_flax_neg.sqlite")
-con_flax <- dbConnect(RSQLite::SQLite(), dbf)
+# flaxseed_FTneg
+get_dynlib_zenodo(
+  doi = ,
+  file = "flax_ftms.sqlite",
+  destdir = "data"
+)
+flax_ftneg <- here("data", "flax_ftneg.sqlite")
+con_fft <- dbConnect(RSQLite::SQLite(), flax_ftneg)
 ```
 
-Loading the sql database of Dynlib qtof negative
-
+Loading the sql database of maize ftms negative from zenodo and create an sql
+connection to the database:
 ```{r}
-dbf <- here("data", "DyLib_FTMS_neg_or.sqlite")
-con_dyL <- dbConnect(RSQLite::SQLite(), dbf)
+# maize_FTneg
+get_dynlib_zenodo(
+  doi = ,
+  file = "maize_ftmsneg.sqlite",
+  destdir = "data"
+)
+maize_ftneg <- here("data", "maize_ftneg.sqlite")
+con_mftneg <- dbConnect(RSQLite::SQLite(), maize_ftneg)
 ```
 
-```{r}
-dbListTables(con_flax)
-```
+Here we show the available tables in both databases:
+flax ftms negative:
 
 ```{r}
-dbListTables(con_dyL)
+dbListTables(con_fft)
+```
+
+Maize ftms negative:
+```{r}
+dbListTables(con_mftneg)
 ```
 
 # Merge databases
 ```{r}
 # Create new database
-dbf <- here("data", "DYL_FLAX_FTMSneg.sqlite")
-con_merged <- dbConnect(RSQLite::SQLite(), dbf)
+dbf <- here("data", "MAIZE_FLAX_FTMSneg.sqlite")
+
 
 # merge
 merge_databases(
-  main_db   = here("data","DyLib_FTMS_neg_or.sqlite"),
-  add_db    = here("data","ftms_flax_neg.sqlite"),
-  output_db = here("data","DYL_FLAX_FTMSneg.sqlite")
+  main_db   = maize_ftneg,
+  add_db    = flax_ftneg,
+  output_db = dbf
 )
-
+#create the connection to the sql database
+con_merged <- dbConnect(RSQLite::SQLite(), dbf)
 
 ```
 
@@ -139,7 +157,7 @@ The new experiment has 266 as expid
 ### Ensuring the ms_compound has been well merged
 
 ```{r}
-dbGetQuery(con_dyL, "
+dbGetQuery(con_mftneg, "
   SELECT * FROM ms_compound
   ORDER BY CAST(compound_id AS INTEGER) DESC
   LIMIT 10
@@ -153,35 +171,29 @@ The highest compound_id is 100911 in the Dynlib database
 dbGetQuery(con_merged, "Select * from ms_compound where expid = 266 LIMIT 10")
 ```
 
-the query results show that the compound_id of the added experiment
-"266" start by 100912 which is correct
-
-### Ensuring the msms_spectrum table has been well merged
+#Ensuring the msms_spectrum table has been well merged
 
 ```{r}
-dbGetQuery(con_dyL, "
+dbGetQuery(con_mftneg, "
   SELECT * FROM msms_spectrum
   ORDER BY CAST(spectrum_id AS INTEGER) DESC
   LIMIT 10
 ")
 ```
 
-The highest spectrum_id is 201034 in the Dynlib database
 
 ```{r}
 dbGetQuery(con_merged, "Select * from msms_spectrum where compound_id = 100912 Limit 10")
 ```
 
-the query results show that the spectrum_id of the added experiment
-"266" start by 201035 which is correct
 
-### Ensuring the msms_spectrum_peak table has been well merged
+Ensuring the msms_spectrum_peak table has been well merged
 
 ```{r}
 dbGetQuery(con_merged, "Select * from msms_spectrum_peak where spectrum_id = 201035")
 ```
 
-### Ensuring the feature_matrix table has been well merged
+Ensuring the feature_matrix table has been well merged
 
 ```{r}
 dbReadTable(con_merged, "feature_matrix")
@@ -210,41 +222,10 @@ sp <- Spectra(cdb)
 spectraData(sp, columns = c("msLevel", "compound_id", "nodename", "rtime", "retention_time", "spectrum_type"))
 ```
 
-# Load the similarity table between flax and Dynlib ftms negative data
-We need the similarity output between the
-existing database and the new experiment that we added. The object was called `ftms_matches`, and generated
-in this quarto document: \
-[FTMS_neg_call.qmd](https://github.com/rebdau/RDynLib/blob/dev_Ahlam/Similarity/FTMS/FTMS_neg_call.qmd).
-We load the object here.
-
-```{r}
-load(here("data/database_FTMS_neg","ftms_matches.RData"))
-print(ftms_matches)
-```
-
-
-# Add automatically generated names of matching compounds to the merged experiment in compoundDb
-
-connect to the database:
-```{r}
-dbf <- here("data", "DYL_FLAX_FTMSneg.sqlite")
-con_merged <- dbConnect(RSQLite::SQLite(), dbf)
-```
-
-
-```{r}
-adding_Names_SQL(db,  spectrum_type = "individual", msLevel = 2, compound_id = NULL,
-    overwrite = FALSE )
-```
-
-```{r}
-dbGetQuery(con_merged, "Select * from ms_compound where expid = 266 and name IS NOT NULL")
-```
-
 # Disonnect databases
 ```{r}
 dbDisconnect(con_flax)
-dbDisconnect(con_dyL)
+dbDisconnect(con_mftneg)
 dbDisconnect(con_merged)
 ```
 

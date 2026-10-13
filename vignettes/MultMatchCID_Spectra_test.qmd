@@ -70,12 +70,10 @@ library(stringr)
 load_all()
 ```
 
-## convert the "Dynlib_FTMS_neg.sqlite" database to a spectra object
-
-Next we convert the "Dynlib_FTMS_neg.sqlite" database to a spectra object
+## convert the flax + maize ftms database to a spectra object
 
 ```{r}
-dbf <- here("data", "DYL_flax_herba_FTMSneg.sqlite")
+dbf <- here("data", "MAIZE_FLAX_FTMSneg.sqlite")
 db <- dbConnect(SQLite(), dbf)
 dy_sps <- sql_to_spectra(dbf)
 ```
@@ -93,7 +91,7 @@ We start by matching the 101280 compound with the database:
 ```{r}
 mt_3_3 <- MultMatchCID_Spectra(
   dy_sps,
-  101280,
+  88409,
   spectrum_type_query = "individual",
   spectrum_type_target = "individual",
   ms_level_query = 3,
@@ -115,7 +113,7 @@ The MS3 vs MS3 returns 71 match in the database.
 ```{r}
 mt_2_2 <- MultMatchCID_Spectra(
   dy_sps,
-  101280,
+  88409,
   spectrum_type_query = "individual",
   spectrum_type_target = "individual",
   ms_level_query = 2,
@@ -137,7 +135,7 @@ The MS2 vs MS2 returns 28 match in the database.
 ```{r}
 mt_4_3 <- MultMatchCID_Spectra(
   dy_sps,
-  101280,
+  88409,
   spectrum_type_query = "individual",
   spectrum_type_target = "individual",
   ms_level_query = 4,
@@ -159,7 +157,7 @@ The MS4 vs MS3 returns 13 match in the database.
 ```{r}
 mt_4_4 <- MultMatchCID_Spectra(
   dy_sps,
-  101280,
+  88409,
   spectrum_type_query = "individual",
   spectrum_type_target = "individual",
   ms_level_query = 4,
@@ -181,26 +179,49 @@ The MS4 vs MS3 returns 1 match in the database.
 look for a given name
 ```{r}
 mt_3_3 %>%
-  filter(str_detect(target_name, regex("herbacetin 3,8-di-o-beta-d-glucopyranoside ID AM", ignore_case = TRUE)))
+  filter(str_detect(target_name, regex("[hexoside KA KM]", ignore_case = TRUE)))
 ```
-we look for the ms_compound table of a given compound_id of HDG-succinate-HDG:
+
+we look for the ms_compound table of a given compound_id:
 ```{r}
-cmp <- get_compound(dbf, 101099)
+cmp <- get_compound(dbf, 206)
 cmp
 ```
+
+Now we show the ion trap based analysis of 100988 compound:
+
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+#| #| dev: svg
+#| fig-width: 14
+#| fig-height: 8
+MSnplot_SQL(dbf, 63652, thr_int = 100)
+```
+
+```{r}
+#| fig-width: 14
+#| fig-height: 4
+MSnplot_SQL(dbf, 88409, thr_int = 100)
+```
+
 
 First we fill in the cspp table:
 
 ```{r}
-ft_path <- here("data", "DYL_flax_herba_FTMSneg.sqlite")
+ft_path <- here("data", "MAIZE_flax_herba_FTMSneg.sqlite")
+#import the resulting file frol the aignment
 alg <- here("data", "assoc_flax_63.txt")
+#import the cspp file
 cspp_flax <- here("data","cspp_flax.txt")
+#import the file with the charge of the known molecules
 charge_file <- here("data", "ftms_all_compounds_RD.xlsx")
 ```
 
 
 ```{r}
-cspp.tot_SQL(ft_path, 266, mzerr = 0.01,
+cspp.tot_SQL(ft_path, 232, mzerr = 0.01,
                          cspp = cspp_ft, peakwidth = 0.1, IntThres  = 0, mz_tol = 0.5,
                          dot_thresh = 0, spectrum_type = "pseudo_MS2",  
                          min_common = 0, charge_file = charge_file)
@@ -209,7 +230,7 @@ cspp.tot_SQL(ft_path, 266, mzerr = 0.01,
 
 Here we show the cspp network of that compound
 ```{r}
-Overall.net_SQL(sql_path = ft_path, exp.id = 266, dbkey = 100988, min = 0,
+Overall.net_SQL(sql_path = ft_path, exp.id = 266, dbkey = 88117, min = 0,
                 nr_of_seq = 3, thr1 = 0.1, thr2 = 0.2, thr3 = 0.3)
 ```
 
@@ -217,11 +238,11 @@ Next, we print the compounds from qtof neg that have been aligned with
 HDG-succinate-HDG:
 
 ```{r}
-qt_path <- here("data","DYL_FLAX_QTOFneg.sqlite")
+qt_path <- here("data","MAIZE_FLAX_QTOFneg.sqlite")
 ```
 
 ```{r}
-getAlignedCompids_SQL(100988, "DYL_FLAX_FTMSneg.sqlite", alg )
+getAlignedCompids_SQL(88117, "MAIZE_FLAX_FTMSneg.sqlite", alg )
 ```
 
 fill in the gnps_add table
@@ -242,16 +263,25 @@ cspp.tot_SQL(qt_path, 52, mzerr = 0.01,
 
 Here we print the ms_compound table of that compound from qtof database:
 ```{r}
-cmp_qt <- get_compound(qt_path, 45890)
+cmp_qt <- get_compound(qt_path, 31027)
 cmp_qt
 ```
 
 Finaly, we show the GNPS network of that compound
 ```{r}
-Overall.net_SQL(sql_path = qt_path, exp.id = 52, dbkey = 45890, min = 0,
+Overall.net_SQL(sql_path = qt_path, exp.id = 52, dbkey = 31027, min = 0,
                 nr_of_seq = 3, thr1 = 0.1, thr2 = 0.2, thr3 = 0.3)
 ```
 
+Now we enter the characterization of the compounds found to the database:
+```{r}
+#EnterName_SQL(ft_path, CoMPID = 101143)
+```
+
+
+```{r}
+#EnterName_SQL(ft_path, CoMPID = 100988)
+```
 
 Next, we call the function to export the sql database to an mgf format that 
 could be used for further analysis and comparisons with public databases 
@@ -262,7 +292,7 @@ We start by converting ftms data
 #| results: "hide"
 #| warning: false
 ft_assembled <- here("data", "ft_assembled.mgf")
-sql_to_mgf(ft_path, expid = 266, spectrum_type = "pseudo_MS2", 
+sql_to_mgf(ft_path, expid = 232, spectrum_type = "pseudo_MS2", 
            output_file = ft_assembled) 
 ```
 
@@ -271,7 +301,7 @@ sql_to_mgf(ft_path, expid = 266, spectrum_type = "pseudo_MS2",
 #| results: "hide"
 #| warning: false
 ft_assembled <- here("data", "ft_MS2.mgf")
-sql_to_mgf(ft_path, expid = 266, spectrum_type = "individual", 
+sql_to_mgf(ft_path, expid = 232, spectrum_type = "individual", 
            msLevel = 2, output_file = ft_assembled) 
 ```
 
@@ -291,7 +321,7 @@ sql_to_mgf(qt_path, expid = 52, spectrum_type = "same_energy",
 #| results: "hide"
 #| warning: false
 qt_assembled <- here("data", "qt_merged.mgf")
-sql_to_mgf(qt_path, expid = 52, spectrum_type = "all_energies", 
+sql_to_mgf(qt_path, expid = 39, spectrum_type = "all_energies", 
            output_file = qt_assembled)
 ```
 

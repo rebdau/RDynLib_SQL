@@ -69,49 +69,70 @@ library(devtools)
 load_all()
 ```
 
-Loading the sql database of flax qtof negative
+#Import data from zenodo
+
+Loading the sql database of flax qtof negative from zenodo and create an sql
+connection to the database:
 ```{r}
-db_flax <- here("data", "QTOF_flax_neg.sqlite")
-con_flax <- dbConnect(RSQLite::SQLite(), db_flax)
+# flaxseed_QTOFneg
+get_dynlib_zenodo(
+  doi = ,
+  file = "flax_qtof.sqlite",
+  destdir = "data"
+)
+flax_qtofneg <- here("data", "flax_qtofneg.sqlite")
+con_fqt <- dbConnect(RSQLite::SQLite(), flax_qtofneg)
 ```
 
-Loading the sql database of Dynlib qtof negative
+Loading the sql database of maize qtof negative from zenodo and create an sql
+connection to the database:
 ```{r}
-db_dyl <- here("data", "DyLib_QTOF_neg.sqlite")
-con_dyL <- dbConnect(RSQLite::SQLite(), db_dyl)
+# maize_QTOFneg
+get_dynlib_zenodo(
+  doi = ,
+  file = "maize_qtofneg.sqlite",
+  destdir = "data"
+)
+maize_qtofneg <- here("data", "maize_qtofneg.sqlite")
+con_mqt <- dbConnect(RSQLite::SQLite(), maize_qtofneg)
 ```
 
-
+Here we show the available tables in both databases:
+flax qtof negative:
 ```{r}
-dbListTables(con_flax)
+dbListTables(con_fqt)
 ```
 
+flax qtof negative:
 ```{r}
-dbListTables(con_dyL)
+dbListTables(con_mqt)
 ```
 
+Create the output path to store the new database where we will merge the flax
+and maize data:
 ```{r}
 # Create new database
-dbf <- here("data", "DYL_FLAX_QTOFneg.sqlite")
+dbf <- here("data", "MAIZE_FLAX_QTOFneg.sqlite")
 con_merged <- dbConnect(SQLite(), dbf)
 ```
 
-
+# Merge flax and maize databases
+Here we call the `merge_databases()` function from RDynLib package to merge 
+both flax and maize databases:
 ```{r}
-main_db <- here("data", "DyLib_QTOF_neg.sqlite")
-add_db <- here("data", "QTOF_flax_neg.sqlite")
-output_db <- here("data", "DYL_FLAX_QTOFneg.sqlite")
+output_db <- here("data", "MAIZE_FLAX_QTOFneg.sqlite")
 merge_databases(
-  main_db   = main_db,
-  add_db    = add_db,
+  main_db   = maize_qtofneg,
+  add_db    = flax_qtofneg,
   output_db = output_db
 )
 
 ```
 
-
+#Verify the merged database
+Verify the tables in the output database:
 ```{r}
-dbf <- here("data", "DYL_FLAX_QTOFneg.sqlite")
+dbf <- here("data", "MAIZE_FLAX_QTOFneg.sqlite")
 con_merged <- dbConnect(SQLite(), dbf)
 dbListTables(con_merged)
 ```
@@ -122,16 +143,16 @@ dbGetQuery(con_merged, "PRAGMA table_info(ms_compound);")
 ```
 
 
-#Ensuring the experiment table has been well merged
+Ensuring the experiment table has been well merged
 ```{r}
 dbReadTable(con_merged, "experiment")
 ```
 
 The new experiment has 52 as expid
 
-#Ensuring the ms_compound has been well merged
+Ensuring the ms_compound has been well merged
 ```{r}
-dbGetQuery(con_merged, "Select * from ms_compound where expid = 52 LIMIT 10")
+dbGetQuery(con_merged, "Select * from ms_compound where expid = 39 LIMIT 10")
 ```
 
 Add accessions to the database with specefic initials for flax and herbacetin 
@@ -139,11 +160,14 @@ experiments, the other experiments would have the first two letters of the user
 column from experiment table as initials.
 ```{r}
 add_accessions(dbf, 
-                initials_overrides = c("52" = "RD"))
+                initials_overrides = c("39" = "RD"))
 ```
+
 ```{r}
 dbReadTable(con_merged, "experiment")
 ```
+
+
 ```{r}
 dbReadTable(con_merged, "ms_compound")
 ```
@@ -151,7 +175,7 @@ dbReadTable(con_merged, "ms_compound")
 
 52 is the expid of the new added experiment
 ```{r}
-dbGetQuery(con_dyL, "
+dbGetQuery(con_mqt, "
   SELECT * FROM ms_compound
   ORDER BY CAST(compound_id AS INTEGER) DESC
   LIMIT 10
@@ -162,15 +186,13 @@ dbGetQuery(con_dyL, "
 The highest compound_id is 45807 in the Dynlib database
 
 ```{r}
-dbGetQuery(con_merged, "Select * from ms_compound where expid = 52 LIMIT 10")
+dbGetQuery(con_merged, "Select * from ms_compound where expid = 39 LIMIT 10")
 ```
-
-the query results show that the compound_id of the added experiment "52" start by 45808 which is correct
 
 #Ensuring the msms_spectrum table has been well merged
 
 ```{r}
-dbGetQuery(con_dyL, "
+dbGetQuery(con_mqt, "
   SELECT * FROM msms_spectrum
   ORDER BY CAST(spectrum_id AS INTEGER) DESC
   LIMIT 10
@@ -180,7 +202,7 @@ The highest spectrum_id is 45807 in the Dynlib database
 
 
 ```{r}
-dbGetQuery(con_merged, "Select * from msms_spectrum where compound_id = 45808 Limit 10")
+dbGetQuery(con_merged, "Select * from msms_spectrum where compound_id = 30945 Limit 10")
 ```
 
 the query results show that the spectrum_id of the added experiment "52" start by 45808 which is correct
@@ -193,7 +215,7 @@ dbReadTable(con_merged, "feature_matrix")
 ```
 
 ```{r}
-dbGetQuery(con_merged, "Select * from feature_matrix where expid = 52 LIMIT 10")
+dbGetQuery(con_merged, "Select * from feature_matrix where expid = 39 LIMIT 10")
 ```
 
 #Converting the merged sql connection to a compdb object
@@ -202,52 +224,19 @@ cdb <- CompDb(con_merged)
 cdb
 ```
 
-
+Show the header of the compoundDb object
 ```{r}
 compounds(cdb) |> head()
 ```
 
+Convert the compoundDb object to a spectra object
 ```{r}
 sp <- Spectra(cdb)
 ```
 
-
+Print the folowing columns from the spectra object:
 ```{r}
-spectraData(sp, columns = c("msLevel", "compound_id", "nodename", "rtime", "retention_time", "spectrum_type"))
+spectraData(sp, columns = c("msLevel", "compound_id", "nodename", "rtime",
+                            "retention_time", "spectrum_type"))
 ```
-
-
-# Load the similarity table between flax and Dynlib qtof negative data
-We need the similarity output between the
-existing database and the new experiment that we added. The object was called 
-`qtof_matches`, and generated in this quarto document: \
-[QTOF_neg_call.qmd](https://github.com/rebdau/RDynLib_SQL/blob/Ahlam/vignettes/QTOF_neg_call.qmd).
-We load the object here.
-
-
-```{r}
-load(here("data/database_QTOF_neg","qtof_matches.RData"))
-print(qtof_matches)
-```
-
-
-# Add automatically generated names of matching compounds to the merged experiment in compoundDb
-
-connect to the database:
-
-```{r}
-dbf <- here("data", "DYL_FLAX_QTOFneg.sqlite")
-con_merged <- dbConnect(RSQLite::SQLite(), dbf)
-
-adding_Names_SQL(con_merged, qtof_matches)
-```
-
-
-#check if the names have been added to the database:
-
-```{r}
-dbGetQuery(con_merged, "Select * from ms_compound where expid = 52 and name IS NOT NULL")
-```
-
-
 

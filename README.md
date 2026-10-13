@@ -57,14 +57,6 @@ This workflow demonstrates the alignment of compounds across different LC–MS e
 
 This workflow enables structural information acquired in different experiments to be connected and reused within the DynLib framework.
 
-#### `dynlib_cid_spectral_matching_workflow.qmd`
-
-This workflow demonstrates the comparison of fragmentation spectra to identify compounds sharing common CID fragmentation characteristics. It illustrates how spectral information stored in DynLib can be exploited to identify related spectra and support metabolite characterization across experiments.
-
-#### `dynlib_characterization_visualization_workflow.qmd`
-
-This workflow illustrates tools for exploring and visualizing structural information stored in DynLib databases. It includes examples based on CID spectral relationships, CSPP and GNPS information, MS/MS and MSⁿ fragmentation data, metabolite annotations, and the export of spectral information for downstream analyses.
-
 ### Database curation and utilities
 
 #### `dynlib_annotation_workflow.qmd`

@@ -10,10 +10,9 @@ author: "Ahlam Mentag, Rebecca Dauwe, Johannes Rainer"
 # Shiny Documents
 
 This Quarto document demonstrates
-(1) how to subset a DynLib SQL database by including certain experiments.
-(2) how the DynLib infrastructure interoperates with the R for Mass Spectrometry
+(1) how the DynLib infrastructure interoperates with the R for Mass Spectrometry
     ecosystem.
-(3) how to use RDynLib Accessors for Compound and Spectral Data.
+(2) how to use RDynLib Accessors for Compound and Spectral Data.
 
 # Load required libraries
 
@@ -30,80 +29,20 @@ library(RSQLite)
 library(devtools)
 load_all()
 ```
-# Subset a DynLib SQL database
-The DynLib SQL database can archive many LC-MS experiments. The expid of each experiment can be retrieved in the experiment table. Here we filter an SQL database to contain only a single experiment experiment.
 
-## File paths to the input and output sql databases
 
+## Load the maize database from zenodo
 ```{r}
-data <- here("data", "Dynlib_ament.sqlite")
-sub_data <- here("data", "subset.sqlite")
-```
-
-## retrieve the expid
-
-```{r}
-con <- dbConnect(RSQLite::SQLite(), data)
-
-#Verify the experiment table
-exp <- dbGetQuery(con, "
-SELECT *
-FROM experiment 
-")
-
-exp[exp$species=="Zea mays",]
-```
-
-
-
-## Call the function to filter the database based on a single expid
-```{r}
-filterDynLibDB(
-  expid = 192,
-  input_db = data,
-  output_db = sub_data
+# maize_FTneg
+get_dynlib_zenodo(
+  doi = ,
+  file = "maize_ftmsneg.sqlite",
+  destdir = "data"
 )
+maize_ftneg <- here("data", "maize_ftneg.sqlite")
+con_mftneg <- dbConnect(RSQLite::SQLite(), maize_ftneg)
 ```
 
-## Connection to the subseted database
-```{r}
-con_filter <- dbConnect(RSQLite::SQLite(), sub_data)
-
-#Verify the experiment table
-dbGetQuery(con_filter , "
-SELECT *
-FROM experiment 
-")
-```
-
-## Print ms_compound table of the filtered database
-```{r}
-dbGetQuery(con_filter , "
-SELECT *
-FROM ms_compound LIMIT 5
-")
-```
-
-## filter the database based on a set of expids
-```{r}
-output_db2 <- here("data", "filter_set.sqlite")
-filterDynLibDB(
-    expid = c(194, 196 ,197),
-    input_db = data,
-    output_db = output_db2
-)
-```
-
-## Connection to the subseted database
-```{r}
-con_filter2 <- dbConnect(RSQLite::SQLite(), output_db2)
-
-#Verify the experiment table
-dbGetQuery(con_filter2 , "
-SELECT *
-FROM experiment
-")
-```
 
 # Convert a DynLib database to CompDb and Spectra objects
 Both `CompDb` and `Spectra` objects are part of the provide access to the R for Mass Spectrometry ecosystem. While `CompDb` offers a database-centric interface for querying and managing compound database content,`Spectra` provides a more spectrum-centric interface.
@@ -111,7 +50,7 @@ Both `CompDb` and `Spectra` objects are part of the provide access to the R for 
 ## CompDb object
 We create a `CompDb` object `cdb` from the DynLib SQL database using the `ExpCompDb()` function from the `RDynLib` package. The resulting `CompDb` object represents the complete SQL database and provides access to all of its tables.
 ```{r}
-cdb <- ExpCompDb(data)
+cdb <- ExpCompDb(maize_ftneg)
 # Print database metadada information
 meta <- metadata(cdb)
 head(meta)
@@ -178,10 +117,12 @@ or nodename.
 
 Here we test using expid and precursor mz within a mass range for a given experiment:
 ```{r}
-FT_path <- here("data", "DYL_FLAX_FTMSneg.sqlite")
+#' Import the data containing flax + maize from 
+#' 'dynlib_ftms_database_integration_workflow.qmd' document
+FT_path <- here("data", "MAIZE_FLAX_FTMSneg.sqlite")
 
 NodenameMass_SQL(
-  sql_path = data,
+  sql_path = maize_ftneg,
   expid = 191,
   mass_measured = 537.1976,
   mass_range = 0.02
@@ -190,7 +131,7 @@ NodenameMass_SQL(
 Next, we look for a given mz range in the whole database without specify the expid:
 ```{r}
 NodenameMass_SQL(
-  sql_path = data,
+  sql_path = maize_ftneg,
   mass_measured = 537.1976,
   mass_range = 0.02
 )
@@ -200,7 +141,7 @@ NodenameMass_SQL(
 Here we test using expid and a part of the name of the compounds we want to show:
 ```{r}
 res <-NodenameMass_SQL(
-  sql_path = data,
+  sql_path = maize_ftneg,
   expid = 198,
   name = "hexoside"
 )
@@ -209,7 +150,7 @@ head(res,3)
 Next, we look for a given name in the whole database without specify the expid:
 ```{r}
 res <-NodenameMass_SQL(
-  sql_path = data,
+  sql_path = maize_ftneg,
   name = "hexoside"
 )
 head(res,3)
@@ -217,12 +158,12 @@ head(res,3)
 
 show the msms_spectrum table of a given compound_id
 ```{r}
-sp_id <- get_spectrum_id(qt_path = sql_db, compound_id = 68855 )
+sp_id <- get_spectrum_id(qt_path = maize_ftneg, compound_id = 229 )
 sp_id
 ```
 
 Retreive the ms_compound table of a given compound_id
 ```{r}
-compound <- get_compound(qt_path = sql_db, compound_id = 68855)
+compound <- get_compound(qt_path = maize_ftneg, compound_id = 217)
 compound
 ```

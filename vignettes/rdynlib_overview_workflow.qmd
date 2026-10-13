@@ -204,7 +204,8 @@ con_hdgft <- dbConnect(RSQLite::SQLite(), hdg_ftneg)
 
 ```
 
-To create the target library for spectral matching, the maize FTneg DynLib database is merged with the HDG_FTneg DynLib database.
+To create the target library for spectral matching, the maize FTneg DynLib
+database is merged with the HDG_FTneg DynLib database.
 
 ```{r}
 target_DL_FTneg <- here("data", "FTneg_maize_hdg.sqlite")

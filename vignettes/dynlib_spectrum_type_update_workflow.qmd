@@ -26,7 +26,7 @@ load_all()
 #FTMS
 
 ```{r}
-FT_path <- here("data","DYL_flax_herba_FTMSneg.sqlite")
+FT_path <- here("data","MAIZE_flax_herba_FTMSneg.sqlite")
 
 FT_con <- DBI::dbConnect(RSQLite::SQLite(), FT_path)
 
@@ -60,7 +60,7 @@ dbGetQuery(FT_con, "Select * from msms_spectrum where spectrum_type = 'individua
 #QTOF
 
 ```{r}
-QTOF_path <- here("data","DYL_FLAX_QTOFneg.sqlite")
+QTOF_path <- here("data","MAIZE_FLAX_QTOFneg.sqlite")
 QTOF_con <- DBI::dbConnect(RSQLite::SQLite(), QTOF_path)
   
 ```

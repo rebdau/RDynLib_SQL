@@ -61,14 +61,14 @@ load_all()
 #(1) database file: 
 
 ```{r}
-dbf <- here("data", "DYL_FLAX_FTMSneg.sqlite")
+dbf <- here("data", "MAIZE_FLAX_FTMSneg.sqlite")
 db <- dbConnect(SQLite(), dbf)
 ```
 
 
 #(2) Print the ms_compound table of a given masses and retention time range:
 ```{r}
-NodenameMass_SQL(dbf, expid = 266,
+NodenameMass_SQL(dbf, expid = 232,
                             # mass_measured = 1333.2920,
                              rt = 35,
                              rt_range = 3
