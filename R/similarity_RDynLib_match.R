@@ -92,7 +92,7 @@
 #' @import MetaboAnnotation
 #' @import rstudioapi
 #' 
-#' @author Ahlam Mentag
+#' @author Ahlam Mentag, Rebecca Dauwe, Johannes Rainer
 #' 
 #' @export
 similarity_RDynLib_match <- function(

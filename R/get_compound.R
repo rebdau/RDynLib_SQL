@@ -9,7 +9,7 @@
 #' @import RSQLite
 #' @import CompoundDb
 #' 
-#' @author Ahlam Mentag
+#' @author Ahlam Mentag, Rebecca Dauwe
 #' 
 #' @export
 get_compound <- function(qt_path, compound_id) {

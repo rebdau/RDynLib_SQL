@@ -64,7 +64,7 @@
 #' @import MetaboAnnotation
 #' @import rstudioapi
 #' 
-#' @author Ahlam Mentag
+#' @author Ahlam Mentag, Rebecca Dauwe, Johannes Rainer
 #' 
 #' @export
 MultMatchCID_Spectra <- function(
