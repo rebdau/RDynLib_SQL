@@ -1,0 +1,610 @@
+---
+title: "Selection of representative MS2 spectra per feature"
+format:
+  html:
+    toc: true
+    self-contained: true
+author: "Ahlam Mentag, Rebecca Dauwe, Johannes Rainer"
+editor: 
+  markdown: 
+    wrap: 72
+---
+
+## Introdcution
+
+In this quarto document we filtered the QTOF neg of flax seed data in
+order to retain one representative MS/MS spectrum per feature. The steps
+and parameters were tested in
+`qtof_filtering_exploreknownfragmentation.qmd`
+
+We create the precursorPurity and PrecursorIntensity columns. We
+centroid the MS2 spectra. We select the 10 % spectra with highest
+precursor purity. We combine spectra to obtain one representative
+spectrum per feature, and finally keep for each spectrum the 100 peaks
+with highest intensities.
+
+## Data upload
+
+```{r, echo = FALSE}
+library(Spectra)
+library(xcms)
+library(MsExperiment)
+library(S4Vectors)
+library(BiocParallel)
+library(Rdisop)
+library(stringr)
+library(dplyr)
+
+register(SerialParam())
+
+pth <- getwd()
+pth
+
+```
+
+Load the qtof final object after preprocessing from
+ftms_preprocessing.qmd file, and convert it to a spectra object
+
+```{r}
+load(file.path(pth, "data/qtof.RData"))
+```
+
+In case of changing the path to the original mzml files used to create the qtof 
+MsExperiment object please run this chunk and replace the path with the actual
+path of your mzml file:
+```{r}
+dataStorageBasePath(qtof@spectra) <- file.path(pth, "data/mzml") 
+```
+
+Convert to a spectra object
+```{r}
+qtof_neg <- spectra(qtof)
+```
+
+
+## Calculate Precursor purity
+
+We next calculate the precursor purity, by calling the
+`precursorPurity()` function from the spectra package, for each MS2
+spectrum as well as the precursor intensity (since that is not provided
+in the original mzML files).
+
+### Function
+
+Note: this function was added to the *Spectra* package with pull request
+[#359](https://github.com/rformassspectrometry/Spectra/pull/359) and will be
+available in the *Spectra* package starting with Bioconductor release 3.22
+(October 2025). In the meantime, the function can be loaded below.
+
+```{r}
+precursorPurity <- function(x, tolerance = 0.3, ppm = 10) {
+   # if (is.unsorted(rtime(x)))
+    #    stop("Spectra with data origin ", dataOrigin(x[1L]),
+     #        " are not increasingly sorted by retention time.")
+    ms2_idx <- which(msLevel(x) == 2L)
+    ms1_idx <- which(msLevel(x) == 1L)
+    ratios <- rep(NA_real_, length(x))
+    pmzs <- precursorMz(x)
+    for (i in ms2_idx) {
+        ratio <- NA_real_
+        j <- ms1_idx[ms1_idx < i]
+
+        if (length(j)) {
+            j <- j[length(j)]
+            s1 <- filterMzRange(
+                x[j], c(pmzs[i] + c(-1, 1) * (tolerance + pmzs[i] * ppm / 1e6)))
+
+            pks <- peaksData(s1, c("mz", "intensity"))[[1L]]
+
+            if (nrow(pks)) {
+                intensities <- pks[, 2L]
+                ratio <- max(intensities) / sum(intensities)
+            }
+        }
+
+        ratios[i] <- ratio
+    }
+
+    ratios
+}
+
+
+```
+
+### Calculation
+
+```{r}
+qtof_neg$precursorPurity <- precursorPurity(qtof_neg, tolerance = 0.3, ppm = 10)
+qtof_neg$precursorIntensity <- estimatePrecursorIntensity(
+    qtof_neg, tolerance = 0.3, ppm = 10)
+qtof@spectra <- qtof_neg
+```
+
+The distribution of the estimated precursor purity and intensity are shown
+below.
+
+```{r}
+#| fig-width: 10
+#| fig-height: 5
+par(mfrow = c(2, 1))
+plot(density(qtof_neg$precursorPurity, na.rm = TRUE),
+     ylab = "Precursor purity", main = "")
+grid()
+plot(density(qtof_neg$precursorIntensity, na.rm = TRUE),
+     ylab = "Precursor intensity", main = "")
+grid()
+```
+
+### Save XcmsExperiment object with precursorPurity
+
+```{r}
+save(qtof, file = file.path(pth, "data", "qtof_precpur.RData"))
+```
+
+### Load XcmsExperiment object with precursorPurity
+
+```{r}
+load(file = "data/qtof_precpur.RData")
+```
+
+## Associate MS2 spectra to features
+
+We next extract all MS2 spectra that can be associated to the MS1
+feature:
+
+```{r}
+feature_spectra <- featureSpectra(dropFilledChromPeaks(qtof), msLevel = 2,
+                                  skipFilled = TRUE)
+```
+
+For only `r length(unique(feature_spectra$feature_id))` of in total
+`r nrow(featureDefinitions(qtof))` features MS2 spectra were defined. A summary
+of the number of MS2 spectra per feature is shown below:
+
+```{r}
+table(feature_spectra$feature_id) |>
+    quantile()
+```
+
+A relatively large number of MS2 spectra was assigned to each feature. A
+summary of the number of fragment peaks per spectrum is given below.
+
+```{r}
+lengths(feature_spectra) |>
+    quantile()
+```
+
+The number of peaks per spectrum is unexpectedly large.
+
+## Centroiding the MS2 data
+
+To reduce the number of fragment peaks we perform a second centroiding of the
+spectra.
+
+```{r}
+feature_spectra_centro <- Spectra::pickPeaks(feature_spectra,
+                                             halfWindowSize = 2L,
+                                             k = 2L, threshold = 0.5)
+```
+
+The fragment peak counts of the spectra after centroiding is:
+
+```{r}
+lengths(feature_spectra_centro) |>
+    quantile()
+```
+
+The number of peaks was reduced - is however still large.
+
+statistics of the features with at least one assigned MS2 spectrum and Total 
+number of detected features
+```{r}
+# Percentage of features with at least one MS2 spectrum
+percentage_assigned <- 
+    100 * length(unique(feature_spectra$feature_id)) /
+    nrow(featureDefinitions(qtof))
+percentage_assigned
+```
+
+
+## Verify if MS2 Spectra are linked to more than one feature
+
+```{r}
+scanIndex.per.ori <- split(feature_spectra_centro$scanIndex,
+                           feature_spectra_centro$dataOrigin)
+```
+
+```{r}
+ms2_id <- paste0(feature_spectra_centro$dataOrigin, "_", feature_spectra_centro$acquisitionNum)
+ms2_table <- table(ms2_id)
+ms2_mult <- names(ms2_table)[ms2_table > 1]
+length(ms2_mult)
+```
+
+There is `r length(ms2_mult)` duplicated assignment.
+
+In case of the length of `ms2_mult` not null, this file
+[Resolve_multiple_assignment.R](https://github.com/rebdau/RDynLib_qtof/blob/ahlam/Resolve_multiple_assignment.R)
+contains an algorithm that remove the duplicated assignments
+
+
+#case 1: If your data were acquired using only a single collision energy
+
+## Precursor purity
+
+### Removing a fraction of the spectra based on precursor purity
+
+We next remove fragment spectra with a low precursor purity. For this we group
+fragment spectra by feature ID and remove, for each group,
+the 10% of spectra with the lowest precursor purity.
+
+```{r}
+# extract the spectra data as a dataframe
+filenames <- feature_spectra$dataOrigin
+
+purity_df <- as.data.frame(spectraData(feature_spectra_centro)) %>%
+  mutate(
+    index = row_number(),
+    f = feature_id
+  )
+
+# 10% lowest
+keep_idx <- purity_df %>%
+  group_by(f) %>%
+  arrange(precursorPurity) %>%
+  mutate(
+    n_rows = n(),
+    cutoff = ceiling(n_rows * 0.10),
+    row_number = row_number()
+  ) %>%
+  filter(row_number > cutoff) %>%
+  pull(index)
+ms2_qtof_precpur <- feature_spectra_centro[keep_idx]
+
+#number of spectra:
+dim(spectraData(ms2_qtof_precpur))[1]
+
+#number of peaks per spectrum:
+counts <- sapply(peaksData(ms2_qtof_precpur), function(x) {
+  dim(x)[1]
+})
+summary(counts)
+hist(counts)
+```
+
+Comparing the precursor purity before and after filtering.
+
+```{r}
+quantile(feature_spectra_centro$precursorPurity, na.rm = TRUE)
+quantile(ms2_qtof_precpur$precursorPurity, na.rm = TRUE)
+```
+
+The global precursor purities slightly improved. After filtering,
+`r length(ms2_qtof_precpur)` MS2 spectra from the in total
+`r length(feature_spectra_centro)` are retained.
+
+## Merge spectra within feature_id
+Create a single spectrum for each feature by combining all spectra associated 
+with the same feature_id , keeping only fragments that are present in minimum 
+`minprop` of spectra. We define that peaks need to be present in at least 50% 
+of the spectra, otherwise they are considered noise.
+
+```{r}
+# grouping by feature_id 
+f <- ms2_qtof_precpur$feature_id
+
+ms2_qtof_ftdda <- combineSpectra(
+    ms2_qtof_precpur, ppm = 5, peaks = "intersect", weighted = TRUE,
+    minProp = 0.5, intensityFun = mean, f = f,
+    p = rep(1L, length(ms2_qtof_precpur)))
+```
+
+Combining reduced the number of MS2 spectra from `r length(ms2_qtof_precpur)`
+to `r length(ms2_qtof_ftdda)`.
+
+The number of peaks of the combined MS2 spectra is summarized below
+
+```{r}
+lengths(ms2_qtof_ftdda) |>
+    quantile()
+```
+
+There are thus `sum(lengths(ms2_qtof_ftdda) <= 1)` spectra with one or no peak.
+We need to remove the spectra without available peaks.
+
+```{r}
+ms2_qtof_ftdda <- ms2_qtof_ftdda[lengths(ms2_qtof_ftdda) > 0]
+```
+
+
+#case 2: If the data were acquired using different collision energies
+
+## Precursor purity
+
+### Removing a fraction of the spectra based on precursor purity
+
+We next remove fragment spectra with a low precursor purity. For this we group
+fragment spectra by feature ID and collision energy and remove, for each group,
+the 10% of spectra with the lowest precursor purity.
+
+```{r}
+# extract the spectra data as a dataframe
+filenames <- feature_spectra$dataOrigin
+dda <- str_extract(filenames, "DDA[0-9]")
+
+purity_df <- as.data.frame(spectraData(feature_spectra_centro)) %>%
+  mutate(
+    index = row_number(),
+    f = paste(feature_id, "|", dda)
+  )
+
+# 10% lowest
+keep_idx <- purity_df %>%
+  group_by(f) %>%
+  arrange(precursorPurity) %>%
+  mutate(
+    n_rows = n(),
+    cutoff = ceiling(n_rows * 0.10),
+    row_number = row_number()
+  ) %>%
+  filter(row_number > cutoff) %>%
+  pull(index)
+ms2_qtof_precpur <- feature_spectra_centro[keep_idx]
+
+#number of spectra:
+dim(spectraData(ms2_qtof_precpur))[1]
+
+#number of peaks per spectrum:
+counts <- sapply(peaksData(ms2_qtof_precpur), function(x) {
+  dim(x)[1]
+})
+summary(counts)
+hist(counts)
+```
+
+Comparing the precursor purity before and after filtering.
+
+```{r}
+quantile(feature_spectra_centro$precursorPurity, na.rm = TRUE)
+quantile(ms2_qtof_precpur$precursorPurity, na.rm = TRUE)
+```
+
+The global precursor purities slightly improved. After filtering,
+`r length(ms2_qtof_precpur)` MS2 spectra from the in total
+`r length(feature_spectra_centro)` are retained.
+
+## Merge spectra within feature_id - collision energy groups
+create a single spectrum for each feature per collision energy, keeping
+only fragments that are present in minimum `minprop` of spectra. We
+define that peaks need to be present in at least 50% of the spectra,
+otherwise they are considered noise.
+
+```{r}
+# grouping by feature_id and collision energy
+filenames <- ms2_qtof_precpur$dataOrigin
+
+# Extract the DDA group (e.g. DDA1, DDA2, ...)
+dda <- str_extract(filenames, "DDA[0-9]")
+
+# Create the grouping factor:
+# spectra are combined only when they have the same feature_id
+# AND belong to the same DDA/collision-energy group
+f <- paste(ms2_qtof_precpur$feature_id, "|", dda)
+
+ms2_qtof_ftdda <- combineSpectra(
+    ms2_qtof_precpur, ppm = 5, peaks = "intersect", weighted = TRUE,
+    minProp = 0.5, intensityFun = mean, f = f,
+    p = rep(1L, length(ms2_qtof_precpur)))
+```
+
+Combining reduced the number of MS2 spectra from `r length(ms2_qtof_precpur)`
+to `r length(ms2_qtof_ftdda)`.
+
+# Percentage of features retained after precursor purity filtering
+```{r}
+length(unique(ms2_qtof_precpur$feature_id)) /
+    nrow(featureDefinitions(qtof)) * 100
+```
+
+
+The number of peaks of the combined MS2 spectra is summarized below
+
+```{r}
+lengths(ms2_qtof_ftdda) |>
+    quantile()
+```
+
+There are thus `sum(lengths(ms2_qtof_ftdda) <= 1)` spectra with one or no peak.
+We need to remove the spectra without available peaks.
+
+```{r}
+ms2_qtof_ftdda <- ms2_qtof_ftdda[lengths(ms2_qtof_ftdda) > 0]
+```
+
+# Percentage of features retained after combining spectra by collision energy
+```{r}
+percentage_after_combining <- 
+    100 * length(unique(ms2_qtof_ftdda$feature_id)) /
+    nrow(featureDefinitions(qtof))
+percentage_after_combining
+```
+
+## For both cases: Keep 100 peaks with highest intensity
+
+In contrast to very few peaks, there are also MS2 spectra with a high number of
+peaks. For these, we restrict the number of fragment peaks to 100.
+
+```{r}
+# Keep only the 100 peaks with the highest intensity
+top100 <- function(x, ...) {
+    # If fewer than 100 peaks, keep them all
+    if (length(x) <= 100) {
+        rep(TRUE, length(x))
+    } else {
+        # Keep TRUE for the 100 highest intensities
+        rank(-x, ties.method = "first") <= 100
+    }
+}
+
+# Apply the filter
+ms2_qtof_sep <- filterIntensity(ms2_qtof_ftdda, intensity = top100)
+
+spectraData(ms2_qtof_sep)$spectrum_type <- "same_energy"
+
+
+```
+
+The number of peaks before and after this filtering are shown below
+
+```{r}
+lengths(ms2_qtof_ftdda) |> quantile()
+lengths(ms2_qtof_sep) |> quantile()
+```
+
+Number of spectra with just one peak
+
+```{r}
+sum(lengths(ms2_qtof_sep) == 1)
+```
+
+
+```{r}
+save(ms2_qtof_sep, file = file.path(pth, "data", "ms2_qtof_sep.RData"))
+
+```
+
+N.B.: If your data were acquired using only a single collision energy, 
+then your final object is ms2_qtof_sep.RData (loaded above).
+In this case, do not continue with the rest of the workflow.
+If your data were acquired using multiple collision energies, 
+load the ms2_qtof_sep.RData object and continue with the following
+steps of the workflow.
+
+## Grouping by feature_id for different collision energies
+
+```{r}
+# grouping by feature_id for different collision energies
+f = ms2_qtof_ftdda$feature_id
+ms2_qtof <- combineSpectra(ms2_qtof_ftdda, ppm = 5, peaks = "union",
+                           intensityFun = sum,weighted = TRUE, f = f,
+                           p = rep(1L, length(ms2_qtof_ftdda)))
+
+
+```
+
+```{r}
+length(unique(unlist(ms2_qtof$feature_id)))
+
+length(unique(spectraData(ms2_qtof)$feature_id))
+```
+
+As a result we have `r length(unique(spectraData(ms2_qtof)$feature_id))`
+unique feature
+
+### Check number of peaks per spectrum
+
+```{r}
+
+#number of peaks per spectrum
+counts <- sapply(peaksData(ms2_qtof), function(x) {
+  dim(x)[1]
+})
+
+summary(counts)
+
+hist(counts, breaks = 100)
+hist(counts, breaks = 100, xlim = c(0,400))
+```
+
+## Keep 100 peaks with highest intensity
+
+```{r}
+# Keep only the 100 peaks with the highest intensity
+top100 <- function(x, ...) {
+    # If fewer than 100 peaks, keep them all
+    if (length(x) <= 100) {
+        rep(TRUE, length(x))
+    } else {
+        # Keep TRUE for the 100 highest intensities
+        rank(-x, ties.method = "first") <= 100
+    }
+}
+
+# Apply the filter
+ms2_qtof_comb <- filterIntensity(ms2_qtof, intensity = top100)
+spectraData(ms2_qtof_comb)$spectrum_type <- "all_energies"
+```
+
+Here we print the summary and the quantile of the peaks number
+
+```{r}
+peak_counts <- sapply(peaksData(ms2_qtof_comb), nrow)
+summary(peak_counts)
+quantile(peak_counts)
+```
+
+save the object
+
+```{r}
+save(ms2_qtof_comb, file = file.path(pth, "data", "ms2_qtof_Comb.RData"))
+```
+
+Here we save the global object that contains the qtof assembled and
+separated, distinguished by spectrum_type column
+
+```{r}
+qtof_flax_final <- c(ms2_qtof_sep, ms2_qtof_comb)
+save(qtof_flax_final, file = file.path(pth, "data", "qtof_flax_final.RData"))
+```
+
+Statistics part:
+
+```{r}
+sd <- spectraData(qtof_flax_final) |> as.data.frame()
+
+unique(sd$spectrum_type)
+
+# extract energy level (DDA1/DDA2/DDA3) from the file path
+sd$energy <- str_extract(sd$dataOrigin, "DDA[0-9]")
+
+## MS2 spectra count PER ENERGY LEVEL, for spectrum_type == "same_energy"
+counts_single_energy <- sd %>%
+  filter(msLevel == 2, spectrum_type == "same_energy") %>%
+  count(energy, name = "n_ms2_spectra")
+
+counts_single_energy
+```
+
+
+```{r}
+## Total MS2 spectra where spectrum_type == "all_energies"
+n_merged_ms2 <- sd %>%
+  filter(msLevel == 2, spectrum_type == "all_energies") %>%
+  nrow()
+
+n_merged_ms2
+```
+
+
+```{r}
+counts_merged_total <- sd %>%
+  filter(msLevel == 2, spectrum_type == "all_energies") %>%
+  summarise(n_ms2_spectra = n())
+
+counts_merged_total
+
+
+counts_merged_by_energy <- sd %>%
+  filter(msLevel == 2, spectrum_type == "all_energies") %>%
+  count(energy, name = "n_ms2_spectra")
+
+counts_merged_by_energy
+```
+
+
+
+## Session information
+
+```{r}
+sessionInfo()
+```

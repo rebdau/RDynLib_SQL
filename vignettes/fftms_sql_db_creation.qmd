@@ -1,0 +1,209 @@
+---
+title: "Create an SQL database with spectral data, feature data, and experiment metadata"
+format:
+  html:
+    toc: true
+    self-contained: true
+author:
+  - name: Ahlam Mentag
+  - name: Johannes Rainer
+  - name: Rebecca Dauwe
+execute:
+  warning: false
+  error: false
+  message: false
+editor: visual
+---
+
+## Introduction
+
+This Quarto document describes the workflow used to create an SQL database containing spectral data, feature data, and experiment metadata for the FTMS negative-mode flax dataset using RDynlib package functions.
+
+# Required packages
+
+```{r}
+library(DBI)
+library(RSQLite)
+library(dplyr)
+library(RDynlib)
+library(here)
+library(devtools)
+load_all()
+```
+
+#Call the ftms spectra object produced in `ftms_trees_selection.qmd` document,:
+
+```{r}
+# Load Spectra objects
+load("data/ftms_all.RData")
+```
+
+#Create an output sql file:
+
+```{r}
+dbfile <- here("data", "ftms_flax_neg_acc.sqlite")
+```
+
+#Create an sql database for flax ftms spectra
+
+Here we call `createSpectraSQLite()` from the RDynLib package, the function takes a spectra object, the experiment metadata as input, and returns an sql database in the given output file:
+
+```{r}
+createSpectraSQLite(
+    sps = ftms_all,
+    dbfile = dbfile,
+    user_initials = "RD",
+    date = "01/06/2015",
+    user = "ament",
+    machine = "LTQ_Orbitrap",
+    mode = "neg",
+    tissue = "Flax",
+    mstype = "FT",
+    column = "Waters_Sunfire_C18",
+    buffera = "water_AA",
+    bufferb = "ACN",
+    gradient_time = "65(95-95in2_to82at32_to76at60min__to0at65minat300_40gr) min",
+    source = "ESI",
+    species = "Linum usitatissimum",
+    ce = 35,
+    meta = "Linea_varieties_S1_S9"
+)
+```
+
+#Query the output SQL database
+
+Create an SQL connection to the output database and list the tables
+
+```{r}
+con <- DBI::dbConnect(RSQLite::SQLite(), dbfile)
+
+DBI::dbListTables(con)
+
+```
+
+Read the experiment table
+
+```{r}
+DBI::dbReadTable(con, "experiment")
+```
+
+Count the compounds number:
+
+```{r}
+DBI::dbGetQuery(con, "SELECT COUNT(*) FROM ms_compound")
+```
+
+Show the the first 5 rows from the ms_compound table
+
+```{r}
+DBI::dbGetQuery(con, "SELECT * FROM ms_compound LIMIT 5")
+```
+
+The number of spectrums in the database from the msms_spectrum table:
+
+```{r}
+DBI::dbGetQuery(con, "SELECT COUNT(*) FROM msms_spectrum")
+```
+
+Show the the first 5 rows from the msms_spectrumtable
+
+```{r}
+DBI::dbGetQuery(con, "SELECT * FROM msms_spectrum LIMIT 5")
+```
+
+Verify the number of compound per experiment
+
+```{r}
+DBI::dbGetQuery(con, "
+SELECT expid, COUNT(*) 
+FROM ms_compound 
+GROUP BY expid
+")
+```
+
+Check if all the compound_ids are not null
+
+```{r}
+DBI::dbGetQuery(con, "
+SELECT COUNT(*)
+FROM msms_spectrum
+WHERE compound_id IS NULL
+")
+```
+
+Print the number of peaks per spectrum
+
+```{r}
+DBI::dbGetQuery(con, "
+SELECT spectrum_id, COUNT(*) AS n_peaks
+FROM msms_spectrum_peak
+GROUP BY spectrum_id
+ORDER BY n_peaks DESC
+LIMIT 10
+")
+```
+
+Print the first 5 rows from the msms_spectrum_peak table
+
+```{r}
+DBI::dbGetQuery(con, "SELECT * FROM msms_spectrum_peak LIMIT 5")
+
+```
+
+Check the minimum and maximum precursorMz values in the dataset
+
+```{r}
+DBI::dbGetQuery(con, "
+SELECT MIN(precursor_mz), MAX(precursor_mz)
+FROM msms_spectrum
+")
+```
+
+Check the minimum and maximum retention time values in the dataset
+
+```{r}
+DBI::dbGetQuery(con, "
+SELECT MIN(rtime), MAX(rtime)
+FROM msms_spectrum
+")
+```
+
+Here we print the number of compounds, spectra and peaks in the dataset
+
+```{r}
+DBI::dbGetQuery(con, "
+SELECT 
+  (SELECT COUNT(*) FROM ms_compound) AS compounds,
+  (SELECT COUNT(*) FROM msms_spectrum) AS spectra,
+  (SELECT COUNT(*) FROM msms_spectrum_peak) AS peaks
+")
+```
+
+```{r}
+DBI::dbGetQuery(con, "
+SELECT COUNT(*) 
+FROM msms_spectrum
+WHERE compound_id IS NULL
+")
+```
+
+#Create the feature matrix table in the sql database
+
+Here we call the `add_FeatureMatrix_SQLite()` function from RDynLib, the function takes as input the sql data file, and the \`XCMSnExperiment\` object produced in the 'ftms_preprocessing.qmd' file, the function then add the feature matrix with intensity of each feature in each sample as a table to the sql database.
+
+```{r}
+add_FeatureMatrix_SQLite(
+  dbfile = dbfile,
+  xcms_exp = ftms
+)
+```
+
+Print the first 5 rows from the feature_matrix table:
+
+```{r}
+DBI::dbGetQuery(con, "
+SELECT * 
+FROM feature_matrix
+Limit 5
+")
+```

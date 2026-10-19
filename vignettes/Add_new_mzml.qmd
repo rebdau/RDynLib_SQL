@@ -1,0 +1,502 @@
+---
+title: "Adding a new mzMl file to the database"
+format:
+  html:
+    toc: true
+    self-contained: true
+author: "Ahlam Mentag, Rebecca Dauwe, Johannes Rainer"
+---
+
+## Shiny Documents
+
+This Quarto document presents the processing workflow for a new mzML (raw) file
+corresponding to a herbacetin experiment. It describes the steps required to add
+the experiment to the SQL database.
+
+
+##Load required libraries
+
+```{r}
+#| message: false
+
+#' Load required libraries
+library(MsExperiment)
+library(Spectra)
+library(xcms)
+library(readxl)
+library(pander)
+library(pheatmap)
+library(S4Vectors)
+library(devtools)
+library(DBI)
+library(RSQLite)
+library(here)
+library(dplyr)
+library(tidyr)
+library(IRanges)
+library(MSnbase)
+rm(list = c("conv.CSPP_SQL"))
+#` Uploading RDynLib: Load all functions of the RDynlib directory
+load_all()
+register(SerialParam())
+```
+
+Import the mzml file  
+```{r}
+mzml_file <- here("data","BeTio_herbacetin1327_F2T3.mzML")
+```
+
+#Centroiding 
+```{r}
+sp <- Spectra(mzml_file)
+a_c <- Spectra::pickPeaks(sp, halfWindowSize = 10L, k = 2L, threshold = 0.33,
+                          msLevel. = 1L)
+
+```
+
+Next we export the centroided file
+```{r}
+export(
+  a_c,
+  backend = MsBackendMzR(),
+  file = here("data","BeTio_herbacetin1327_F2T3_centroided.mzML"),
+  format = "mzML",
+  copy = FALSE
+)
+```
+#Convert the mzml file to an MSExperiment object
+
+Convert the mzML file to an MSExperiment object and import 
+the corresponding sample data
+```{r}
+mzml_file_c <- here("data","BeTio_herbacetin1327_F2T3_centroided.mzML")
+sample_data_ftms <- DataFrame(
+    sample_id = "S1",
+    sample_name = "Sample_1"
+)
+ftms <- readMsExperiment(
+    mzml_file_c,
+    sampleData = sample_data_ftms
+)
+ftms
+```
+
+colors assignment for the heatmap visualization
+```{r}
+sampleData(ftms)
+col_sample_ftms <- "blue"
+col_sample_ftms_id <- c(S1 = "blue")
+col_sample_ftms <- "blue"
+```
+
+## Base peak chromatogram
+```{r}
+bpc0 <- chromatogram(ftms, aggregationFun = "max")
+
+plot(bpc0, col = col_sample_ftms)
+grid()
+```
+
+## Filter by mass to get the feature range of herbacetin
+```{r}
+ftms <- filterSpectra(ftms, filterMzRange, mz = c(625.0, 625.4), msLevel. = 1L)
+
+table(msLevel(spectra(ftms)))
+```
+
+## Filter by rt to get the retention time range of herbacetin
+```{r}
+ftms <- filterSpectra(ftms, filterRt, c(690, 790))
+
+table(msLevel(spectra(ftms)))
+```
+
+## Remove empty spectra 
+```{r}
+ftms <- filterSpectra(ftms, filterEmptySpectra)
+
+table(msLevel(spectra(ftms)))
+```
+
+#Visualizing the base peak chromatogram again:
+```{r}
+bpc0 <- chromatogram(ftms, aggregationFun = "max")
+
+plot(bpc0, col = col_sample_ftms)
+grid()
+```
+
+#Peak detection
+```{r}
+ftms <- findChromPeaks(ftms, CentWaveParam(peakwidth = c(20, 80),
+                                            integrate = 2, snthresh = 2))
+```
+```{r}
+pks <- chromPeaks(ftms)
+quantile(unname(pks[, "rtmax"] - pks[, "rtmin"]))
+quantile(unname(pks[, "mzmax"] - pks[, "mzmin"]))
+```
+
+
+Change the backend to MsBackendMemory for further analysis
+```{r}
+ftms_sub <- ftms
+## Change the backend to in-memory backend
+ftms_sub@spectra <- setBackend(spectra(ftms_sub), MsBackendMemory())
+## Apply any processing steps
+ftms_sub@spectra <- applyProcessing(spectra(ftms_sub))
+
+```
+
+Visualizing spectra data
+```{r}
+sp <- spectra(ftms_sub)
+spectraData(sp)
+```
+
+
+```{r}
+cps <- chromPeakSpectra(ftms_sub, ppm = 10)
+cps$precursorMz
+```
+
+Visualizing some peaks:
+```{r}
+peaksData(sp)[[2]]
+```
+
+```{r}
+peaksData(sp)[[126]]
+```
+#Associate MS2 spectra to features
+
+We remove the MS1 spectra, and keep juste the MS2, MS3, and MS4 spectra:
+```{r}
+sps <- spectra(ftms_sub)
+
+frag_sps <-  chromPeakSpectra(ftms_sub, msLevel = 2, ppm = 10)
+
+#spectraData(frag_sps)$feature_id <- "FT001"
+
+spectraData(frag_sps)
+
+msLevel(frag_sps) |>
+  table()
+```
+Rename the chrom_peak_id column to feature_id for more compatibility with 
+the workflow
+```{r}
+frag_sps$feature_id <- frag_sps$chrom_peak_id
+frag_sps$feature_mzmed <- frag_sps$chrom_peak_mz
+frag_sps$feature_rtmed <- frag_sps$chrom_peak_rt
+```
+
+#Grouping MSn spectra into spectral trees
+
+We next extract the full MSn tree for the feature:
+```{r}
+ftms_msn_tree <- ftms_all_levels(ftms,frag_sps)
+```
+Asigning an id for each tree
+```{r}
+ftms_msn_tree_herba <- assign_msntree_id(ftms_msn_tree)
+spectraVariables(ftms_msn_tree_herba)
+```
+```{r}
+length(unique(ftms_msn_tree_herba$MSntreeID))
+ftms_msn_tree_herba$MSntreeID |>
+    table() |>
+    quantile()
+
+table(table(ftms_msn_tree_herba$MSntreeID))
+```
+#Select single best MSn spectral tree per feature
+
+Select the feature with the highest basePeakIntensity
+```{r}
+## Metadata
+spd <- spectraData(ftms_msn_tree_herba)
+
+## Find the MS2 spectrum with the highest base peak intensity
+ms2 <- spd$msLevel == 2
+
+best_tree <- spd$MSntreeID[
+  which.max(spd$basePeakIntensity[ms2])
+]
+
+## Keep the complete tree
+best_ft <- ftms_msn_tree_herba[
+  spd$MSntreeID == best_tree
+]
+spectraData(best_ft)
+```
+
+Enrich the tree
+```{r}
+frag_dt <- as.data.frame(spectraData(ftms_msn_tree_herba))
+ftms_final <- enrich_msntree(
+  ftms_best = best_ft,
+  sd_filtered = frag_dt
+)
+```
+
+```{r}
+spectraData(ftms_final)
+```
+filter out all peaks that have intensity below 1% (or 0.5%) of the base peak
+
+```{r}
+filter_basepeak_intensity <- function(x, threshold = 0.01) {
+  
+  if (nrow(x) == 0)
+    return(x)
+  
+  base_peak <- max(x[, 2], na.rm = TRUE)
+  
+  x[x[, 2] >= threshold * base_peak, , drop = FALSE]
+}
+```
+
+```{r}
+ftms_msn_tree_best <- addProcessing(
+  ftms_final,
+  function(x) {
+    filter_basepeak_intensity(x, threshold = 0.01)
+  }
+)
+```
+
+```{r}
+cbind(
+  before = lengths(peaksData(ftms_final)),
+  after  = lengths(peaksData(ftms_msn_tree_best))
+)
+```
+
+
+Now the spectra object contains just one tree. 
+
+Save the object with trees localy:
+```{r}
+save(ftms_msn_tree_best, file = here("data", "ftms_msn_tree_best.RData"))
+```
+
+#Pseudo MS2 spectra
+
+Create assembled tree (pseudo MS2) by calling the assembledSpectraTree() function
+from RDynlib package:
+
+```{r}
+
+ftms_assembled_herba <- msntree_to_pseudoMS2(ftms_msn_tree_best)
+
+ftms_assembled_herba
+unique(spectraData(ftms_assembled_herba)$msLevel)
+```
+
+```{r}
+spectraData(ftms_assembled_herba)
+```
+Add "not_assembled" label to the initial object with separated spectrums 
+```{r}
+spectraData(ftms_msn_tree_best)$spectrum.type <- "individual"
+```
+
+Concatenate both spectra objects with "pseudo_MS2" and "individual" into one
+spectra object.
+```{r}
+ftms_one_merged_tree <- setBackend(ftms_msn_tree_best,  MsBackendMemory())
+ftms_assembled_herba <- setBackend(ftms_assembled_herba,  MsBackendMemory())
+
+# Concatenate
+ftms_all_herba <- concatenateSpectra(ftms_one_merged_tree, ftms_assembled_herba)
+
+peaksData(ftms_all_herba)[[1,]]            
+
+head(spectraData(ftms_all_herba))
+```
+save locally the object that contains both spectrum types
+```{r}
+save(ftms_all_herba, file = here("data", "ftms_all_herba.RData"))
+```
+
+
+#Create sql database for this feature
+```{r}
+load("data/ftms_all_herba.RData")
+dbfile <- here("data", "herba_ftneg.sqlite")
+createSpectraSQLite(
+    sps = ftms_all_herba,
+    dbfile = dbfile,
+    date = '01/06/2015',
+    user = 'ament',
+    machine = 'LTQ_Orbitrap',
+    column = 'Waters_Sunfire_C18',
+    mstype = 'FT',
+    buffera = 'water_AA',
+    bufferb = 'ACN',
+    gradient_time = '65(95-95in2_to82at32_to76at60min__to0at65minat300_40gr) min',
+    source = 'ESI',
+    mode = 'neg',
+    species = 'Linum usitatissimum',
+    tissue = 'seed_integument',
+    ce = '35',
+    meta = 'Linea_varieties_S1_S9'
+)
+```
+
+
+# Add the herbacytine feature to Dynlib sql
+```{r}
+dbf0 <- here("data","DYL_FLAX_FTMSneg.sqlite")
+db <- dbConnect(SQLite(), dbf0)
+```
+
+retreive the maximum expid in the global database before adding the new feature.
+```{r}
+dbGetQuery(db, "
+  SELECT MAX(CAST(expid AS INTEGER)) AS max_expid
+  FROM experiment
+")
+```
+#Add the new experiment to the existing Dynlib
+```{r}
+# Create new database
+#dbf <- here("data", "DYL_herba2_FTMSneg.sqlite")
+#con_merged <- dbConnect(RSQLite::SQLite(), dbf)
+
+# merge
+merge_databases(
+  main_db   = here("data","DYL_FLAX_FTMSneg.sqlite"),
+  add_db    = here("data","herba_ftneg.sqlite"),
+  output_db = here("data","DYL_flax_herba_FTMSneg.sqlite")
+)
+```
+## connect to the merged database
+```{r}
+dbf <- here("data", "DYL_flax_herba_FTMSneg.sqlite")
+con_merged <- dbConnect(RSQLite::SQLite(), dbf)
+```
+
+Retreive the new maximum expid (it should be the old expid + 1)
+```{r}
+dbGetQuery(con_merged, "
+  SELECT MAX(CAST(expid AS INTEGER)) AS max_expid
+  FROM experiment
+")
+```
+
+```{r}
+add_db <- here("data","herba_ftneg.sqlite")
+con_herba <- dbConnect(RSQLite::SQLite(), add_db)
+dbGetQuery(con_herba, "Select * from experiment ")
+```
+
+```{r}
+dbExecute(
+    con_merged,
+    "
+    UPDATE experiment
+    SET
+        date = '01/06/2015',
+        user = 'ament',
+        machine = 'LTQ_Orbitrap',
+        column = 'Waters_Sunfire_C18',
+        mstype = 'FT',
+        buffera = 'water_AA',
+        bufferb = 'ACN',
+        gradient_time = '65(95-95in2_to82at32_to76at60min__to0at65minat300_40gr) min',
+        source = 'ESI',
+        mode = 'neg',
+        species = 'Linum usitatissimum',
+        tissue = 'seed_integument',
+        ce = '35',
+        meta = 'Linea_varieties_S1_S9'
+    WHERE expid = 266
+    "
+)
+```
+
+
+```{r}
+dbExecute(
+    con_merged,
+    "
+    UPDATE experiment
+    SET
+        date = '01/06/2015',
+        user = 'rebdau',
+        machine = 'LTQ_Orbitrap',
+        column = 'Waters_Sunfire_C18',
+        mstype = 'FT',
+        buffera = 'water_AA',
+        bufferb = 'ACN',
+        gradient_time = '65(95-95in2_to82at32_to76at60min__to0at65minat300_40gr) min',
+        source = 'ESI',
+        mode = 'neg',
+        species = 'Standards',
+        tissue = 'seed_integument',
+        ce = '35',
+        meta = 'Linea_varieties_S1_S9'
+    WHERE expid = 267
+    "
+)
+```
+
+
+```{r}
+dbGetQuery(con_merged, "Select * from experiment where expid = '266' or expid = '267' ")
+```
+
+Fill the herbacetin data by the EnterName() function:
+
+```{r}
+EnterName_SQL(dbf, 101307)
+```
+
+```{r}
+dbGetQuery(con_merged, "Select * from ms_compound where expid = '267' ")
+``` 
+
+Change the "spectrum_type" of the existing dynlib from "NA" to "individual":
+```{r}
+DBI::dbExecute(
+  con_merged,
+  "UPDATE msms_spectrum
+   SET spectrum_type = 'individual'
+   WHERE spectrum_type IS NULL"
+)
+```
+
+Verification:
+```{r}
+DBI::dbGetQuery(
+  con_merged,
+  "SELECT spectrum_type FROM msms_spectrum"
+)
+```
+Convert the sql database to spectra object:
+```{r}
+dbf <- here("data", "DYL_flax_herba_FTMSneg.sqlite")
+dy_sps <- sql_to_spectra(dbf)
+```
+
+Add accessions to the database with specefic initials for flax and herbacetin 
+experiments, the other experiments would have the first two letters of the user
+column from experiment table as initials.
+```{r}
+add_accessions(dbf, 
+                initials_overrides = c("266" = "RD",
+                                    "267" = "RD"))
+```
+
+
+```{r}
+MSnplot_SQL(dbf, 101307)
+```
+
+
+```{r}
+MSnplot_SQL(dbf, 101280)
+```
+
