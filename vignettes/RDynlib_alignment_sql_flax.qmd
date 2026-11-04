@@ -40,10 +40,9 @@ err <- 0.02
 t.ini <- 5
 
 #SQL databases paths
-
-FT_path <- here("data", "DYL_FLAX_FTMSneg.sqlite")
-QTOF_path <- here("data", "DYL_FLAX_QTOFneg.sqlite")
-assoc_path <- here("data", "combined_assoc.txt")
+FT_path <-  here("data","zenodo", "flax_ftneg.sqlite")
+QTOF_path <- here("data","zenodo", "flax_qtofneg.sqlite")
+assoc_path <- here("data", "flax_qtn_ftn_align.txt")
 FT_con <- DBI::dbConnect(RSQLite::SQLite(), FT_path)
 QTOF_con <- DBI::dbConnect(RSQLite::SQLite(), QTOF_path)
   
@@ -211,6 +210,6 @@ NodenameMass_SQL(
 #Transfer names between the compounds that have been aligned in both sql databases
 ```{r}
 dir <- here("data")
-SubDBNameTransfer_SQL(sqlite_dir = dir,  assoc_path = here("data","assoc_flax_63.txt") )
+SubDBNameTransfer_SQL(sqlite_dir = dir,  assoc_path = here("data","flax_qtn_ftn_align.txt") )
 ```
 

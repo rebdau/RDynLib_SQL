@@ -1,0 +1,248 @@
+---
+title: "Integrated Workflow for Molecular Network Characterization, Spectral
+        Annotation, and Database Curation"
+format:
+  html:
+    toc: true
+    self-contained: true
+author: "Ahlam Mentag, Rebecca Dauwe, Johannes Rainer"
+---
+
+## Shiny Documents
+
+This Quarto document presents a workflow for the characterization and 
+visualization of molecular networks. It includes the analysis of known
+compounds detected in FT-MS data and their corresponding features in QTOF 
+datasets, as well as the visualization of ion trap–based and QTOF-based neutral
+loss analyses. The document further summarizes the results of CID spectral 
+matching, describes the annotation and incorporation of characterized molecules 
+into the database.
+
+## Load required libraries
+
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+#' Load required libraries
+library(devtools)
+library(DBI)
+library(RSQLite)
+library(here)
+library(CompoundDb)
+library(MsBackendMgf)
+#rm(list = c("convert_compid_assoc"))
+#` Uploading RDynLib: Load all functions of the RDynlib directory
+load_all()
+```
+
+
+#FTMS flax negative
+We start by loading the flax sql qtof and ftms data, the cspp file that contains 
+the biochemical transformations, and the charge_file where we mention the charge 
+of the known compound in our flax database:
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+# maize FTneg
+maize_ftneg <- here("data","zenodo", "maize_ftneg.sqlite")
+con_mftneg <- dbConnect(RSQLite::SQLite(), maize_ftneg)
+
+# flax FTneg
+flax_ftneg <- here("data","zenodo", "flax_ftneg.sqlite")
+con_fft <- dbConnect(RSQLite::SQLite(), flax_ftneg)
+
+# flax QTOFneg
+flax_qtofneg <- here("data","zenodo", "flax_qtofneg.sqlite")
+con_fqt <- dbConnect(RSQLite::SQLite(), flax_qtofneg)
+
+cspp_ft <- here("data","cspp_flax.txt")
+charge_file <- here("data", "ftms_all_compounds_RD.xlsx")
+```
+
+Extract the available experiments in the flax ftms database:
+```{r}
+get_expid(flax_ftneg)
+```
+
+
+Then we update the cspp table:
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+cspp.tot_SQL(flax_ftneg, 266, mzerr = 0.01,
+                         cspp = cspp_ft, peakwidth = 0.1, IntThres  = 0, mz_tol = 0.5,
+                         dot_thresh = 0, spectrum_type = "pseudo_MS2",  
+                         min_common = 0, charge_file = charge_file)
+```
+
+Update the gnps table:
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+conv.GNPS_SQL(sql_path= flax_ftneg, expid = 266, peakwidth = 0.2, mzerr = 0.015,
+              min = 5, adduct = 60.0211, thr1 = 2, thr2 = 0.1, thr3 = 0.3,
+              spectrum_type = "individual", IntThres = 0)
+```
+
+Next we visualize the CSPP and GNPS network of 101238 compound from ftms neg:
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+#| #| dev: svg
+#| fig-width: 20
+#| fig-height: 15
+Overall.net_SQL(sql_path = flax_ftneg, exp.id = 266, dbkey = 101280, min = 0,
+                nr_of_seq = 3, thr1 = 0.1, thr2 = 0.2, thr3 = 0.3)
+```
+
+Based on the spectral similarity results performed in the **rdynlib_overview_workflow.qmd** 
+workflow, the compound 101280 from ftms flax data had a high similarity with 
+the 74905 refers to quercetin dihexoside compound from maize data.
+Here we visualize the MSn spectra of both compounds:
+```{r}
+MSnplot_SQL(flax_ftneg, 101280, thr_int = 100)
+```
+
+```{r}
+MSnplot_SQL(maize_ftneg, 74905, thr_int = 100)
+```
+The spectral plots shows a high similarity in MS2 level between 74905 and 101280,
+
+Next, we print the plot the network of 101141 compound from the flax data, 
+this compound has been detected in the cspp network of the 101280 compound:
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+#| #| dev: svg
+#| fig-width: 20
+#| fig-height: 15
+Overall.net_SQL(sql_path = flax_ftneg, exp.id = 266, dbkey = 101141, min = 0,
+                nr_of_seq = 3, thr1 = 0.1, thr2 = 0.2, thr3 = 0.3)
+```
+
+Now we show the ion trap based analysis of 101141 compound:
+
+```{r}
+#| fig-width: 14
+#| fig-height: 4
+MSnplot_SQL(flax_ftneg, 101141, thr_int = 100)
+```
+
+
+
+#Qtof flax analysis
+
+Import the qtof flax database and required files:
+```{r}
+# flax QTOFneg
+flax_qtofneg <- here("data","zenodo", "flax_qtofneg.sqlite")
+con_fqt <- dbConnect(RSQLite::SQLite(), flax_qtofneg)
+
+neutral_loss_candid <- here("data", "neutral_loss_candid.txt")
+neutloss <- read.table(
+  neutral_loss_candid,
+  header = TRUE,
+  sep = "\t",
+  stringsAsFactors = FALSE
+)
+
+product_ion_candid <- here("data", "product_ion_candid_2.txt")
+prdion <- read.table(
+  product_ion_candid,
+  header = TRUE,
+  sep = "\t",
+  stringsAsFactors = FALSE
+)
+
+```
+
+
+The aligned compound of the 101141 compound from flax in qtof data corresponds
+to 45889 compound from ftms data:
+```{r}
+alignment_file <- here("data", "flax_qtn_ftn_align.txt")
+
+getAlignedCompids <- getAlignedCompids_SQL(
+compound_id = 101141,
+  database_name = "flax_ftneg.sqlite",
+  alignment_file = alignment_file
+)
+getAlignedCompids
+```
+The 45890 is the qtof compound_id that was aligned with 100988 ftms compound_id. 
+
+The msms_spectrum table linked to that compound_id to select the spectrum_id:
+```{r}
+list_spectrum <- get_spectrum_id(flax_qtofneg, 45889)
+list_spectrum
+```
+
+We chose the 46001 spectrum_id to show the qtof based neutral loss analysis:
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+#| #| dev: svg
+#| fig-width: 14
+#| fig-height: 8
+res <- MSMSspecplot_SQL(flax_qtofneg, 45889, 
+                 prdion = prdion, neutloss = neutloss, err = NULL, 
+                 minum = NULL, nr_col = NULL,   nr_col2 = NULL)
+```
+print the neutral losses:
+```{r}
+output_text <- capture.output(
+  res <- MSMSspecplot_SQL(
+    flax_qtofneg, 45889,
+    prdion = prdion,
+    neutloss = neutloss,
+    err = NULL,
+    minum = NULL,
+    nr_col = NULL,
+    nr_col2 = NULL
+  ),
+  type = "output"
+)
+
+cat(output_text, sep = "\n")
+```
+
+Extract the experiment id:
+```{r}
+get_expid(flax_qtofneg)
+```
+Next, we show the molecular networks of the 45889 compound id:
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+#| #| dev: svg
+#| fig-width: 20
+#| fig-height: 15
+Overall.net_SQL(sql_path = flax_qtofneg, exp.id = 52, dbkey = 45889, min = 0,
+                nr_of_seq = 3, thr1 = 0.1, thr2 = 0.2, thr3 = 0.3)
+```
+
+
+Finaly, we enter the characterization of the compounds found to the database:
+```{r}
+EnterName_SQL(ft_path, CoMPID = 101143)
+```
+
+
+```{r}
+#EnterName_SQL(ft_path, CoMPID = 100988)
+```
+
+
+
+
+
+
+
