@@ -1255,7 +1255,8 @@ stored in the assoc.txt file:
 assoc_path <- here("data", "flax_qtn_ftn_align.txt")
 ```
 
-
+Here we extract the different statistics about the number of matches and aligned
+compounds:
 ```{r}
 # High-scoring compound IDs
 ft_high <- as.character(flax_ftneg_compounds_all_matches)
@@ -1330,15 +1331,6 @@ assoc |>
   filter(ft_id %in% ft_only | qt_id %in% qt_only)
 ```
 
-
-TODO: 
-
--Move alignment to another vignette DynLib_experiment_alignment.qmd. There do alignment between flaxseed FTneg pseudo_MS2 and flaxseed QTOFneg all_energies, and report the number of reference matches that are retained to build the regression model.
--Refer here  to DynLib_experiment_alignment.qmd for the alignment between flaxseed FTneg and flaxseed QTOFneg experiments, mention creation of assoc file.
--Analyse complementarity: find for which high similarity scoring compound_ids from FTneg, the matching qtofneg compound_id belongs also to the high similarity scoring compound_ids of QTOFneg. Tell the number.
--for how many compounds in flaxseed QTOFneg in list of high scoring spectral match, there is an associated compound in flaxseed FTneg? and for those where there is an associated compound in FTneg, how many had also Ftneg spectra that yielded high similarity score?
--opposite way: for how many compounds in flaxseed FTneg in list of high scoring spectral match, there is an associated compound in flaxseed QTOFneg? and for those where there is an associated compound in QTOFneg, how many had also Ftneg spectra that yielded high similarity score?
--Write code and explanatory text, and complete/adapt the text below:
 
 Alignment of the FTneg and QTOFneg experiments revealed the complementarity of the two acquisition methods. Among the 30 aligned compound pairs, three QTOFneg compounds yielded high-scoring spectral matches exclusively from QTOF MS/MS spectra, whereas three FTneg compounds yielded high-scoring matches exclusively from ion-trap MS2 or MS3 spectra. Notably, no aligned compound pair exhibited high-scoring spectral matches in both datasets. These results highlight the complementary annotation capabilities of FT-MSⁿ and QTOF-MS/MS, suggesting that combining both acquisition methods can improve spectral annotation coverage.
 
@@ -1437,7 +1429,9 @@ the spectra of 88410:
 MSnplot_SQL(ftflax_maize_hdg_sql, 88410, thr_int = 100)
 ```
 
-The spectra plots confirms a high similarity between the two MS3 spectra 
+The spectral comparison reveals a high degree of similarity between the query compound and the reference compound 88041, annotated as herbacetin '3,8-di-O-β-D-glucopyranoside'. The MS3 spectra exhibit nearly identical precursor m/z values (463.04 and 463.08), with 23 common fragment ions and a dot product similarity score of 1.00, indicating a strong agreement between their fragmentation patterns.
+
+Visual inspection of the spectra further supports this result, particularly through the presence of dominant fragment ions around m/z 300–301 and several additional shared fragments. Among the identified matches, compound 88041 shows the highest number of common fragment ions, providing stronger evidence of spectral similarity than the other candidate matches.
 
 
 # Compound annotation in RDynLib
@@ -1461,70 +1455,9 @@ Adding names in ftms
 adding_Names_SQL(con_fft,  spectrum_type = "individual", msLevel = 2, compound_id = NULL,
     overwrite = FALSE )
 ```
+#Different alignment possibilities
 
-#Qtof flax analysis
-
-Import the database and required files:
-
-```{r}
-qt_path <- here("data", "DYL_FLAX_QTOFneg.sqlite")
-con_qt <- dbConnect(RSQLite::SQLite(), qt_path )
-neutral_loss_candid <- here("data", "neutral_loss_candid.txt")
-neutloss <- read.table(
-  neutral_loss_candid,
-  header = TRUE,
-  sep = "\t",
-  stringsAsFactors = FALSE
-)
-
-product_ion_candid <- here("data", "product_ion_candid_2.txt")
-prdion <- read.table(
-  product_ion_candid,
-  header = TRUE,
-  sep = "\t",
-  stringsAsFactors = FALSE
-)
-
-```
-
-The aligned compound in qtof data that corresponds to 100988 compound from ftms data:
-
-```{r}
-alignment_file <- here("data", "assoc_flax_63.txt")
-
-getAlignedCompids <- getAlignedCompids_SQL(
-compound_id = 100988,
-  database_name = "DYL_FLAX_FTMSneg.sqlite",
-  alignment_file = alignment_file
-)
-getAlignedCompids
-```
-
-The 45890 is the qtof compound_id that was aligned with 100988 ftms compound_id.
-
-The msms_spectrum table linked to that compound_id to select the spectrum_id:
-
-```{r}
-list_spectrum <- get_spectrum_id(qt_path,45890)
-list_spectrum
-```
-
-We chose the 46001 spectrum_id to show the qtof based neutral loss analysis:
-
-```{r}
-#| message: false
-#| results: "hide"
-#| warning: false
-#| #| dev: svg
-#| fig-width: 14
-#| fig-height: 8
-MSMSspecplot_SQL(qt_path, 46001, 
-                 prdion = prdion, neutloss = neutloss, err = NULL, 
-                 minum = NULL, nr_col = NULL,   nr_col2 = NULL)
-```
-
-
-#Alignment RDinlib offres tools for aliging two expriment acquired from th same/diffrent platforms with the same/different ionization modes, as well as two different experiments stored in the same database.
+RDynlib offres tools for aliging two expriment acquired from the same/diffrent platforms with the same/different ionization modes, as well as two different experiments stored in the same database.
 The aligned **compound_ids** are then stored in a given .txt file.
 
 We start by aligning the flax_ftneg flax ftms negative data against the flax qtof negative data:
@@ -1621,9 +1554,27 @@ Now we enter the characterization of the compounds found to the database., Using
 Together, these functions provide a framework for progressive annotation of DynLib databases, ranging from automated transfer of tentative annotations to manual curation of fully characterized compounds:
 
 ```{r}
-EnterName_SQL(maize_qtofpos, CoMPID = 1144)
+EnterName_SQL(maize_qtofpos, CoMPID = 101214)
 ```
 
 ```{r}
 #EnterName_SQL(ft_path, CoMPID = 100988)
 ```
+
+#Annotation history
+
+RDynLib provides the possibility to store the annotation history of the new annotated compounds via the function below, the history of the annotions should be given throw a csv file in order to add it to the flax database:
+
+```{r}
+csv_annot <- here("data", "annotation_history_final.csv")
+add_annotation_event(sql_path = flax_ftneg, csv_file = csv_annot)
+```
+Now, the annotation history is well inserted to the sql database, we can check:
+```{r}
+DBI::dbGetQuery(
+   con_fft,
+ 'SELECT compound_id, date, type, description, "references"
+ FROM annotation_history'
+ )
+```
+
