@@ -440,7 +440,7 @@ existing_matches <- DBI::dbGetQuery(
   )
 )
 
-existing_matches[,c("spectrum_id","match","match_name","match_compound_id","match_precursor_mz","match_score","match_common","match_mslevel","match_spectrum_type")]
+existing_matches[,c("spectrum_id","match_name","match_compound_id","match_precursor_mz","match_score","match_common","match_mslevel","match_spectrum_type")]
 ```
 
 And we can store the best 22 new matches in the flax ftneg SQL database:
@@ -551,7 +551,7 @@ existing_matches <- DBI::dbGetQuery(
   )
 )
 
-existing_matches[,c("spectrum_id","match","match_name","match_compound_id","match_precursor_mz","match_score","match_common","match_mslevel","match_spectrum_type")]
+existing_matches[,c("spectrum_id", "match_name","match_compound_id","match_precursor_mz","match_score","match_common","match_mslevel","match_spectrum_type")]
 
 ```
 
@@ -568,7 +568,7 @@ add_spectral_matches(con_fft, ftms_matches_sel)
 DBI::dbGetQuery(con_fft,
   paste(
     "Select spectrum_id, ms_level, compound_id, precursor_mz,
-                     spectrum_type, match, match_mslevel, match_common,
+                     spectrum_type, match_mslevel, match_common,
                      match_precursor_mz, match_compound_id, match_spectrum_type
            from msms_spectrum where spectrum_id IN (", paste(query_ids, collapse = ", "),")"
   )
@@ -703,7 +703,7 @@ add_spectral_matches(con_fqt, qtof_matches2_T)
 dbGetQuery(con_fqt,
   paste(
     "Select spectrum_id, ms_level, compound_id, precursor_mz,
-                     spectrum_type, match, match_mslevel, match_common,
+                     spectrum_type, match_mslevel, match_common,
                      match_precursor_mz, match_compound_id, match_spectrum_type
            from msms_spectrum where spectrum_id IN (", paste(query_ids, collapse = ", "),")"
   )
