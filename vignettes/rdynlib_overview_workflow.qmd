@@ -215,9 +215,6 @@ available_spectrum_types(con_fft)
 
 The available options and matching and scoring procedures, as well as definitions of the different spectrum types are provided in the documentation of `similarity_RDynLib_match()`:
 
-TODO: add definitions of spectrum types (as in manuscript) AND add explicitly which similarity scoring function is used for unit.resolution and high.resolution, in documentation.
-Ahlam: Done
-
 ```{r}
 ?similarity_RDynLib_match()
 ```
@@ -319,7 +316,7 @@ flax_ftneg_compounds_DLmatch_MS2MS2 <- ftms_matches2_T$query_compound_id[o][1:6]
 flax_ftneg_compounds_DLmatch_MS2MS2
 ```
 
-The `add_spectral_matches()` function allows to **store spectral matches**, or a selected subset, can be stored in dedicated columns of the `msms_spectrum` table of the DynLib SQL database.
+The `add_spectral_matches()` function allows to **store spectral matches**, or a selected subset, in dedicated columns of the `msms_spectrum` table of the DynLib SQL database.
 
 However, storing new matching results will overwrite any previously stored results for the corresponding query spectra.
 We are curious to know whether matching results already exist for the six spectra identified above.
@@ -355,7 +352,7 @@ add_spectral_matches(con_fft, ftms_matches_sel)
 DBI::dbGetQuery(con_fft,
   paste(
     "Select spectrum_id, ms_level, compound_id, precursor_mz,
-                     spectrum_type, match, match_mslevel, match_common,
+                     spectrum_type, match_name, match_mslevel, match_common,
                      match_precursor_mz, match_compound_id, match_spectrum_type
            from msms_spectrum where spectrum_id IN (", paste(query_ids, collapse = ", "),")"
   )
@@ -364,7 +361,6 @@ DBI::dbGetQuery(con_fft,
 
 ```
 
-The add_spectral_matches()\` function generates a summary of the spectral match, consisting of the name of the matched compound, prefixed with the number of matched peaks and the similarity score, and stores this value in the `matches` variable of the `msms_table`.
 
 ### MS3(query) vs. MS2(target)
 
@@ -1437,7 +1433,7 @@ Visual inspection of the spectra further supports this result, particularly thro
 # Compound annotation in RDynLib
 
 Based on the spectral matches, compound names can be automatically added to the `ms_compound` table using the `**adding_Names_SQL()**` function.
-The automatically generated name combines the name of the matched compound with the spectral similarity score and is prefixed with `!!` to distinguish it from manually assigned structural annotations.
+The automatically generated name combines the name of the matched compound with the spectral similarity score and is prefixed with `!` to distinguish it from manually assigned structural annotations.
 No confidence level is assigned at this stage.
 
 Each automatic annotation also creates an **annotation event** in the `annotation_history` table.
