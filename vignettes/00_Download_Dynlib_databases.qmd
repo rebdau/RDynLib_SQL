@@ -1,0 +1,119 @@
+---
+title: "Downloading DynLib databases from Zenodo"
+format:
+  html:
+    toc: true
+    self-contained: true
+author: "Ahlam Mentag, Rebecca Dauwe"
+---
+
+# Overview
+This Quarto document provides a workflow for downloading DynLib SQL
+databases from Zenodo using the `RDynLib` package, and storing them locally for subsequent use.
+
+This workflow is a preparatory step for the subsequent DynLib workflows
+and only needs to be executed when downloading a database for the first
+time or retrieving a new database release.
+
+Once downloaded, the databases can be accessed directly from their local
+file paths.
+
+The DynLib databases are publicly available on Zenodo. Each Zenodo
+release may contain multiple SQLite database files, corresponding to
+different analytical platforms (e.g. FTMS and QTOF) and ionization modes
+(positive and negative).
+
+## Maize
+
+- Release date: TODO
+- Zenodo DOI: TODO
+
+| Analytical platform | Ionization mode | SQLite filename |
+|---------------------|-----------------|-----------------|
+| FTMS | Negative | `maize_ftneg.sqlite` |
+| FTMS | Positive | `maize_ftpos.sqlite` |
+| QTOF | Negative | `maize_qtofneg.sqlite` |
+| QTOF | Positive | `maize_qtofpos.sqlite` |
+
+## Flaxseed
+
+- Release date: TODO
+- Zenodo DOI: TODO
+
+| Analytical platform | Ionization mode | SQLite filename |
+|---------------------|-----------------|-----------------|
+| FTMS | Negative | TODO |
+| FTMS | Negative | TODO |
+| QTOF | Negative | TODO |
+
+
+
+# Load required R packages
+
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+#| 
+library(devtools)
+library(DBI)
+library(RSQLite)
+library(here)
+library(RDynLib)
+# TODO: Replace with library(RDynLib) once the package is finalized.
+load_all()
+```
+
+# Download a DynLib database from Zenodo
+
+The `get_dynlib_zenodo()` function from the `RDynLib` package allows
+DynLib databases to be downloaded directly from Zenodo.
+
+The following arguments must be specified:
+
+- `doi`: the Zenodo DOI of the database release.
+- `file`: the name of the SQLite database file to download.
+- `destdir`: the local directory in which the database will be stored.
+
+Select the desired database from the list provided in the overview
+and adapt the DOI and filename in the example below.
+
+```{r}
+# Specify the database to download
+doi <- "TODO"
+filename <- "maize_ftneg.sqlite"
+
+# Specify the local destination directory
+destdir <- here("data")
+
+# Download the database
+get_dynlib_zenodo(
+  doi = doi,
+  file = filename,
+  destdir = destdir
+)
+```
+
+# Verify the downloaded database
+
+```{r}
+# Local path of the downloaded database
+db_path <- file.path(destdir, filename)
+
+# Check whether the database file exists
+file.exists(db_path)
+
+# Display the local database path
+db_path
+```
+
+
+# Next steps
+
+The downloaded databases are now available locally and can be used
+in subsequent DynLib workflows. These workflows demonstrate how to
+access, query and manipulate the databases using SQL, `CompoundDb`,
+`Spectra` and `RDynLib` functionalities.
+
+
+
