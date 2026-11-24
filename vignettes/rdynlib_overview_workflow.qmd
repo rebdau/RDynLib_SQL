@@ -225,11 +225,7 @@ Total number of MS2 spectra in the new flaxseed FTneg experiment:
 
 ```{r}
 
-n_individual_ms2 <- export_settings |>
-  dplyr::filter(ms_level == 2, spectrum_type == "individual") |>
-  dplyr::summarise(n_spectra = sum(n_spectra))
-
-n_individual_ms2
+DBI::dbGetQuery(con_fft, "Select count(*) from msms_spectrum where ms_level = 2 and spectrum_type = 'individual'")
 
 ```
 
@@ -238,24 +234,21 @@ In the query database, the `similarity_RDynLib_match()` function only takes into
 Total number of MS2 spectra number in the target DynLib, where the name is not null:
 
 ```{r}
-compounds <- DBI::dbReadTable(con_merged, "ms_compound")
-spectra <- DBI::dbReadTable(con_merged, "msms_spectrum")
-
-# Keep the name filters from the original query
-compound_names <- trimws(compounds$name)
-named_ids <- with(compounds, compound_id[
-    !is.na(compound_names) &
-    !toupper(compound_names) %in% c("", "NULL") &
-    !startsWith(compound_names, "!")
-])
-
-# Count individual spectra at each MS level
-ms_levels <- with(spectra, ms_level[
-    compound_id %in% named_ids & spectrum_type %in% "individual"
-])
-
-table(ms_levels)
-sum(ms_levels == 2L, na.rm = TRUE)  # MS2 count
+DBI::dbGetQuery(
+    con_merged,
+    "
+    SELECT COUNT(*) AS n_spectra
+    FROM msms_spectrum AS s
+    INNER JOIN ms_compound AS c
+        ON s.compound_id = c.compound_id
+    WHERE s.ms_level = 2
+      AND s.spectrum_type = 'individual'
+      AND c.name IS NOT NULL
+      AND TRIM(c.name) != ''
+      AND UPPER(TRIM(c.name)) != 'NULL'
+      AND TRIM(c.name) NOT LIKE '!%'
+    "
+)
 ```
 
 ### MS2 vs. MS2
@@ -328,22 +321,22 @@ The `add_spectral_matches()` function allows to **store spectral matches**, or a
 However, storing new matching results will overwrite any previously stored results for the corresponding query spectra.
 We are curious to know whether matching results already exist for the six spectra identified above.
 
-Using their `query_spectrum_id` values, through the existing connection `con_ftt`, we retrieve the corresponding records from the `msms_spectrum` table of the `flax_ftneg` database.
+Using their `query_spectrum_id` values, and a simple SQL query through the existing connection `con_ftt`, we retrieve the corresponding records from the `msms_spectrum` table of the `flax_ftneg` database.
 We then display only the columns containing the `spectrum identifiers`spectrum_id\` and spectral matching information.
 
 ```{r}
-query_ids <- head(ftms_matches22_T$query_spectrum_id[o], 22)
+# Retrieve the query spectrum IDs of the six best matches
+query_ids <- ftms_matches2_T$query_spectrum_id[o][1:6]
 
-spectra <- DBI::dbReadTable(con_fft, "msms_spectrum")
-existing_matches <- spectra[spectra$spectrum_id %in% query_ids, ]
-
-columns <- c(
-    "spectrum_id", "match_name", "match_compound_id",
-    "match_precursor_mz", "match_score", "match_common",
-    "match_mslevel", "match_spectrum_type"
+# Retrieve their existing records from the DynLib database
+existing_matches <- DBI::dbGetQuery(
+  con_fft,
+  paste(
+    "SELECT * FROM msms_spectrum WHERE spectrum_id IN (", paste(query_ids, collapse = ", "),")"
+  )
 )
 
-existing_matches[, columns]
+existing_matches[,c("spectrum_id","match_name","match_compound_id","match_precursor_mz","match_score","match_common","match_mslevel","match_spectrum_type")]
 ```
 
 If we want to store the best six matches in the flax ftneg SQL database (and overwrite existing matches if present):
@@ -355,16 +348,16 @@ ftms_matches_sel <- ftms_matches2_T[o,][1:6,]
 # Add the selection of matches to the msms_spectrum table of the sql database
 add_spectral_matches(con_fft, ftms_matches_sel)
 
-# Read the updated table and display the relevant rows and columns.
-spectra <- DBI::dbReadTable(con_fft, "msms_spectrum")
-
-columns <- c(
-    "spectrum_id", "ms_level", "compound_id", "precursor_mz",
-    "spectrum_type", "match_name", "match_mslevel", "match_common",
-    "match_precursor_mz", "match_compound_id", "match_spectrum_type"
+# Verify the addition, printing only relevant columns
+DBI::dbGetQuery(con_fft,
+  paste(
+    "Select spectrum_id, ms_level, compound_id, precursor_mz,
+                     spectrum_type, match_name, match_mslevel, match_common,
+                     match_precursor_mz, match_compound_id, match_spectrum_type
+           from msms_spectrum where spectrum_id IN (", paste(query_ids, collapse = ", "),")"
+  )
 )
 
-spectra[spectra$spectrum_id %in% query_ids, columns]
 
 ```
 
@@ -424,17 +417,7 @@ write.csv(matches_table_assembled, here("data","matches_ftms_flaxseed_MS3_indivi
 
 ```
 
-```{r}
-strong_matches <- subset(
-    ftms_matches32_T,
-    score >= 0.8 & matched_peaks_count >= 5
-)
-
-nrow(strong_matches)                             
-length(unique(strong_matches$query_spectrum_id))  
-```
-
-Twenty-two query MS3 spectra yielded similarity score of \>0.8, with five or more matched spectral peaks.
+Twenty-two query MS3 spectra yielded similarity score of \>0.9, with five or more matched spectral peaks.
 We store the `compound_id`s of unique compounds for which a strong match was found, for later use.
 
 ```{r}
@@ -443,144 +426,42 @@ flax_ftneg_compounds_DLmatch_MS3MS2 <- unique(ftms_matches32_T$query_compound_id
 
 The spectral matches, or a selected subset, can be stored in dedicated columns of the `msms_spectrum` table of the DynLib SQL database.
 
-Using their `query_spectrum_id` values, we check whether matching results for these 22 MS3 spectra are already stored in the `msms_spectrum` table of the `flax_ftneg` database.
+Using their `query_spectrum_id` values, and a simple SQL query, we check whether matching results for these 22 MS3 spectra are already stored in the `msms_spectrum` table of the `flax_ftneg` database.
 
 ```{r}
-query_ids <- head(ftms_matches32_T$query_spectrum_id[o], 22)
+# Retrieve the query spectrum IDs of the 22 best matches
+query_ids <- ftms_matches32_T$query_spectrum_id[o][1:22]
 
-spectra <- DBI::dbReadTable(con_fft, "msms_spectrum")
-existing_matches <- spectra[spectra$spectrum_id %in% query_ids, ]
-
-columns <- c(
-    "spectrum_id", "match_name", "match_compound_id",
-    "match_precursor_mz", "match_score", "match_common",
-    "match_mslevel", "match_spectrum_type"
+# Retrieve their existing records from the DynLib database
+existing_matches <- DBI::dbGetQuery(
+  con_fft,
+  paste(
+    "SELECT * FROM msms_spectrum WHERE spectrum_id IN (", paste(query_ids, collapse = ", "),")"
+  )
 )
 
-existing_matches[, columns]
+existing_matches[,c("spectrum_id","match_name","match_compound_id","match_precursor_mz","match_score","match_common","match_mslevel","match_spectrum_type")]
 ```
 
-And we can store the best 21 new matches in the flax ftneg SQL database:
+And we can store the best 22 new matches in the flax ftneg SQL database:
 
 ```{r}
-# Select up to 22 matches using the existing order.
-ftms_matches_sel <- head(ftms_matches32_T[o, ], 22)
-query_ids <- ftms_matches_sel$query_spectrum_id
+# Make a selection of the spectral similarity output table
+ftms_matches_sel <- ftms_matches32_T[o,][1:22,]
 
+# Add the selection of matches to the msms_spectrum table of the sql database
 add_spectral_matches(con_fft, ftms_matches_sel)
 
-# Read the updated records and display the relevant columns.
-spectra <- DBI::dbReadTable(con_fft, "msms_spectrum")
-
-columns <- c(
-    "spectrum_id", "ms_level", "compound_id", "precursor_mz",
-    "spectrum_type", "match_name", "match_mslevel", "match_common",
-    "match_precursor_mz", "match_compound_id", "match_spectrum_type"
+# Verify the addition, printing only relevant columns
+DBI::dbGetQuery(con_fft,
+  paste(
+    "Select spectrum_id, ms_level, compound_id, precursor_mz,
+                     spectrum_type, match_name, match_mslevel, match_common,
+                     match_precursor_mz, match_compound_id, match_spectrum_type
+           from msms_spectrum where spectrum_id IN (", paste(query_ids, collapse = ", "),")"
+  )
 )
 
-spectra[spectra$spectrum_id %in% query_ids, columns]
-```
-
-### MS4(query) vs. MS2(target)
-
-```{r}
-ftms_matches42_T <- similarity_RDynLib_match(
-  sp_ftflax,
-  sp_maize_hdg,
-  polarity_query = 0,
-  polarity_target = 0,
-  msLevel_query = 4,
-  msLevel_target = 2,
-  spectrum_type_query = "individual",
-  spectrum_type_target = "individual",
-  requirePrecursor = TRUE,
-  tolerance = 0.5,
-  ppm = 5,
-  threshold = 0.7,
-  fragments_resolution = "unit.resolution"
-)
-```
-We have a quick look at the MS4-MS2 matches and order them according to decreasing similarity score and number of matched peaks.
-
-```{r}
-names(ftms_matches42_T)
-nrow(ftms_matches42_T)
-o <- order(ftms_matches42_T$matched_peaks_count, decreasing =T)
-print(ftms_matches42_T[o,c("query_compound_id", "query_spectrum_id", "msLevel","precursorMz","target_name","target_msLevel","target_precursorMz","target_compound_id","score", "matched_peaks_count")])
- 
-```
-We can save the spectral matching results as .csv file for later consultation.
-
-```{r}
-# Select the variable of interest to save
-(matches_table <- (ftms_matches42_T[o,c("query_compound_id", "query_compound_accession","query_spectrum_id", "msLevel","precursorMz","target_name","target_msLevel","target_precursorMz","target_compound_id","target_compound_accession","target_spectrum_id","score", "matched_peaks_count")]))
-
-# Extend the table with metadata about the Query (date of query, query database, target databases)
-
-# Retrieve the experiment accession
-experiment_accession <- DBI::dbGetQuery(con_fft, "SELECT experiment_accession FROM experiment")
-
-# Assemble the table
-matches_table_assembled <- data.frame(experiment = experiment_accession, queryDate = "2009/09/30", queryDB = "flax_FTneg2023", targetDB ="maize_hdg_FTneg", matches_table)
-
-# Export to a .csv file
-write.csv(matches_table_assembled, here("data","matches_ftms_flaxseed_MS4_individual_vs_maizehdg_MS2_individual.csv"), row.names = FALSE)
-
-```
-
-```{r}
-strong_matches <- subset(
-    ftms_matches42_T,
-    score >= 0.7 & matched_peaks_count >= 2
-)
-
-nrow(strong_matches)                             
-length(unique(strong_matches$query_spectrum_id))  
-```
-Twenty-four query MS4 spectra yielded similarity score of \>0.9, with two or more matched spectral peaks.
-We store the `compound_id`s of unique compounds for which a strong match was found, for later use.
-
-```{r}
-flax_ftneg_compounds_DLmatch_MS4MS2 <- unique(ftms_matches42_T$query_compound_id[o][1:24])
-```
-
-The spectral matches, or a selected subset, can be stored in dedicated columns of the `msms_spectrum` table of the DynLib SQL database.
-
-Using their `query_spectrum_id` values, we check whether matching results for these 24 MS4 spectra are already stored in the `msms_spectrum` table of the `flax_ftneg` database.
-
-```{r}
-query_ids <- head(ftms_matches42_T$query_spectrum_id[o], 24)
-
-spectra <- DBI::dbReadTable(con_fft, "msms_spectrum")
-existing_matches <- spectra[spectra$spectrum_id %in% query_ids, ]
-
-columns <- c(
-    "spectrum_id", "match_name", "match_compound_id",
-    "match_precursor_mz", "match_score", "match_common",
-    "match_mslevel", "match_spectrum_type"
-)
-
-existing_matches[, columns]
-```
-And we can store the best 24 new matches in the flax ftneg SQL database:
-
-```{r}
-# Select up to 22 matches using the existing order.
-ftms_matches_sel <- head(ftms_matches42_T[o, ], 22)
-query_ids <- ftms_matches_sel$query_spectrum_id
-
-add_spectral_matches(con_fft, ftms_matches_sel)
-
-# Read the updated records and display the relevant columns.
-spectra <- DBI::dbReadTable(con_fft, "msms_spectrum")
-
-columns <- c(
-    "spectrum_id", "ms_level", "compound_id", "precursor_mz",
-    "spectrum_type", "match_name", "match_mslevel", "match_common",
-    "match_precursor_mz", "match_compound_id", "match_spectrum_type"
-)
-
-spectra[spectra$spectrum_id %in% query_ids, columns]
 ```
 
 ### MS3(query) vs MS3(target)
@@ -632,16 +513,6 @@ write.csv(matches_table_assembled, here("data","matches_ftms_flaxseed_MS3_indivi
 
 ```
 
-```{r}
-strong_matches <- subset(
-    ftms_matches33_T,
-    score >= 0.9 & matched_peaks_count >= 5
-)
-
-nrow(strong_matches)                             
-length(unique(strong_matches$query_spectrum_id))
-```
-
 Fourteen query MS3 spectra yielded similarity score >0.9, with five or more matched spectral peaks.
 We store the `compound_id`s of unique compounds for which a strong match was found, for later use.
 
@@ -649,62 +520,78 @@ We store the `compound_id`s of unique compounds for which a strong match was fou
 flax_ftneg_compounds_DLmatch_MS3MS3 <- unique(ftms_matches33_T$query_compound_id[o][1:14])
 ```
 
-Here we display the Unique flaxseed and references compounds with matches
-```{r}
-# Unique flaxseed compounds with matches
-dplyr::n_distinct(ftms_matches33_T$query_compound_id)
 
-# Unique reference compounds matched
-dplyr::n_distinct(ftms_matches33_T$target_compound_id)
-```
 
-Then, we display the unique matched reference compounds and their annotations,
-sorted alphabetically by compound name.
-```{r}
-ftms_matches33_T |>
-  dplyr::distinct(target_compound_id, target_name) |>
-    dplyr::arrange(target_name) |>
-    print(n = Inf)
-```
 
 
 ```{r}
-query_ids <- head(ftms_matches33_T$query_spectrum_id[o], 14)
+# Retrieve the query spectrum IDs of the 14 best matches
+query_ids <- ftms_matches33_T$query_spectrum_id[o][1:14]
 
-spectra <- DBI::dbReadTable(con_fft, "msms_spectrum")
-existing_matches <- spectra[spectra$spectrum_id %in% query_ids, ]
-
-columns <- c(
-    "spectrum_id", "match_name", "match_compound_id", "match_precursor_mz",
-    "match_score", "match_common", "match_mslevel", "match_spectrum_type"
+# Retrieve their existing records from the DynLib database
+existing_matches <- DBI::dbGetQuery(
+  con_fft,
+  paste(
+    "SELECT * FROM msms_spectrum WHERE spectrum_id IN (", paste(query_ids, collapse = ", "),")"
+  )
 )
 
-existing_matches[, columns]
+existing_matches[,c("spectrum_id", "match_name","match_compound_id","match_precursor_mz","match_score","match_common","match_mslevel","match_spectrum_type")]
+
 ```
 
 And we can store the best 14 new MS3-MS3 matches in the flax ftneg SQL database:
 
 ```{r}
-# Select the first 14 matches in the order defined by o.
-ftms_matches_sel <- head(ftms_matches33_T[o, ], 14)
-query_ids <- ftms_matches_sel$query_spectrum_id
+# Make a selection of the spectral similarity output table
+ftms_matches_sel <- ftms_matches33_T[o,][1:14,]
 
+# Add the selection of matches to the msms_spectrum table of the sql database
 add_spectral_matches(con_fft, ftms_matches_sel)
 
-# Read the updated table and display the selected records.
-spectra <- DBI::dbReadTable(con_fft, "msms_spectrum")
-
-columns <- c(
-    "spectrum_id", "ms_level", "compound_id", "precursor_mz",
-    "spectrum_type", "match_mslevel", "match_common",
-    "match_precursor_mz", "match_compound_id", "match_spectrum_type"
+# Verify the addition, printing only relevant columns
+DBI::dbGetQuery(con_fft,
+  paste(
+    "Select spectrum_id, ms_level, compound_id, precursor_mz,
+                     spectrum_type, match_mslevel, match_common,
+                     match_precursor_mz, match_compound_id, match_spectrum_type
+           from msms_spectrum where spectrum_id IN (", paste(query_ids, collapse = ", "),")"
+  )
 )
 
-spectra[spectra$spectrum_id %in% query_ids, columns]
 ```
 
-### MS4(query) vs. MS3(target)
+### MS4(query) vs MS2(target)
+```{r}
+ftms_matches42_T <- similarity_RDynLib_match(
+  sp_ftflax,
+  sp_maize_hdg,
+  polarity_query = 0,
+  polarity_target = 0,
+  msLevel_query = 4,
+  msLevel_target = 2,
+  spectrum_type_query = "individual",
+  spectrum_type_target = "individual",
+  requirePrecursor = TRUE,
+  tolerance = 0.5,
+  ppm = 5,
+  threshold = 0.7,
+  fragments_resolution = "unit.resolution"
+)
+```
+```{r}
+o <- order(ftms_matches42_T$matched_peaks_count, decreasing =T)
+print(ftms_matches42_T[o,c("query_compound_id", "query_spectrum_id", "msLevel","precursorMz","target_name","target_msLevel","target_precursorMz","target_compound_id","score", "matched_peaks_count")])
+ 
+```
 
+The best match between a query MS4 spectrum and a target MS2 spectrum yielded similarity score 1, with four matched spectral peaks.
+We store the `compound_id` of this query compounds, for later use.
+
+```{r}
+flax_ftneg_compounds_DLmatch_MS4MS2 <- unique(ftms_matches42_T$query_compound_id[o][1])
+```
+### MS4(query) vs MS3(target)
 ```{r}
 ftms_matches43_T <- similarity_RDynLib_match(
   sp_ftflax,
@@ -722,92 +609,19 @@ ftms_matches43_T <- similarity_RDynLib_match(
   fragments_resolution = "unit.resolution"
 )
 ```
-We have a quick look at the MS4-MS2 matches and order them according to decreasing similarity score and number of matched peaks.
 
 ```{r}
-names(ftms_matches43_T)
-nrow(ftms_matches43_T)
 o <- order(ftms_matches43_T$matched_peaks_count, decreasing =T)
 print(ftms_matches43_T[o,c("query_compound_id", "query_spectrum_id", "msLevel","precursorMz","target_name","target_msLevel","target_precursorMz","target_compound_id","score", "matched_peaks_count")])
  
 ```
-We can save the spectral matching results as .csv file for later consultation.
 
-```{r}
-# Select the variable of interest to save
-(matches_table <- (ftms_matches43_T[o,c("query_compound_id", "query_compound_accession","query_spectrum_id", "msLevel","precursorMz","target_name","target_msLevel","target_precursorMz","target_compound_id","target_compound_accession","target_spectrum_id","score", "matched_peaks_count")]))
-
-# Extend the table with metadata about the Query (date of query, query database, target databases)
-
-# Retrieve the experiment accession
-experiment_accession <- DBI::dbGetQuery(con_fft, "SELECT experiment_accession FROM experiment")
-
-# Assemble the table
-matches_table_assembled <- data.frame(experiment = experiment_accession, queryDate = "2009/09/30", queryDB = "flax_FTneg2023", targetDB ="maize_hdg_FTneg", matches_table)
-
-# Export to a .csv file
-write.csv(matches_table_assembled, here("data","matches_ftms_flaxseed_MS4_individual_vs_maizehdg_MS3_individual.csv"), row.names = FALSE)
-
-```
-
-```{r}
-strong_matches <- subset(
-    ftms_matches43_T,
-    score >= 0.7 & matched_peaks_count >= 3
-)
-
-nrow(strong_matches)                             
-length(unique(strong_matches$query_spectrum_id))
-```
-
-
-17 query MS4 spectra yielded similarity score of \>0.7, with three or more matched spectral peaks.
+Six query MS4 spectra yielded similarity score >0.9, with five or more matched spectral peaks.
 We store the `compound_id`s of unique compounds for which a strong match was found, for later use.
 
 ```{r}
-flax_ftneg_compounds_DLmatch_MS4MS2 <- unique(ftms_matches42_T$query_compound_id[o][1:17])
+flax_ftneg_compounds_DLmatch_MS4MS3 <- unique(ftms_matches43_T$query_compound_id[o][1:6])
 ```
-
-The spectral matches, or a selected subset, can be stored in dedicated columns of the `msms_spectrum` table of the DynLib SQL database.
-
-Using their `query_spectrum_id` values, we check whether matching results for these 17 MS4 spectra are already stored in the `msms_spectrum` table of the `flax_ftneg` database.
-
-```{r}
-query_ids <- head(ftms_matches42_T$query_spectrum_id[o], 17)
-
-spectra <- DBI::dbReadTable(con_fft, "msms_spectrum")
-existing_matches <- spectra[spectra$spectrum_id %in% query_ids, ]
-
-columns <- c(
-    "spectrum_id", "match_name", "match_compound_id",
-    "match_precursor_mz", "match_score", "match_common",
-    "match_mslevel", "match_spectrum_type"
-)
-
-existing_matches[, columns]
-```
-
-And we can store the best 17 new matches in the flax ftneg SQL database:
-
-```{r}
-# Select up to 22 matches using the existing order.
-ftms_matches_sel <- head(ftms_matches42_T[o, ], 17)
-query_ids <- ftms_matches_sel$query_spectrum_id
-
-add_spectral_matches(con_fft, ftms_matches_sel)
-
-# Read the updated records and display the relevant columns.
-spectra <- DBI::dbReadTable(con_fft, "msms_spectrum")
-
-columns <- c(
-    "spectrum_id", "ms_level", "compound_id", "precursor_mz",
-    "spectrum_type", "match_name", "match_mslevel", "match_common",
-    "match_precursor_mz", "match_compound_id", "match_spectrum_type"
-)
-
-spectra[spectra$spectrum_id %in% query_ids, columns]
-```
-
 ## QTOF spectral similarity (flax vs maize_hdg)
 
 ### Preliminary operations and database exploration
@@ -828,46 +642,42 @@ available_spectrum_types(con_mqtneg)
 available_spectrum_types(con_fqt) 
 ```
 
-In the flaxseed QTOFneg DynLib, two spectrum_types are available: `all_energies` and `same_energy`. The `same_energy` spectrum type combines replicate MS2 spectra acquired at the same collision energy. Since spectra were acquired at three collision energies, a chromatographic feature (`compound_id`) can be associated with up to three same_energy spectra, one per collision energy.
+In the flaxseed QTOFneg DynLib, two spectrum_types are available: `all_energies` and `same_energy`. These spectrum_types both represent composite spectra. The `same_energy` spectrum type combines replicate MS2 spectra acquired at the same collision energy. Since spectra were acquired at three collision energies, a chromatographic feature (`compound_id`) can be associated with up to three `same_energy` spectra, one per collision energy. The `all_energies` spectrum type combines MS2 spectra acquired at all different collision energies for a given `comound_id`.
+
+Total `all_energies` MS2 spectra number in flax qtof negative data:
+
+```{r}
+DBI::dbGetQuery(con_fqt, "Select count(*) from msms_spectrum where ms_level = 2 and spectrum_type = 'all_energies'")
+```
+
 Total `same_energy` MS2 spectra number in flax qtof negative data:
 
 ```{r}
-spectra <- DBI::dbReadTable(con_fqt, "msms_spectrum")
-
-n_spectra <- sum(
-    spectra$ms_level == 2 & spectra$spectrum_type == "same_energy",
-    na.rm = TRUE
-)
-
-n_spectra
+DBI::dbGetQuery(con_fqt, "Select count(*) from msms_spectrum where ms_level = 2 and spectrum_type = 'same_energy'")
 ```
+
 
 Total MS2 spectra number in maize qtof negative data where the name is not null:
 
 ```{r}
-compounds <- DBI::dbReadTable(con_mqtneg, "ms_compound")
-spectra <- DBI::dbReadTable(con_mqtneg, "msms_spectrum")
-
-# Select compound IDs with usable names
-compound_names <- trimws(compounds$name)
-has_name <- !is.na(compound_names) &
-    !toupper(compound_names) %in% c("", "NULL") &
-    !startsWith(compound_names, "!")
-
-named_ids <- compounds$compound_id[has_name & !is.na(compounds$compound_id)]
-
-# Count individual spectra for those compounds
-ms_levels <- spectra$ms_level[
-    spectra$compound_id %in% named_ids &
-    spectra$spectrum_type %in% "individual"
-]
-
-table(ms_levels)  # Counts by MS level
-n_spectra <- sum(ms_levels == 2L, na.rm = TRUE)
-n_spectra        # Individual MS2 count
+DBI::dbGetQuery(
+    con_mqtneg,
+    "
+    SELECT COUNT(*) AS n_spectra
+    FROM msms_spectrum AS s
+    INNER JOIN ms_compound AS c
+        ON s.compound_id = c.compound_id
+    WHERE s.ms_level = 2
+      AND s.spectrum_type = 'individual'
+      AND c.name IS NOT NULL
+      AND TRIM(c.name) != ''
+      AND UPPER(TRIM(c.name)) != 'NULL'
+      AND TRIM(c.name) NOT LIKE '!%'
+    "
+)
 ```
 
-### MS/MS vs. MS/MS
+### MS/MS same energy vs. MS/MS
 
 We then use 'similarity_RDynLib_match()' to search the QTOF spectra from the flax experiment against the maize DynLib spectra.
 Since both datasets contain high-resolution fragment ions, we set 'fragments_resolution = "high.resolution"'.
@@ -876,7 +686,7 @@ With 'requirePrecursor = TRUE', these parameters are also used to pre-filter tar
 Here, we use a tolerance of 20 ppm and no additional absolute tolerance (tolerance = 0).
 
 ```{r}
-qtof_matches2_T <- similarity_RDynLib_match(
+qtof_matches_samen_ind_T <- similarity_RDynLib_match(
   sp_qtflax,
   sp_qtmaize,
   polarity_query = 0,
@@ -896,12 +706,12 @@ qtof_matches2_T <- similarity_RDynLib_match(
 Show the matches, and save them to a .csv file:
 
 ```{r}
-o <- order(qtof_matches2_T$matched_peaks_count, decreasing =T)
-print(qtof_matches2_T[o,c("query_compound_id", "query_spectrum_id", "msLevel","precursorMz","target_name","target_msLevel","target_precursorMz","target_compound_id","score", "matched_peaks_count")])
+o <- order(qtof_matches_samen_ind_T$matched_peaks_count, decreasing =T)
+print(qtof_matches_samen_ind_T[o,c("query_compound_id", "query_spectrum_id", "msLevel","precursorMz","target_name","target_msLevel","target_precursorMz","target_compound_id","score", "matched_peaks_count")])
 
 # We can save the table as .csv file for later consultation
 # Select the variable of interest to save
-(matches_table <- (qtof_matches2_T[o,c("query_compound_id", "query_compound_accession","query_spectrum_id", "msLevel","precursorMz","target_name","target_msLevel","target_precursorMz","target_compound_id","target_compound_accession","target_spectrum_id","score", "matched_peaks_count")]))
+(matches_table <- (qtof_matches_samen_ind_T[o,c("query_compound_id", "query_compound_accession","query_spectrum_id", "msLevel","precursorMz","target_name","target_msLevel","target_precursorMz","target_compound_id","target_compound_accession","target_spectrum_id","score", "matched_peaks_count")]))
 
 # Extend the table with metadata about the Query (date of query, query database, target databases)
 
@@ -920,37 +730,72 @@ Six flaxseed MS/MS spectra yielded a hit with similarity score \> 0.7 and five o
 We store the `compound_id`s of unique compounds for which a strong match was found, for later use.
 
 ```{r}
-flax_qtofneg_compounds_DLmatch <- unique(qtof_matches2_T$query_compound_id[o][1:6])
+flax_qtofneg_compounds_DLmatch_samen_ind <- unique(qtof_matches_samen_ind_T$query_compound_id[o][1:6])
 ```
 
 We can store the spectral matches in the `msms_spectrum` table of the query SQL database:
 
 ```{r}
-# Check existing matches.
-query_ids <- qtof_matches2_T$query_spectrum_id
-spectra <- DBI::dbReadTable(con_fqt, "msms_spectrum")
+# First check if there are spectral matches stored in the database
+# Retrieve the query spectrum IDs
+query_ids <- qtof_matches_samen_ind_T$query_spectrum_id
 
-existing_matches <- spectra[spectra$spectrum_id %in% query_ids, ]
+# Retrieve their existing records from the DynLib database
+existing_matches <- DBI::dbGetQuery(
+  con_fqt,
+  paste(
+    "SELECT * FROM msms_spectrum WHERE spectrum_id IN (", paste(query_ids, collapse = ", "),")"
+  )
+)
 
-existing_matches[, c(
-    "spectrum_id", "match_name", "match_compound_id",
-    "match_precursor_mz", "match_score", "match_common",
-    "match_mslevel", "match_spectrum_type"
-)]
+existing_matches[,c("spectrum_id","match_name","match_compound_id","match_precursor_mz","match_score","match_common","match_mslevel","match_spectrum_type")]
 
-# Update the matches and verify the stored values.
-add_spectral_matches(con_fqt, qtof_matches2_T)
-
-spectra <- DBI::dbReadTable(con_fqt, "msms_spectrum")
-spectra[spectra$spectrum_id %in% query_ids, c(
-    "spectrum_id", "ms_level", "compound_id", "precursor_mz",
-    "spectrum_type", "match_mslevel", "match_common",
-    "match_precursor_mz", "match_compound_id", "match_spectrum_type"
-)]
+# If OK to overwrite, proceed:
+add_spectral_matches(con_fqt, qtof_matches_samen_ind_T)
+  
+# Verify the addition of the matching data in the database
+dbGetQuery(con_fqt,
+  paste(
+    "Select spectrum_id, ms_level, compound_id, precursor_mz,
+                     spectrum_type, match_name, match_mslevel, match_common,
+                     match_precursor_mz, match_compound_id, match_spectrum_type
+           from msms_spectrum where spectrum_id IN (", paste(query_ids, collapse = ", "),")"
+  )
+)
 
 ```
 
+### MS/MS all energies vs. MS/MS
 
+
+
+```{r}
+qtof_matches_allen_ind_T <- similarity_RDynLib_match(
+  sp_qtflax,
+  sp_qtmaize,
+  polarity_query = 0,
+  polarity_target = 0,
+  msLevel_query = 2,
+  msLevel_target = 2,
+  spectrum_type_query = "all_energies",
+  spectrum_type_target = "individual",
+  requirePrecursor = TRUE,
+  tolerance = 0,
+  ppm = 20,
+  threshold = 0.7,
+  fragments_resolution = "high.resolution"
+ )
+```
+There is only one match above the imposed threshold:
+
+```{r}
+o <- order(qtof_matches_allen_ind_T$matched_peaks_count, decreasing =T)
+print(qtof_matches_allen_ind_T[o,c("query_compound_id", "query_spectrum_id", "msLevel","precursorMz","target_name","target_msLevel","target_precursorMz","target_compound_id","score", "matched_peaks_count")])
+
+
+```
+
+The query compound_id and match compound_id where already found using the `same_energy` spectra with similar socres (same number of matching peaks and score slightly higher when using `same_energy` spectrum (0.766 vs. 0.705).
 
 ## Public spectral database search
 
@@ -958,107 +803,41 @@ In this section, spectra from the flaxseed DynLib database are **exported in MGF
 
 When exporting spectra to MGF format, RDynLib allows the user to select the **spectrum type** and, where applicable, the **fragmentation level** to be exported. For multilevel fragmentation trees, spectra can additionally be distinguished by their **MSⁿ level**. In a multi-experiment DynLib database, the export can be restricted to spectra from **selected experiments**. 
 
-TODO: correct this: is it obliged to choose a single expid, can expid = NULL? what happens then? adpat function (documentation) and text above.
-
-
-### Flaxseed FTneg DynLib
+### Flaxseed FTneg
+#### Pseudo-MS2
+##### Export to MGF
 A DynLib database can store different types of spectra for each compound; see the documentation of `MultMatchCID_Spectra()` for definitions of the different spectrum types. 
-The flaxseed FTneg DynLib conatains multilevel fragmentation spectra acquired with ion trap instruments. The `pseudo_MS2` spectrum type (which has `ms_level` assigned to 2) combines fragment ions from all MSⁿ levels of a spectral tree into a single spectrum, summing the intensities of matching fragment ions. By integrating fragmentation information across MSⁿ levels, this `pseudo_MS2` representation may facilitate comparisons with reference MS/MS spectra, acquired using QTOF or other tandem mass spectrometers, and available in public spectral databases. 
-Here, we will export both the `pseudo_MS2` spectra as well as the `individual` spectra of `ms_level = 2` and `ms_level = 3` from the flaxseed FTneg DynLib database in MGF format for spectral similarity searching against public spectral databases.
 
-We First identify the available spectrum types and ms levels in the database:
-
+We First identify the available experiments, spectrum types and ms levels in the database. Spectrum type and MS level are part of the spectral metadata of a `Spectra` object that can be accessed using the `spectraData()` function. When a `Spectra` object is derived from a `DynLib` SQL database, however, the exact **spectral metadata variables that need to be extracted need to be specified explicitly** in the `columns` argument of `spectraData()`. Therefore we first print the names of the variables, to choose from.
 ```{r}
-#| message: false
-#| results: "hide"
-#| warning: false
-
-path <- flax_ftneg
-
-# Reuse export_settings from the preceding chunk.
-export_settings_266 <- export_settings |>
-  dplyr::filter(expid == 266) |>
-  dplyr::select(spectrum_type, ms_level) |>
-  dplyr::arrange(spectrum_type, ms_level)
-
-export_settings_266
-```
-
-
-```{r}
-#| message: false
-#| results: "hide"
-#| warning: false
-# Export one MGF file per combination
-for (i in seq_len(nrow(export_settings))) {
-
-  type <- export_settings$spectrum_type[i]
-  level <- export_settings$ms_level[i]
-
-  output <- here(
-    "data",
-    paste0("ft_", type, "_MS", level, ".mgf")
-  )
-
-  sql_to_mgf(
-    sqlite_path = path,
-    expid = 266,
-    spectrum_type = type,
-    ms_level = level,
-    output_file = output
-  )
-}
-```
-
-Next we export multi msLevels, spectrum types, and expids into a single mgf file:
-First we check available combinations across all experiments
-```{r}
-# Reuse sp_ftflax <- sql_to_spectra(flax_ftneg) from earlier in the workflow.
+# flax_ftneg is the path to the flaxseed ftneg sql DynLib
+# Create Spectra and CompDb objects
+sp_ftflax <- sql_to_spectra(flax_ftneg)
 cdb_ftflax <- ExpCompDb(flax_ftneg)
 
-spectrum_metadata <- Spectra::spectraData(
-  sp_ftflax,
+# List the available experiments
+names(compounds(cdb_ftflax))
+table(compounds(cdb_ftflax, columns = "expid"))
+
+# List available spectrum types and MS levels
+spectraVariables(sp_ftflax)
+spectrum_metadata <- spectraData(sp_ftflax,
   columns = c("compound_id", "spectrum_type", "msLevel")
-) |>
-  as.data.frame()
-
-compound_experiments <- CompoundDb::compounds(
-  cdb_ftflax,
-  columns = c("compound_id", "expid")
-) |>
-  as.data.frame()
-
-export_settings <- spectrum_metadata |>
-  dplyr::inner_join(compound_experiments, by = "compound_id") |>
-  dplyr::rename(ms_level = msLevel) |>
-  dplyr::filter(!is.na(spectrum_type), !is.na(ms_level)) |>
-  dplyr::count(expid, spectrum_type, ms_level, name = "n_spectra") |>
-  dplyr::arrange(expid, spectrum_type, ms_level)
-
-print(export_settings)
-```
-
-
-
-We assign expid NULL to return all the available expids in the database (in this
-case of flax data it will return only one experiment)
-```{r}
-ft_multi <- here("data", "ft_multi_exp_types.mgf")
-
-sql_to_mgf(
-  sqlite_path = path,
-  expid = NULL,
-  spectrum_type = c("individual", "pseudo_MS2"),
-  ms_level = c(2, 3, 4),
-  output_file = ft_multi
 )
+type.level <- table(spectrum_metadata$spectrum_type, spectrum_metadata$msLevel)
+
+type.level
 ```
-Finaly, we import to an mgf file a specific spectrum type and ms_level:
+
+The flaxseed FTneg DynLib contains multilevel fragmentation spectra acquired with ion trap instruments. The `pseudo_MS2` spectrum type (which has `ms_level` assigned to 2) combines fragment ions from all MSⁿ levels of a spectral tree into a single spectrum, summing the intensities of matching fragment ions. By integrating fragmentation information across MSⁿ levels, this `pseudo_MS2` representation may facilitate comparisons with reference MS/MS spectra, acquired using QTOF or other tandem mass spectrometers, and available in public spectral databases.
+
+
+Here, we will export the `pseudo_MS2` spectra from the flaxseed FTneg DynLib database in MGF format for spectral similarity searching against public spectral databases:
 ```{r}
 ft_pseudoMS2 <- here("data", "ft_pseudoMS2.mgf")
 
 sql_to_mgf(
-  sqlite_path = path,
+  sqlite_path = flax_ftneg,
   expid = 266,
   spectrum_type = "pseudo_MS2",
   ms_level = NULL,
@@ -1066,41 +845,67 @@ sql_to_mgf(
 )
 ```
 
-The exported MGF files were submitted to **GNPS2** for spectral similarity searching against all available reference spectral libraries. In the GNPS2 **File Browser**, we created a folder and uploaded the MGF files. We then launched the **Library Search** workflow (*Launch Workflows → librarysearch_workflow*) to search the uploaded spectra against the reference libraries. Multiple MGF files can be launched simultanuously.
 
-The sql_to_mgf() function writes a unique identifier, constructed by concatenating the compound_accession and spectrum_id separated by an underscore, to the SCANS field of the exported MGF file. Consequently, the #Scan# column in the resulting GNPS spectral matching reports contains this identifier, allowing the original spectrum_id and the associated compound_accession to be retrieved and linked back to the corresponding compound_id in the DynLib database.
+In the code chunk below, we created a loop to export separate MGF files for each combination of spectrum type and MS level, for which spectra are available in the flaxseed FTneg DynLib database.
+```{r}
+# Export one MGF file per spectrum_type - msLevel combination
+
+for (i in seq_len(nrow(type.level))) {
+  for (j in seq_len(ncol(type.level))){
+
+  # Skip combinations with no spectra
+    if (type.level[i, j] == 0) next
+
+    type <- rownames(type.level)[i]
+    level <- colnames(type.level)[j]
+
+
+  output <- here(
+    "data",
+    paste0("ft_", type, "_MS", level, ".mgf")
+  )
+
+  sql_to_mgf(
+    sqlite_path = flax_ftneg,
+    expid = 266,
+    spectrum_type = type,
+    ms_level = as.integer(level),
+    output_file = output
+  )
+  }
+}
+```
+
+The `sql_to_mgf()` function can also export multiple MS levels, spectrum types, and experiments into a single mgf file.
+
+We assign expid NULL to return all the available expids in the database. (In this
+case of the flax ftneg database, it will return only one experiment.)
+```{r}
+ft_multi <- here("data", "ft_multi_exp_types.mgf")
+
+sql_to_mgf(
+  sqlite_path = flax_ftneg,
+  expid = NULL,
+  spectrum_type = c("individual", "pseudo_MS2"),
+  ms_level = c(2, 3, 4),
+  output_file = ft_multi
+)
+```
+
+##### View GNPS output
+The exported MGF files were submitted to **GNPS2** for spectral similarity searching against all available reference spectral libraries. In the GNPS2 **File Browser**, we created a folder and uploaded the MGF files. We then launched the **Library Search** workflow (*Launch Workflows → librarysearch_workflow*) to search the uploaded spectra against the reference libraries. Multiple MGF files can be launched simultaneously.
+
+The `sql_to_mgf()` function writes a unique identifier, constructed by concatenating the compound_accession and spectrum_id separated by an underscore, to the SCANS field of the exported MGF file. Consequently, the #Scan# column in the resulting GNPS spectral matching reports contains this identifier, allowing the original `spectrum_id` and the associated `compound_accession` to be retrieved and linked back to the corresponding `compound_id` in the DynLib database.
 
 The resulting spectral matches were downloaded as a CSV file for further analysis in R.
 
-We extract the unique `compound_id`s associated with high-scoring spectral matches (MQscore > 0.8 or > 0.9, depending on the number of matches).
-
-The gnps resulting output from matching the ftms pseudoMS2 spectra is a .tsv file, here we convert it to a csv file :
+We extract the unique `compound_id`s associated with high-scoring spectral matches (MQScore >= 0.8 & SharedPeaks >= 4).
 ```{r}
-path <- "../data/matches_gnps_ft_pseudo.tsv",
-
-# Lire le fichier TSV
-data <- read_tsv(path, show_col_types = FALSE)
-
-# Vérifier les colonnes
-colnames(data)
-View(data)
-
-# Enregistrer le CSV dans le même dossier
-output_file <- file.path(
-  dirname(path),
-  "gnps_librarysearch_results.csv"
+# Import GNPS2 spectral matching results from TSV
+gnps_matches <- read_tsv(
+  "../data/matches_gnps_ft_pseudo.tsv",
+  show_col_types = FALSE
 )
-
-write_csv(data, output_file, na = "")
-
-# Vérifier le résultat
-file.exists(output_file)
-```
-
-Inspect the GNPS results
-```{r}
-# Import GNPS2 spectral matching results
-gnps_matches <- read.csv("data/gnps_librarysearch_results.csv")
 
 # Inspect the available columns
 names(gnps_matches)
@@ -1109,44 +914,47 @@ head(gnps_matches)
 
 Filter matches and extract compound IDs
 ```{r}
-# Select GNPS matches meeting similarity criteria
-gnps_matches_filtered <- gnps_matches |>
-  filter(
-    MQScore >= 0.8,
-    SharedPeaks >= 4,
+# Filter GNPS matches by similarity criteria and spectrum file
+gnps_matches_filtered <- subset(
+  gnps_matches,
+  MQScore >= 0.8 & SharedPeaks >= 4 &
     SpectrumFile == "ft_pseudo_MS2_MS2.mgf"
-  ) |>
-  mutate(
-    spectrum_id = as.integer(sub(".*_", "", `X.Scan.`))
-  )
-
-# Retrieve compound IDs from the SQLite database
-spectrum_mapping <- dbGetQuery(
-  con_ftneg,
-  "SELECT spectrum_id, compound_id
-   FROM msms_spectrum"
 )
 
-# Link GNPS matches to flaxseed compounds
-gnps_matches_filtered <- gnps_matches_filtered |>
-  left_join(spectrum_mapping, by = "spectrum_id")
+# Extract spectrum IDs from GNPS scan identifiers
+gnps_matches_filtered$spectrum_id <- as.integer(
+  sub(".*_", "", gnps_matches_filtered[["#Scan#"]])
+)
 
-# Extract unique flaxseed compound IDs matched using pseudo-MS2
-flax_ftneg_compounds_GNPSmatch_PseudoMS2 <-
-  gnps_matches_filtered |>
-  filter(!is.na(compound_id)) |>
-  pull(compound_id) |>
-  unique()
+# Retrieve spectrum-to-compound mapping from Spectra
+spectrum_mapping <- spectraData(
+  sp_ftflax, columns = c("spectrum_id", "compound_id")
+)
 
-# Number of unique matched compounds
-length(flax_ftneg_compounds_GNPSmatch_PseudoMS2)
+# Associate GNPS matches with DynLib compounds
+gnps_matches_filtered$compound_id <- spectrum_mapping$compound_id[
+  match(gnps_matches_filtered$spectrum_id, spectrum_mapping$spectrum_id)
+]
 
-gnps_matches_filtered |>
-  select(`X.Scan.`, spectrum_id, compound_id, Compound_Name)
+# Extract unique matched compound IDs
+flax_ftneg_compounds_GNPSmatch_PseudoMS2 <- unique(gnps_matches_filtered$compound_id)
+
+# Inspect GNPS matches and structural annotations
+gnps_matches_filtered[, c(
+  "#Scan#", "compound_id","spectrum_id", 
+  "Compound_Name", "Smiles", "InChIKey",
+  "MQScore", "SharedPeaks", "MZErrorPPM"
+)]
+
 
 ```
 
-Compare the individual MS2 to public databases on GNPS with 4 mininum shared peaks and a score of 0.8:
+TODO: explain here why compound_id and compound_accession are the same in the flax_ftneg DynLib.
+
+#### Individual MS2
+Compare the individual MS2 spectra to public databases on GNPS. We set the similarity score threshold at minimum 4 shared peaks and a score of 0.8.
+
+TODO: adapt code according to example of pseudo-MS2
 
 ```{r}
 #chose the tsv file 
@@ -1176,7 +984,6 @@ head(gnps_matches2)
 dim(gnps_matches2)
 
 ```
-
 Extract the corresponding compound_id and spectrum_id
 ```{r}
 # Select GNPS matches meeting similarity criteria
@@ -1219,14 +1026,17 @@ n_distinct(gnps_matches_filtered2$compound_id, na.rm = TRUE)
 The results show that only one match was identified between spectra of the *individual* spectrum type and the public spectral libraries available through GNPS, with a similarity score of 0.94 and six shared peaks. In contrast, five matches were obtained when comparing *pseudo-MS2* spectra against the same libraries. These findings suggest that the *pseudo-MS2* representation is better suited for spectral similarity searches against public spectral libraries, as it yields a higher number of matches than the *individual* spectrum type.
 
 ### Flaxseed QTOFneg DynLib
-For the flaxseed QTOFneg DynLib database, we will export the `same_energy` spectra, as well as the `all_energies` spectra, in MGF format for spectral similarity searching against public spectral databases. The `all_energies` spectra combine fragmentation information acquired at different collision energies.
+For the flaxseed QTOFneg DynLib database, we will export first the `same_energy` spectra, and later the `all_energies` spectra, in MGF format for spectral similarity searching against public spectral databases. 
+
+#### All_energies
+The `all_energies` spectra combine fragmentation information acquired at different collision energies.
 
 We first inspect the existing expids in the database:
 ```{r}
 get_expid(flax_qtofneg)
 ```
 
-Next, we create an mgf file for the 52 experiment that correspond to the flax qtof neg data with the **all_energyies** as a spectrum type with a minimum score of 0.8 and minimum number of shared peaks of 6:
+Next, we create an mgf file for the experiment with expid = 52, corresponding to the flax qtof neg data, containing the spectra of spectrum type **all_energies**.
 ```{r}
 #| message: false
 #| results: "hide"
@@ -1324,7 +1134,9 @@ n_distinct(gnps_matches_filtered_qt_all$compound_id, na.rm = TRUE)
 ```
 All the 16 matches found represent unique compounds
 
-Now we explore the qtof single energy spectral matches in GNPS, we start by creatin the specific mgf file for this spectrum type:
+#### same_energy
+
+Now we explore the qtof single energy spectral matches in GNPS, we start by creating the specific mgf file for this spectrum type:
 ```{r}
 #| message: false
 #| results: "hide"
@@ -1420,9 +1232,12 @@ flax_qtneg_compounds_gnpsmatch_same <-
 n_distinct(gnps_matches_filtered_qt_same$compound_id, na.rm = TRUE)
 
 ```
-from the 35 gnps matches there are 19 unique matches compound_id.
+The 35 GNPS matches correspond to 19 unique compound_id values.
 
 ## Overview
+TODO: make this much text shorter, to the point: Create a vector with unique compounds that yielded high-scoring spectral matches with characterized compounds in the reference DynLib or with GNPS spectra, separately for the flaxseed FTneg and QTOFneg DynLib databases.
+TODO: Add MS4vsMS2 and MS4vsMS3 matches. 
+
 To obtain a comprehensive overview of the compounds showing significant spectral similarities with reference spectra, the results from all DynLib and GNPS spectral matching approaches were combined for the FTneg and QTOFneg datasets.
 
 For FTneg, the combined results included DynLib spectral matches obtained from MS²–MS², MS³–MS³, and MS³–MS² comparisons, together with GNPS matches obtained using individual MS² and pseudo-MS² representations. For QTOFneg, the results included DynLib spectral matches and GNPS matches obtained using the all_energies and same_energy spectrum types. Duplicate compound identifiers were removed to ensure that each compound was counted only once, regardless of the number of matching approaches through which it was identified.
@@ -1433,9 +1248,11 @@ For FTneg, the combined results included DynLib spectral matches obtained from M
 ## FTneg: Combine DynLib and GNPS matches
 
 flax_ftneg_compounds_all_matches <- unique(c(
-  flax_ftneg_compounds_DLmatch_MS3MS3,
   flax_ftneg_compounds_DLmatch_MS2MS2,
   flax_ftneg_compounds_DLmatch_MS3MS2,
+  flax_ftneg_compounds_DLmatch_MS3MS3,
+  flax_ftneg_compounds_DLmatch_MS4MS2,
+  flax_ftneg_compounds_DLmatch_MS4MS3,
   flax_ftneg_compounds_GNPSmatch_PseudoMS2,
   101005
 ))
