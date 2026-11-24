@@ -292,6 +292,6 @@ peaksData(sp_selected)[[1]]
 ```
 
 ```{r}
-MSnplot_SQL(maize_ftneg, 63846, thr_int = 10)
+plotMSn(maize_ftneg, 63846, thr_int = 5)
 ```
 
