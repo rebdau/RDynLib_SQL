@@ -1,0 +1,297 @@
+---
+title: "Accessing and exploring DynLib databases in R"
+format:
+  html:
+    toc: true
+    self-contained: true
+author: "Ahlam Mentag, Rebecca Dauwe, Johannes Rainer"
+---
+
+# Introduction
+
+This Quarto document demonstrates how to access and explore DynLib
+databases in R through three complementary approaches:
+
+1. Direct retrieval and querying of DynLib SQL database tables.
+2. Integration with the R for Mass Spectrometry ecosystem through
+   `CompoundDb` and `Spectra`.
+3. Use of RDynLib-specific accessors to retrieve compound and spectral data.
+
+# Setup and direct access to DynLib SQL databases
+## Load required R packages
+
+```{r}
+#| message: false
+#| results: "hide"
+#| warning: false
+library(here)
+library(Spectra)
+library(CompoundDb)
+library(DBI)
+library(RSQLite)
+#library(RDynLib)
+library(devtools)
+load_all()
+```
+
+## Connect to a local DynLib SQL database
+
+This workflow assumes that the DynLib database has already been
+downloaded and stored locally. If not, please refer to the
+[Downloading DynLib databases from Zenodo](00_download_DynLib_databases.qmd)
+workflow.
+
+In the following examples, we use the maize FTMS negative ionization
+mode database. The same procedure can be applied to any other DynLib
+database by adapting the local file path.
+
+```{r}
+# Define the local database path
+maize_ftneg <- here("data", "maize_ftneg.sqlite")
+
+# Check that the database file exists
+stopifnot(
+  "Database not found. Please run the download workflow first." =
+    file.exists(maize_ftneg)
+)
+
+# Connect to the SQL database
+con_mftneg <- DBI::dbConnect(RSQLite::SQLite(), maize_ftneg)
+```
+
+
+## Retrieve and query DynLib database tables directly
+The DynLib SQL database can be accessed directly using functions from the `DBI` package. Entire tables can be imported into R as data frames, or specific information can be retrieved using SQL queries without loading the complete tables into memory.
+
+### List and retrieve database tables
+
+```{r}
+# List available tables in the DynLib SQL database
+DBI::dbListTables(con_mftneg)
+
+# Retrieve tables
+experiment <- DBI::dbReadTable(con_mftneg, "experiment")
+ms_compound <- DBI::dbReadTable(con_mftneg, "experiment")
+msms_spectrum <- DBI::dbReadTable(con_mftneg, "experiment")
+msms_spectrum_peak <- DBI::dbReadTable(con_mftneg, "experiment")
+
+table(experiment$expid)
+
+```
+Note that importing entire tables, particularly `msms_spectrum_peak`, may be memory-intensive for large databases. Direct SQL queries provide an alternative for retrieving only the required information.
+
+### Count database entries
+
+The SQL `COUNT()` function can be used to determine the number of entries in a table without importing its contents into R.
+
+```{r}
+# Count the number of experiments
+DBI::dbGetQuery(con_mftneg, 
+                "SELECT COUNT(*) FROM experiment")
+
+# Count the number of compounds
+DBI::dbGetQuery(con_mftneg, 
+                "SELECT COUNT(*) FROM ms_compound")
+
+# Count the number of spectra
+DBI::dbGetQuery(con_mftneg, 
+                "SELECT COUNT(*) FROM msms_spectrum")
+```
+
+In the maize databases, each feature has a unique `compound_id`. The number of entries in the `ms_compound` table therefore corresponds to the number of features, rather than the number of distinct chemical structures.
+
+SQL queries can also be used to summarize the contents of a table by category using the `GROUP BY` clause.
+
+```{r}
+# Count the number of spectra per MS level
+DBI::dbGetQuery(con_mftneg, 
+                "SELECT ms_level, COUNT(*) AS n_spectra
+                 FROM msms_spectrum
+                 GROUP BY ms_level")
+```
+
+### Retrieve specific database entries
+
+The `WHERE` clause allows specific rows to be retrieved based on one or more conditions. The identifiers `expid`, `compound_id` and `spectrum_id` can be used to navigate between the different DynLib tables.
+
+```{r}
+# Retrieve metadata for selected experiments
+DBI::dbGetQuery(con_mftneg, 
+                "SELECT * FROM experiment 
+                 WHERE expid IN (199, 230)")
+
+# Retrieve all compounds associated with a given experiment
+DBI::dbGetQuery(con_mftneg, 
+                "SELECT * FROM ms_compound 
+                 WHERE expid = 199")
+
+# Retrieve information on a specific compound
+DBI::dbGetQuery(con_mftneg, 
+                "SELECT * FROM ms_compound 
+                 WHERE compound_id = 63668")
+
+# Retrieve all spectra associated with this compound
+DBI::dbGetQuery(con_mftneg, 
+                "SELECT * FROM msms_spectrum 
+                 WHERE compound_id = 63668")
+
+# Retrieve all peaks of a specific spectrum
+DBI::dbGetQuery(con_mftneg, 
+                "SELECT * FROM msms_spectrum_peak 
+                 WHERE spectrum_id = 157135")
+```
+
+## Disconnect from the SQL database
+
+Once the required tables have been retrieved and SQL queries have been completed, the database connection can be closed using `dbDisconnect()`. The `CompDb` and `Spectra` objects introduced in the following section can be created directly from the database file path.
+
+```{r}
+DBI::dbDisconnect(con_mftneg)
+```
+
+# Accessing DynLib data through R for Mass Spectrometry
+Both `CompDb` and `Spectra` objects provide access to the R for Mass Spectrometry ecosystem. While `CompDb` offers a database-centric interface for querying and managing compound database content,`Spectra` provides a more spectrum-centric interface.
+
+## Working with CompDb objects
+
+### Creating a CompDb object from a DynLib database
+We create a `CompDb` object `cdb` from the DynLib SQL database using the `ExpCompDb()` function from the `RDynLib` package. The resulting `CompDb` object represents the complete SQL database and provides access to all of its tables.
+```{r}
+cdb <- ExpCompDb(maize_ftneg)
+# Print database metadada information
+meta <- metadata(cdb)
+head(meta)
+str(cdb)
+```
+
+### Retrieving and filtering compound information
+Compound information can be extracted from a `CompDb` object using the `compounds()` function from the `CompoundDb` package. The resulting table corresponds to the `ms_compound` table in the SQL database and contains the compound identifier (compound_id), together with chromatographic information such as m/z and retention time, and structural annotation data, such as the compound name and molecular formula. By applying filters in the `compounds()` function, one can create a subsetted ms_compund table with compound identifiers (compound_id) of selected compounds corresponding to a defined value for `name` or `exactmass`.
+
+
+
+The compound information of specific criteria:
+```{r}
+supportedFilters(cdb)
+compounds(cdb, columns = c("compound_id", "name", "formula", "expid"))
+
+```
+
+```{r}
+compounds(cdb, columns = c("compound_id", "name", "formula", "expid"),
+          filter = ~ name == "maysin 2 PU KM")
+```
+
+For more queries and details visit this workflow: https://www.bioconductor.org/packages//release/bioc/vignettes/CompoundDb/inst/doc/CompoundDb-usage.html
+
+These filters require prior knowledge of the compound name or theoretical exact mass and are therefore not suitable for retrieving uncharacterized compounds based on their experimental m/z or retention time. For this purpose, RDynLib provides dedicated accessor functions (see the section "RDynLib accessors for retrieving compound and spectral data" below).
+
+## Working with Spectra objects
+
+### Creating a Spectra object from a DynLib database
+A `CompDb` object can be converted into a `Spectra` object using the `Spectra()` function from the `Spectra` package. By default, the MzBackendCompDb backend is used, which keeps the spectra linked to the underlying compound database, allowing the entire database to be accessed through the resulting `Spectra` object.
+Alternatively, `RDynLib` provides a function to convert a DynLib SQL database directly into a Spectra object with MzBackendCompDb backend. 
+
+```{r}
+# Using the Spectra package:
+sps <- Spectra(cdb)
+sps
+
+# Using the RDynLib package:
+sps.rdl <- sql_to_spectra(sql_db)
+
+str(sps)
+str(sps.rdl)
+```
+The objects `sps` and `sps.rdl` are exactly the same `Spectra` objects.
+
+### Accessing spectral metadata
+
+Print spectra variables:
+```{r}
+spectraVariables(sps)
+```
+
+Print spectra Data:
+```{r}
+spectraData(sps, columns = c("msLevel" , "retention_time", "precursorMz",
+                                "centroided","scanIndex", "dataOrigin", 
+                                "compound_id", "nodename" 
+                                ))
+```
+
+All the columns from the original SQL table are preserved and reported in 
+the spectraData of the `Spectra` object.
+
+# RDynLib Accessors for retrieving compound and spectral data
+DynLib is designed to store information on both characterized and uncharacterized compounds. RDynLib provides dedicated accessor functions, to complement the functionality of `CompoundDb` and `Spectra`, allowing to retrieve compound and spectral information for uncharacterized compounds, even when exact theoretical mass or the compound name are unknown. These functions allow users to search for compounds based on experimental properties or available annotations (`filterCompounds()`), or to retrieve compound information (`get_compound()`), and spectral metadata (`get_spectrum_id()`) based on `compound_id`.
+
+
+## Filtering compounds by experimental properties and annotation
+RDynLib provides `filterCompounds()` to retrieve compound records based on experimental properties and available annotations. The `filterCompounds()` function allows filtering by measured m/z, retention time, nodename, complete or partial compound name, and experiment identifier. Multiple filtering criteria can be combined.
+
+Retrieve compounds in experiment 191 with a measured m/z between 537.1 and 537.3:
+
+```{r}
+filterCompounds(
+  sql_path = maize_ftneg,
+  expid = 191,
+  mass_measured = 537.2,
+  mass_tolerance = 0.1
+)
+
+```
+
+Retrieve compounds, in all experiments of the maize ftneg DynLib database, whose name contains "DIMBOA":
+
+```{r}
+filterCompounds(maize_ftneg, name = "DIMBOA")
+```
+
+
+Multiple filtering criteria can be combined, for example to retrieve compounds within specified m/z and retention time windows:
+
+```{r}
+filterCompounds(
+  maize_ftneg,
+  expid = 192,
+  name = "DIMBOA",
+  mass_measured = 372,
+  mass_tolerance = 0.5,
+  retention_time = 10,
+  rt_tolerance = 2
+)
+```
+
+## Retrieve compound information by compound ID
+RDynLib provides `get_compound()` to retrieve the `ms_compound` table of a given `compound_id`.
+```{r}
+compound <- get_compound(sql_path = maize_ftneg, compound_id = 63846)
+compound
+```
+
+## Retrieve spectral information by compound ID
+RDynLib provides `get_spectrum_id()` to retrieve spectrum identifiers (`spectrum_id`) and spectral metadata, associated to a compound_id, for subsequent extraction of MS/MS or MS$^n$ spectra. 
+
+Show the msms_spectrum table of a given compound_id
+```{r}
+sp_id <- get_spectrum_id(sql_path = maize_ftneg, compound_id = 63846 )
+sp_id
+```
+
+Retrieve the corresponding spectrum using `filterValues()` from the `Spectra` package:
+
+```{r}
+sp <- sql_to_spectra(maize_ftneg)
+sp_selected <- filterValues(sp, "spectrum_id", sp_id$spectrum_id)
+```
+
+Display the m/z and intensity values of the spectrum:
+
+```{r}
+peaksData(sp_selected)[[1]]
+```
+
+```{r}
+plotMSn(maize_ftneg, 63846, thr_int = 5)
+```
+
