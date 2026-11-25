@@ -272,11 +272,6 @@ plotMSn <- function(sql_path,
   # Retrieve peak data
   peaks <- peaksData(sp_selected)
   
-  stopifnot(
-    all(vapply(peaks, nrow, integer(1)) ==
-          sp_selected_id$peaks_count, na.rm = TRUE)
-  )
-  
   # Define graphical layout
   col.nr <- min(max_cols, totalplots)
   row.nr <- ceiling(totalplots / col.nr)
