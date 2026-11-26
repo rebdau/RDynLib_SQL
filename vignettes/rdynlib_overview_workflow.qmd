@@ -815,7 +815,7 @@ c(
     qualifying_hits = nrow(gnps_matches)
 )
 ```
-We searched 120 flaxseed Qtofneg with all_energies MS² spectra against the GNPS2 spectral libraries and retained 16 hit with MQScore ≥ 0.80 and in contrast to ftms we select at least six shared peaks because qtof represents a large number of peaks.
+For matching the QTOFneg dataset against the GNPS2 libraries, we applied the same MQScore threshold (≥ 0.80) as for the FT-MS dataset but imposed a higher minimum number of shared fragment ions (six instead of four), as QTOF MS² spectra generally contain more fragment ions. Out of 120 flaxseed QTOFneg MS² spectra (spectrum_type = all_energies) searched against the GNPS2 spectral libraries, 16 hits were retained using these criteria.
 Extract the corresponding compound_id and spectrum_id
 ```{r}
 gnps_matches_filtered_qt_all <- subset(
@@ -1099,9 +1099,6 @@ get_compound(ftflax_maize_hdg_sql, 88041)
 
 we plot the spectra of that highest match:
 ```{r}
-MSnplot_SQL(ftflax_maize_hdg_sql, 88041, thr_int = 100)
-```
-```{r}
 plotMSn(ftflax_maize_hdg_sql,
                     compound_id = 88041,
                     prcx = 0.6,
@@ -1116,7 +1113,15 @@ plotMSn(ftflax_maize_hdg_sql,
 
 Spectra of 88410:
 ```{r}
-MSnplot_SQL(ftflax_maize_hdg_sql, 88410, thr_int = 100)
+plotMSn(ftflax_maize_hdg_sql,
+                    compound_id = 88410,
+                    prcx = 0.6,
+                    thr_int = 0,
+                    label_peaks = TRUE,
+                    thr_label = 5,
+                    digits = 0,
+                    max_cols = 2,
+                    spectrum_id = NULL)
 ```
 
 The spectral comparison reveals a high degree of similarity between the query compound and the reference compound 88041, annotated as herbacetin '3,8-di-O-β-D-glucopyranoside'. The MS3 spectra exhibit nearly identical precursor m/z values (463.04 and 463.08), with 23 common fragment ions and a dot product similarity score of 1.00, indicating a strong agreement between their fragmentation patterns.

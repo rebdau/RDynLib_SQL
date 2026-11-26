@@ -105,11 +105,27 @@ workflow, the compound 101280 from ftms flax data had a high similarity with
 the 74905 refers to quercetin dihexoside compound from maize data.
 Here we visualize the MSn spectra of both compounds:
 ```{r}
-MSnplot_SQL(flax_ftneg, 101280, thr_int = 100)
+plotMSn(flax_ftneg,
+                    compound_id = 101280,
+                    prcx = 0.6,
+                    thr_int = 0,
+                    label_peaks = TRUE,
+                    thr_label = 5,
+                    digits = 0,
+                    max_cols = 2,
+                    spectrum_id = NULL)
 ```
 
 ```{r}
-MSnplot_SQL(maize_ftneg, 74905, thr_int = 100)
+plotMSn(maize_ftneg,
+                    compound_id = 74905,
+                    prcx = 0.6,
+                    thr_int = 0,
+                    label_peaks = TRUE,
+                    thr_label = 5,
+                    digits = 0,
+                    max_cols = 2,
+                    spectrum_id = NULL)
 ```
 The spectral plots shows a high similarity in MS2 level between 74905 and 101280,
 
@@ -131,7 +147,15 @@ Now we show the ion trap based analysis of 101141 compound:
 ```{r}
 #| fig-width: 14
 #| fig-height: 4
-MSnplot_SQL(flax_ftneg, 101141, thr_int = 100)
+plotMSn(flax_ftneg,
+                    compound_id = 101141,
+                    prcx = 0.6,
+                    thr_int = 0,
+                    label_peaks = TRUE,
+                    thr_label = 5,
+                    digits = 0,
+                    max_cols = 2,
+                    spectrum_id = NULL)
 ```
 
 
