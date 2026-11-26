@@ -50,6 +50,7 @@
 #'
 #' @author Ahlam Mentag
 #' @export
+
 adding_Names_SQL <- function(
     con_merged,
     spectrum_type,
@@ -76,19 +77,17 @@ adding_Names_SQL <- function(
     )
   }
   
-  
   # Check spectrum_type argument
   if (missing(spectrum_type) ||
+      !is.character(spectrum_type) ||
       length(spectrum_type) != 1L ||
       is.na(spectrum_type) ||
-      !is.character(spectrum_type) ||
       !nzchar(spectrum_type)) {
     
     stop(
       "`spectrum_type` must be provided as a single non-empty character value."
     )
   }
-  
   
   # Check msLevel argument
   if (!is.null(msLevel)) {
@@ -98,34 +97,66 @@ adding_Names_SQL <- function(
     }
   }
   
-  
   # Create annotation_history table if it does not exist
-  if (!"annotation_history" %in% DBI::dbListTables(con_merged)) {
-    
-    DBI::dbExecute(
-      con_merged,
-      "
-      CREATE TABLE annotation_history (
-        annotation_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        expid INTEGER,
-        compound_id INTEGER,
-        date TEXT,
-        type TEXT,
-        description TEXT,
-        annotation_events TEXT
-      )
-      "
+  DBI::dbExecute(
+    con_merged,
+    '
+    CREATE TABLE IF NOT EXISTS annotation_history (
+      annotation_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      expid INTEGER,
+      compound_id INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      type TEXT,
+      description TEXT,
+      "references" TEXT,
+      annotation_events TEXT,
+
+      FOREIGN KEY(compound_id)
+        REFERENCES ms_compound(compound_id),
+
+      UNIQUE(compound_id, date)
     )
-  }
+    '
+  )
   
-  
-  # Add annotation_events column if annotation_history already existed
-  # without this column
+  # Check existing annotation_history columns
   annotation_fields <- DBI::dbListFields(
     con_merged,
     "annotation_history"
   )
   
+  # Rename reference to references if needed
+  if ("reference" %in% annotation_fields &&
+      !"references" %in% annotation_fields) {
+    
+    DBI::dbExecute(
+      con_merged,
+      '
+      ALTER TABLE annotation_history
+      RENAME COLUMN "reference" TO "references"
+      '
+    )
+  }
+  
+  # Refresh column names
+  annotation_fields <- DBI::dbListFields(
+    con_merged,
+    "annotation_history"
+  )
+  
+  # Add references column if missing
+  if (!"references" %in% annotation_fields) {
+    
+    DBI::dbExecute(
+      con_merged,
+      '
+      ALTER TABLE annotation_history
+      ADD COLUMN "references" TEXT
+      '
+    )
+  }
+  
+  # Add annotation_events column if missing
   if (!"annotation_events" %in% annotation_fields) {
     
     DBI::dbExecute(
@@ -137,6 +168,34 @@ adding_Names_SQL <- function(
     )
   }
   
+  # Check for duplicate annotations
+  duplicates <- DBI::dbGetQuery(
+    con_merged,
+    "
+    SELECT compound_id, date, COUNT(*) AS n
+    FROM annotation_history
+    GROUP BY compound_id, date
+    HAVING COUNT(*) > 1
+    "
+  )
+  
+  if (nrow(duplicates) > 0) {
+    stop(
+      "Cannot create UNIQUE constraint: ",
+      "duplicate (compound_id, date) pairs exist ",
+      "in annotation_history."
+    )
+  }
+  
+  # Ensure UNIQUE constraint for existing databases
+  DBI::dbExecute(
+    con_merged,
+    "
+    CREATE UNIQUE INDEX IF NOT EXISTS
+      idx_annotation_compound_date
+    ON annotation_history(compound_id, date)
+    "
+  )
   
   # Get available matches
   candidates <- DBI::dbGetQuery(
@@ -147,11 +206,11 @@ adding_Names_SQL <- function(
       c.compound_accession,
       c.expid,
       c.name AS current_name,
-      
+
       s.spectrum_id,
       s.ms_level,
       s.spectrum_type,
-      
+
       s.match_name,
       s.match_compound_id,
       s.match_score,
@@ -159,28 +218,26 @@ adding_Names_SQL <- function(
       s.match_mslevel,
       s.match_spectrum_type,
       s.match_spectrum_id
-      
+
     FROM ms_compound AS c
-    
+
     INNER JOIN msms_spectrum AS s
       ON c.compound_id = s.compound_id
-    
+
     WHERE s.match_name IS NOT NULL
       AND s.match_common IS NOT NULL
       AND s.match_score IS NOT NULL
-    
+
     ORDER BY
       c.compound_id,
       s.match_score DESC
     "
   )
   
-  
   if (nrow(candidates) == 0) {
     message("No matches available.")
     return(invisible(0))
   }
-  
   
   # Check that requested spectrum type exists
   available_types <- unique(candidates$spectrum_type)
@@ -196,25 +253,24 @@ adding_Names_SQL <- function(
     )
   }
   
-  
   # Filter by spectrum type
   candidates <- candidates[
-    candidates$spectrum_type == spectrum_type,
+    !is.na(candidates$spectrum_type) &
+      candidates$spectrum_type == spectrum_type,
     ,
     drop = FALSE
   ]
-  
   
   # Filter by MS level
   if (!is.null(msLevel)) {
     
     candidates <- candidates[
-      candidates$ms_level == msLevel,
+      !is.na(candidates$ms_level) &
+        candidates$ms_level == msLevel,
       ,
       drop = FALSE
     ]
   }
-  
   
   # Filter by selected compound IDs
   if (!is.null(compound_id)) {
@@ -226,12 +282,10 @@ adding_Names_SQL <- function(
     ]
   }
   
-  
   if (nrow(candidates) == 0) {
     message("No matches available for the selected filters.")
     return(invisible(0))
   }
-  
   
   # Keep only unnamed compounds unless overwrite = TRUE
   if (!overwrite) {
@@ -244,12 +298,10 @@ adding_Names_SQL <- function(
     ]
   }
   
-  
   if (nrow(candidates) == 0) {
     message("No compound names need to be updated.")
     return(invisible(0))
   }
-  
   
   # Construct new name
   candidates$new_name <- paste0(
@@ -261,7 +313,6 @@ adding_Names_SQL <- function(
     candidates$match_name
   )
   
-  
   # Define annotation type
   candidates$annotation_type <- ifelse(
     is.na(candidates$current_name) |
@@ -270,10 +321,8 @@ adding_Names_SQL <- function(
     "name update"
   )
   
-  
   # Create annotation description
   candidates$annotation_description <- candidates$new_name
-  
   
   # Get accession of matched compounds
   accessions <- DBI::dbGetQuery(
@@ -286,7 +335,6 @@ adding_Names_SQL <- function(
     "
   )
   
-  
   candidates <- merge(
     candidates,
     accessions,
@@ -295,6 +343,15 @@ adding_Names_SQL <- function(
     sort = FALSE
   )
   
+  # Restore original match ordering after merge
+  candidates <- candidates[
+    order(
+      candidates$compound_id,
+      -candidates$match_score
+    ),
+    ,
+    drop = FALSE
+  ]
   
   # Create annotation_events
   candidates$annotation_events <- paste0(
@@ -312,15 +369,8 @@ adding_Names_SQL <- function(
     candidates$match_spectrum_id
   )
   
-  
   # Update database + annotation history
-  tryCatch({
-    
-    DBI::dbExecute(
-      con_merged,
-      "BEGIN TRANSACTION"
-    )
-    
+  DBI::dbWithTransaction(con_merged, {
     
     for (i in seq_len(nrow(candidates))) {
       
@@ -338,11 +388,10 @@ adding_Names_SQL <- function(
         )
       )
       
-      
-      # Add trace to annotation_history
+      # Insert or update annotation_history
       DBI::dbExecute(
         con_merged,
-        "
+        '
         INSERT INTO annotation_history (
           expid,
           compound_id,
@@ -352,7 +401,14 @@ adding_Names_SQL <- function(
           annotation_events
         )
         VALUES (?, ?, ?, ?, ?, ?)
-        ",
+
+        ON CONFLICT(compound_id, date)
+        DO UPDATE SET
+          expid = excluded.expid,
+          type = excluded.type,
+          description = excluded.description,
+          annotation_events = excluded.annotation_events
+        ',
         params = list(
           candidates$expid[i],
           candidates$compound_id[i],
@@ -363,29 +419,12 @@ adding_Names_SQL <- function(
         )
       )
     }
-    
-    
-    DBI::dbExecute(
-      con_merged,
-      "COMMIT"
-    )
-    
-  }, error = function(e) {
-    
-    DBI::dbExecute(
-      con_merged,
-      "ROLLBACK"
-    )
-    
-    stop(e)
   })
-  
   
   message(
     nrow(candidates),
-    " compound name(s) updated and recorded in annotation_history."
+    " compound name update(s) processed and recorded in annotation_history."
   )
-  
   
   invisible(nrow(candidates))
 }

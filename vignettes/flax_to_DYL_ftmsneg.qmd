@@ -1,0 +1,250 @@
+---
+title: "Adding flax ftms neg sql to Dynlib ftms neg sql"
+format:
+  html:
+    toc: true
+    self-contained: true
+author: "Ahlam Mentag, Rebecca Dauwe, Johannes Rainer"
+editor: 
+  markdown: 
+    wrap: 72
+---
+
+## Shiny Documents
+
+This quarto document represents the full workflow to add ftmsneg flax to
+Dynlib sql database, and then to a CompDb and spectra Objects. The
+retention times in Dynlib are in minutes, but in flax data are in
+seconds. In the following workflow while adding flax to Dynlib we will
+unify the units and convert the retention times of flax data to minutes.
+
+Note: In this file we will need the similarity output file between the
+existing database and the new experiment that we would like to  add,
+that's why we have to run first this quarto document: \
+[FTMS_neg_call.qmd](https://github.com/rebdau/RDynLib_SQL/blob/Ahlam/vignettes/FTMS_neg_call.qmd)
+and load the output here.
+
+# Directroy layout
+
+This project follows an  R package layout as follows:
+
+The main project folder is:
+
+RDynLib_SQL/
+
+
+Within this directory, the structure is organized as follows:
+
+RDynLib_SQL/
+├── data/
+├── R/
+└── vignettes/
+
+
+### `data/`
+
+Contains the SQLite database files used in the workflow (e.g., `ftms_flax_neg.sqlite`).
+
+### `R/`
+
+Contains the R source files (`.R`) that define the package functions and core implementation.
+
+### `vignettes/`
+
+Contains Quarto (`.qmd`) files that document the workflow and provide reproducible examples.
+
+In this workflow, the working directory is set to the project root:
+
+RDynLib_SQL/
+
+# Required packages
+
+```{r}
+library(here)
+library(Spectra)
+library(DBI)
+library(dplyr)
+library(RSQLite)
+library(CompoundDb)
+library(devtools)
+
+#` Uploading RDynLibSQL: Load all functions of the RDynlib directory
+load_all()
+
+register(SerialParam())
+
+```
+
+# Load databases
+Loading the sql database of flax ftms negative
+
+```{r}
+dbf <- here("data", "ftms_flax_neg.sqlite")
+con_flax <- dbConnect(RSQLite::SQLite(), dbf)
+```
+
+Loading the sql database of Dynlib qtof negative
+
+```{r}
+dbf <- here("data", "DyLib_FTMS_neg_or.sqlite")
+con_dyL <- dbConnect(RSQLite::SQLite(), dbf)
+```
+
+```{r}
+dbListTables(con_flax)
+```
+
+```{r}
+dbListTables(con_dyL)
+```
+
+# Merge databases
+```{r}
+# Create new database
+dbf <- here("data", "DYL_FLAX_FTMSneg.sqlite")
+con_merged <- dbConnect(RSQLite::SQLite(), dbf)
+
+# merge
+merge_databases(
+  main_db   = here("data","DyLib_FTMS_neg_or.sqlite"),
+  add_db    = here("data","ftms_flax_neg.sqlite"),
+  output_db = here("data","DYL_FLAX_FTMSneg.sqlite")
+)
+
+
+```
+
+# Check merging
+```{r}
+dbListTables(con_merged)
+```
+
+```{r}
+dbGetQuery(con_merged, "PRAGMA table_info(msms_spectrum);")
+dbGetQuery(con_merged, "PRAGMA table_info(ms_compound);")
+```
+
+### Ensuring the experiment table has been well merged
+
+```{r}
+dbReadTable(con_merged, "experiment")
+```
+
+```{r}
+dbGetQuery(con_merged, "Select * from experiment where user = 'ament'")
+```
+
+The new experiment has 266 as expid
+
+### Ensuring the ms_compound has been well merged
+
+```{r}
+dbGetQuery(con_dyL, "
+  SELECT * FROM ms_compound
+  ORDER BY CAST(compound_id AS INTEGER) DESC
+  LIMIT 10
+")
+
+```
+
+The highest compound_id is 100911 in the Dynlib database
+
+```{r}
+dbGetQuery(con_merged, "Select * from ms_compound where expid = 266 LIMIT 10")
+```
+
+the query results show that the compound_id of the added experiment
+"266" start by 100912 which is correct
+
+### Ensuring the msms_spectrum table has been well merged
+
+```{r}
+dbGetQuery(con_dyL, "
+  SELECT * FROM msms_spectrum
+  ORDER BY CAST(spectrum_id AS INTEGER) DESC
+  LIMIT 10
+")
+```
+
+The highest spectrum_id is 201034 in the Dynlib database
+
+```{r}
+dbGetQuery(con_merged, "Select * from msms_spectrum where compound_id = 100912 Limit 10")
+```
+
+the query results show that the spectrum_id of the added experiment
+"266" start by 201035 which is correct
+
+### Ensuring the msms_spectrum_peak table has been well merged
+
+```{r}
+dbGetQuery(con_merged, "Select * from msms_spectrum_peak where spectrum_id = 201035")
+```
+
+### Ensuring the feature_matrix table has been well merged
+
+```{r}
+dbReadTable(con_merged, "feature_matrix")
+```
+
+```{r}
+dbGetQuery(con_merged, "Select * from feature_matrix where expid = 266 LIMIT 10")
+```
+
+# Converting the merged sql connection to a compdb object
+
+```{r}
+cdb <- CompDb(con_merged)
+cdb
+```
+
+```{r}
+compounds(cdb) |> head()
+```
+
+```{r}
+sp <- Spectra(cdb)
+```
+
+```{r}
+spectraData(sp, columns = c("msLevel", "compound_id", "nodename", "rtime", "retention_time", "spectrum_type"))
+```
+
+# Load the similarity table between flax and Dynlib ftms negative data
+We need the similarity output between the
+existing database and the new experiment that we added. The object was called `ftms_matches`, and generated
+in this quarto document: \
+[FTMS_neg_call.qmd](https://github.com/rebdau/RDynLib/blob/dev_Ahlam/Similarity/FTMS/FTMS_neg_call.qmd).
+We load the object here.
+
+```{r}
+load(here("data/database_FTMS_neg","ftms_matches.RData"))
+print(ftms_matches)
+```
+
+
+# Add automatically generated names of matching compounds to the merged experiment in compoundDb
+
+connect to the database:
+```{r}
+dbf <- here("data", "DYL_FLAX_FTMSneg.sqlite")
+con_merged <- dbConnect(RSQLite::SQLite(), dbf)
+```
+
+
+```{r}
+adding_Names_SQL(db,  spectrum_type = "individual", msLevel = 2, compound_id = NULL,
+    overwrite = FALSE )
+```
+
+```{r}
+dbGetQuery(con_merged, "Select * from ms_compound where expid = 266 and name IS NOT NULL")
+```
+
+# Disonnect databases
+```{r}
+dbDisconnect(con_flax)
+dbDisconnect(con_dyL)
+dbDisconnect(con_merged)
+```
+

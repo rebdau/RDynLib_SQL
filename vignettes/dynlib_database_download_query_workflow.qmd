@@ -25,6 +25,7 @@ library(devtools)
 library(DBI)
 library(RSQLite)
 library(here)
+library(RDynLib)
 # TODO: Replace with library(RDynLib) once the package is finalized.
 load_all()
 ```
